@@ -8,3 +8,9 @@ gateseeker-report*.json
 
 # Fixture projects intentionally contain a fake node_modules directory and dotenv files.
 !fixtures/projects/*/node_modules/
+
+# Playwright
+.e2e-tmp/
+playwright-report/
+test-results/
+ui/dist/

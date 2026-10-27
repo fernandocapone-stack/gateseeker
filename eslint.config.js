@@ -3,7 +3,8 @@ import js from "@eslint/js";
 import tseslint from "typescript-eslint";
 
 export default tseslint.config(
-  { ignores: ["dist/**", "coverage/**", "node_modules/**", "fixtures/**"] },
+  // ui/ is a separate Vite + React package with its own tsconfig; it is type-checked by its build.
+  { ignores: ["dist/**", "coverage/**", "node_modules/**", "fixtures/**", "ui/**", ".e2e-tmp/**", "playwright-report/**", "test-results/**"] },
   js.configs.recommended,
   ...tseslint.configs.strictTypeChecked,
   ...tseslint.configs.stylisticTypeChecked,
@@ -31,7 +32,7 @@ export default tseslint.config(
     },
   },
   {
-    files: ["eslint.config.js", "vitest.config.ts"],
+    files: ["eslint.config.js", "vitest.config.ts", "e2e/start.mjs"],
     extends: [tseslint.configs.disableTypeChecked],
   },
 );

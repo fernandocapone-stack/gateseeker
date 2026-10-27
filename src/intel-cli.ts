@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { spawn } from "node:child_process";
 import { readdir, readFile, stat, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -21,6 +22,7 @@ Usage:
   gateseeker-intel collect  [--root <dir>] [--dry-run] [--summary-file <file>] [--max-age-days <n>] [--max-proposals <n>]
   gateseeker-intel validate [--root <dir>]
   gateseeker-intel build    [--root <dir>] [--out <file>]
+  gateseeker-intel ui       [--root <dir>] [--port <n>] [--no-open] [--no-merge-intel]
 
 --root defaults to the repository checkout containing this build.
 `;
@@ -87,6 +89,12 @@ export async function main(argv: string[], io: Io): Promise<number> {
         "summary-file": { type: "string" },
         "max-age-days": { type: "string" },
         "max-proposals": { type: "string" },
+        port: { type: "string" },
+        "no-open": { type: "boolean" },
+        "no-merge-intel": { type: "boolean" },
+        // Undocumented: fixed session token and UI directory for end-to-end tests.
+        token: { type: "string" },
+        "ui-dist": { type: "string" },
         help: { type: "boolean", short: "h" },
       },
     });
@@ -123,7 +131,11 @@ export async function main(argv: string[], io: Io): Promise<number> {
       }
       const approved = records
         .filter((r) => r.advisory.status === "approved")
-        .map((r) => r.advisory)
+        .map((r) => {
+          const rest: Advisory = { ...r.advisory };
+          delete rest.draft;
+          return rest;
+        })
         .sort((a, b) => a.id.localeCompare(b.id));
       const out = resolve(values.out ?? join(root, "dist", "advisories.json"));
       await writeFile(out, `${JSON.stringify(approved, null, 2)}\n`, "utf8");
@@ -149,9 +161,44 @@ export async function main(argv: string[], io: Io): Promise<number> {
       else io.stdout(`${result.written.length} proposal file(s) written; state updated.\n`);
       return 0;
     }
+    case "ui": {
+      const port = values.port !== undefined ? Number(values.port) : 0;
+      if (!Number.isInteger(port) || port < 0 || port > 65535) {
+        io.stderr("--port must be an integer between 0 and 65535.\n");
+        return 3;
+      }
+      const { createUiServer } = await import("./intel/ui/server.js");
+      const ui = createUiServer({
+        root,
+        mergeIntel: values["no-merge-intel"] !== true,
+        ...(values.token !== undefined ? { token: values.token } : {}),
+        ...(values["ui-dist"] !== undefined ? { uiDist: resolve(values["ui-dist"]) } : {}),
+      });
+      await new Promise<void>((resolveListen) => ui.server.listen(port, "127.0.0.1", resolveListen));
+      const addr = ui.server.address();
+      const actualPort = addr !== null && typeof addr !== "string" ? addr.port : port;
+      const url = `http://127.0.0.1:${actualPort}/?token=${ui.token}`;
+      io.stdout(`Gateseeker triage interface: ${url}\n(Only this machine can reach it. Press Ctrl+C to stop.)\n`);
+      if (values["no-open"] !== true) openBrowser(url);
+      await new Promise<void>(() => {
+        /* run until interrupted */
+      });
+      return 0;
+    }
     default:
       io.stderr(`Unknown command "${command}".\n\n${USAGE}`);
       return 3;
+  }
+}
+
+function openBrowser(url: string): void {
+  // Fixed commands with the URL as a single argument; nothing is interpolated into a shell.
+  const [cmd, args] =
+    process.platform === "win32" ? ["rundll32", ["url.dll,FileProtocolHandler", url]] : process.platform === "darwin" ? ["open", [url]] : ["xdg-open", [url]];
+  try {
+    spawn(cmd, args, { stdio: "ignore", detached: true }).unref();
+  } catch {
+    /* the URL is printed anyway */
   }
 }
 

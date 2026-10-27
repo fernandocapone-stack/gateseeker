@@ -1,4 +1,4 @@
-# Threat model (after Sprint 2a)
+# Threat model (after Sprint 2a-UI)
 
 Gateseeker processes attacker-controlled input (any project's files and lockfile), data from an external service (OSV), and prints results into a terminal and a file. This document lists what we protect, who might attack, where, how we mitigate, and which test proves each mitigation.
 
@@ -75,14 +75,25 @@ Residual: Gateseeker trusts TLS and OSV itself.
 | Third-party text or credentials pasted into a record | Text limits on `summary`/`notes`, credential-pattern rejection over the whole record, review guidance in `advisories/README.md`. | `intel.test.ts` "credential-looking token in notes", "summary over 300 chars" |
 | The workflow token is abused | Write permissions only in the `Intel feed` workflow, scoped to contents and pull requests; the main CI stays read-only; nothing merges automatically. | By construction (`.github/workflows/intel.yml`) |
 
-### 6. Output
+### 6. Local triage interface
+
+| Threat | Mitigation | Test |
+|---|---|---|
+| Another process or site on the machine drives the triage API | Server binds to 127.0.0.1 only; every `/api/*` call needs the per-session token the CLI prints; the UI removes the token from the URL after reading it; CSP `connect-src 'self'`. | `ui-server.test.ts` "requires the session token"; e2e "the page refuses to work without the session token" |
+| Path traversal through the static file server | Paths normalized and confined to `ui/dist`; anything outside is refused. | `ui-server.test.ts` "does not serve files outside the UI directory" |
+| The interface is tricked into running destructive git commands | Allowlisted runner (`add`, `commit`, `push`, `fetch`, `merge --no-edit`, read-only queries); force/hard/delete/amend/no-verify flags refused before execution. | `ui-server.test.ts` "git allowlist" |
+| A client bypasses the approval rules | The server re-validates every decision with the same Zod schema as CI (two publishers or a primary source, text limits, credential patterns); the id comes from the pending record on disk; drafts are stripped. | `ui-server.test.ts` approve/reject tests; e2e approval test |
+| Decisions without an accountable reviewer | Reviewer is read from git `user.name`; approve/reject are refused when it is missing. | `ui-server.test.ts` "refuses to approve when git has no user.name" |
+| Embedded source page attacks the interface | The source is shown in a sandboxed iframe (`allow-scripts allow-same-origin` on the remote origin only), with `referrerpolicy=no-referrer`; the app itself never reads from it. | By construction (`ReviewForm.tsx`) |
+
+### 7. Output
 
 | Threat | Mitigation | Test |
 |---|---|---|
 | Package name, advisory summary or code snippet containing ANSI escapes or newlines spoofs a `GATE: PASS` line | `sanitize()` strips C0/C1 controls, DEL, U+2028/2029 and collapses newlines before any untrusted string is printed; values are truncated. | `cli.test.ts` "strips control characters", "renders an untrusted summary without letting it break lines" |
 | Attacker-controlled URL in `ref:` or in an advisory source is auto-opened | Nothing is opened; URLs are printed as text only. | By construction |
 
-### 7. Language and interpretation
+### 8. Language and interpretation
 
 | Threat | Mitigation | Test |
 |---|---|---|

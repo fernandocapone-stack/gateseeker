@@ -6,6 +6,7 @@ Read `docs/SPRINT_0.md` (current scope) and `docs/PRODUCT.md` (direction) before
 
 - `pnpm check` runs lint, typecheck, tests and build. Run it before declaring any task done.
 - `pnpm test` runs Vitest. Tests must never reach the network: inject `fetch` into `OsvClient` or use the local HTTP server pattern in `tests/cli.test.ts`.
+- `pnpm test:e2e` runs Playwright against the triage interface (needs `pnpm build` first and `pnpm exec playwright install chromium` once).
 - `pnpm dev scan <lockfile>` runs the CLI from source.
 
 ## Non-negotiable rules
@@ -29,6 +30,9 @@ src/parser/    package-lock.json parsing and limits
 src/intel/     OSV client and schema
 src/rules/     CVSS scoring, severity tier, priority table, finding builder
 src/patterns/  directory walker, file classifier, gitignore matcher, rule engine, rules/ (one file per GSK rule)
+src/intel/     OSV client, advisory schema + loader/matcher, feed/ (RSS parser, collector), ui/ (local triage server, git allowlist)
+ui/            separate Vite + React + Tailwind package (shadcn-style components) served by `gateseeker-intel ui`; built into ui/dist
+e2e/           Playwright tests for the triage interface (webServer: e2e/start.mjs builds a throwaway repo)
 src/report/    text renderer
 src/scan.ts    orchestration and verdict
 src/cli.ts     argument parsing and exit codes

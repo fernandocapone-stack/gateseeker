@@ -1,6 +1,8 @@
 # Gateseeker — Sprint 2a-UI: interface de triagem do feed
 
-> Status: **proposta, aguardando aprovação do PO**. Antecipada em relação ao roadmap (a interface web estava na Sprint 3) porque a triagem por edição de JSON em pull request não serve ao revisor que o produto tem.
+> Status: **implementada em 2026-10-27** (aprovada pelo PO no mesmo dia: código primeiro com shadcn, PO ajusta o design depois; leitura das pendências também da branch de intel aberta; Playwright como dependência de desenvolvimento). Pendente: a medição de tempo da triagem pelo PO (`docs/VALIDATION_SPRINT_2A_UI.md`) e a captura de tela no README, que dependem do PO usar a interface.
+>
+> Desvios registrados: os componentes shadcn foram escritos à mão seguindo as convenções do projeto (pasta `components/ui`, `cn()`, variantes com `class-variance-authority`) em vez de gerados pelo CLI do shadcn, para não depender de um passo interativo; o PO pode substituí-los pelos oficiais. O contador "decisões ainda não enviadas" depende de um remoto configurado. Antecipada em relação ao roadmap (a interface web estava na Sprint 3) porque a triagem por edição de JSON em pull request não serve ao revisor que o produto tem.
 > Última atualização: 2026-10-27
 
 Você é o Software Engineer responsável pelo Gateseeker. O stakeholder, Product Owner, Product Designer e auditor é o usuário humano, **que não é desenvolvedor**. As regras de trabalho, a stack e os controles de segurança das sprints anteriores continuam valendo.

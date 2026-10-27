@@ -101,7 +101,21 @@ Official vulnerability databases miss a class of incident: a package whose exist
 - `pnpm build` compiles `advisories/approved/` into `dist/advisories.json`; `gateseeker scan` matches every npm dependency against it and reports hits as `supply-chain-anomaly` findings with the record's severity, sources and reviewer. Packagist records are stored and validated; they will match once the `composer.lock` parser lands (Sprint 2b).
 - Approved records are offered upstream to OSV/GHSA following [docs/UPSTREAM.md](docs/UPSTREAM.md). Advisory data is CC-BY-4.0.
 
-Maintainer commands: `gateseeker-intel collect | validate | build`.
+Maintainer commands: `gateseeker-intel collect | validate | build | ui`.
+
+### Reviewing proposals without touching JSON
+
+```bash
+pnpm build
+```
+
+```bash
+node dist/intel-cli.js ui
+```
+
+opens a local triage interface in the browser (127.0.0.1 only, with a per-session token in the address). It merges the newest open `intel/*` branch into the current one, lists pending proposals in plain language, shows the original source beside the form, and offers **Aprovar**, **Rejeitar com motivo** and **Deixar para depois**. Each decision validates the record against the schema, records the git user as reviewer, moves the file to `advisories/approved/` or `advisories/rejected/`, and makes one local commit; **Enviar para o GitHub** pushes when the batch is done. Approving requires two sources from distinct publishers or one primary source, exactly like the CI check. Engineering can pre-fill a `draft` block that the reviewer confirms field by field; drafts are never read by the scanner and are removed on decision.
+
+The interface lives in `ui/` (Vite, React, Tailwind, shadcn-style components) and is served by the `gateseeker-intel ui` command from `src/intel/ui/`. It only runs `git add`, `commit`, `push`, `fetch` and `merge --no-edit`; everything else is refused.
 
 ## Code-pattern rules
 

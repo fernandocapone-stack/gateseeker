@@ -1,4 +1,4 @@
-# Architecture (after Sprint 2a)
+# Architecture (after Sprint 2a-UI)
 
 ## Data flow
 
@@ -38,7 +38,10 @@ The only runtime dependency is Zod. HTTP uses Node's global `fetch`; argument pa
 | `intel/advisories.ts` | Load the advisory set (explicit path, bundled `dist/advisories.json`, or checkout directory), keep `approved` only, match npm dependencies by exact version or range, build `supply-chain-anomaly` findings. | Download at runtime, match non-npm ecosystems (until the Composer parser exists). |
 | `intel/feed/rss.ts` | Minimal RSS/Atom parser: refuses DOCTYPE/ENTITY, bounded regexes, keeps title/link/date only. | General XML. |
 | `intel/feed/collect.ts` | Fetch configured feeds through an injected `fetch` (https only, size and time limits, no cross-host redirects), filter by keywords, extract package candidates lexically, deduplicate against committed state, write `proposed` records. | Decide anything; call a model. |
-| `intel-cli.ts` | `gateseeker-intel collect / validate / build` for maintainers and the scheduled workflow. | Run during a user's scan. |
+| `intel-cli.ts` | `gateseeker-intel collect / validate / build / ui` for maintainers and the scheduled workflow. | Run during a user's scan. |
+| `intel/ui/server.ts` | Local triage server (127.0.0.1, per-session token): serves `ui/dist`, lists records, applies approve/reject/save with schema validation, reviewer stamping, file moves and one commit per decision; optional merge of the newest `origin/intel/*` branch at start. | Listen on other interfaces, accept requests without the token, edit approved records. |
+| `intel/ui/git.ts` | Allowlisted git runner: `add`, `commit`, `push`, `fetch`, `merge --no-edit`, read-only `config`/`rev-parse`/`rev-list`/`branch`/`log`/`status`; forbids force, hard, delete, amend, no-verify. | Any other git command. |
+| `ui/` (separate package) | React + Vite + Tailwind interface with shadcn-style components: pending list, review form in plain language with the source beside it, history, push. | Talk to anything but the local API. |
 | `rules/cvss.ts` | CVSS 3.0/3.1 base score from a vector string. | Score CVSS 2 or 4. |
 | `rules/severity.ts` | Severity tier: max CVSS 3.x score → tier; else declared rating; else UNKNOWN. | Guess from free text. |
 | `rules/priority.ts` | The priority table and modifiers, shared by both finding kinds. Returns priority plus rule ids applied. | Anything beyond the table. |
@@ -71,7 +74,8 @@ The workflow is the only one with write permissions and uses the repository's ow
 3. **OSV → client.** Schema validation (malformed response is a failed query), timeout, pagination cap, summaries and references treated as untrusted text.
 4. **Public feeds → collector.** Feed bodies are attacker-influenceable text. Controls: allow-listed `https` sources only, 2 MB and 10 s limits, no cross-host redirects, parser refuses DOCTYPE/ENTITY, only title/link/date retained, titles sanitized, output is a `proposed` record that a human must act on.
 5. **Advisory records → scanner.** Records are data in the repository, reviewed in PRs and validated by schema in CI and at load time; credential-looking tokens are rejected; only `approved` records match.
-6. **Report → terminal / file.** `sanitize()` removes control characters and newlines, truncates long values. Secrets never appear in full in any output; tests assert this for the JSON report and the terminal text.
+6. **Browser → triage server.** Only 127.0.0.1; every API call needs the session token printed by the CLI (the page strips it from the address bar); CSP and nosniff headers; static files are confined to `ui/dist`; request bodies capped at 512 KB; the record id in a decision is taken from the server-side pending record, not from the client; approve/reject refuse to run when git has no `user.name`.
+7. **Report → terminal / file.** `sanitize()` removes control characters and newlines, truncates long values. Secrets never appear in full in any output; tests assert this for the JSON report and the terminal text.
 
 ## Query states and the verdict
 

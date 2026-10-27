@@ -65,6 +65,8 @@ export const advisorySchema = z
       notes: z.string().max(500).nullable(),
     }),
     upstream: z.strictObject({ osv: z.string().nullable(), ghsa: z.string().nullable() }),
+    /** Pre-filled suggestions for the reviewer; never read by the scanner, removed on approve/reject. */
+    draft: z.looseObject({}).optional(),
   })
   .superRefine((a, ctx) => {
     if (a.status === "approved" || a.status === "rejected" || a.status === "withdrawn") {
