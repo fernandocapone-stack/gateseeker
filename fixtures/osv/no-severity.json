@@ -1,0 +1,33 @@
+{
+  "vulns": [
+    {
+      "id": "GSK-TEST-0001",
+      "summary": "Synthetic test record without severity",
+      "aliases": [],
+      "affected": [
+        {
+          "package": {
+            "name": "example-pkg",
+            "ecosystem": "npm"
+          },
+          "ranges": [
+            {
+              "type": "SEMVER",
+              "events": [
+                {
+                  "introduced": "0"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "references": [
+        {
+          "type": "WEB",
+          "url": "https://example.invalid/advisory"
+        }
+      ]
+    }
+  ]
+}

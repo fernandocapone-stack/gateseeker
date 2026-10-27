@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        # Version is read from "packageManager" in package.json.
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - run: pnpm test
+      - run: pnpm build
+
+      # Smoke test of the built CLI with offline-safe expectations:
+      # a v1 lockfile must be rejected with exit code 3 before any network call.
+      - name: CLI rejects unsupported lockfile (exit 3)
+        run: |
+          set +e
+          node dist/cli.js scan fixtures/lockfiles/v1.package-lock.json
+          code=$?
+          set -e
+          test "$code" -eq 3

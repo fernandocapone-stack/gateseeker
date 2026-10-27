@@ -1,0 +1,22 @@
+# pnpm settings (pnpm >= 11 reads these here, not from .npmrc).
+# Gateseeker analyzes untrusted lockfiles, so its own install must never run
+# dependency scripts. esbuild ships its binary via optionalDependencies; the
+# install script is only a fallback and is denied.
+ignoreScripts: true
+engineStrict: true
+allowBuilds:
+  esbuild: false
+# Added automatically by pnpm's minimum-release-age policy for versions
+# published less than the default threshold before install.
+minimumReleaseAgeExclude:
+  - '@typescript-eslint/eslint-plugin@8.72.1'
+  - '@typescript-eslint/parser@8.72.1'
+  - '@typescript-eslint/project-service@8.72.1'
+  - '@typescript-eslint/scope-manager@8.72.1'
+  - '@typescript-eslint/tsconfig-utils@8.72.1'
+  - '@typescript-eslint/type-utils@8.72.1'
+  - '@typescript-eslint/types@8.72.1'
+  - '@typescript-eslint/typescript-estree@8.72.1'
+  - '@typescript-eslint/utils@8.72.1'
+  - '@typescript-eslint/visitor-keys@8.72.1'
+  - typescript-eslint@8.72.1
