@@ -7,10 +7,11 @@
 
 **Gateseeker.** Mantido.
 
-- Verificado em 2026-10-27: `gateseeker`, `@gateseeker/cli` e `gate-seeker` livres no npm. Nenhum produto, startup ou projeto de software com esse nome encontrado em busca web. O usuário `gateseeker` no GitHub existe (criado em 2026-01-08, sem repositórios e sem perfil); assumimos que é reserva do próprio PO. Confirmar.
-- Registrar antes da Sprint 1: pacote npm `gateseeker`, organização GitHub, domínio `.dev` ou `.io`. Marca no INPI só quando houver receita.
+- Verificado em 2026-10-27: `gateseeker`, `@gateseeker/cli` e `gate-seeker` livres no npm. Nenhum produto, startup ou projeto de software com esse nome encontrado em busca web.
+- O usuário `gateseeker` no GitHub existe (criado em 2026-01-08, sem repositórios) e **não pertence ao PO**. O repositório vive em `fernandocapone-stack/gateseeker`. Se uma organização for criada, precisará de outro handle (ex.: `gateseeker-dev`, `gateseeker-app`).
+- Registrar antes do lançamento público: pacote npm `gateseeker`, domínio `.dev` ou `.io`. Marca no INPI só quando houver receita.
 
-**O que o nome não faz sozinho:** ele não explica o produto. "Seeker" soa passivo (quem procura), e o produto é ativo (quem barra). A tagline e o branding fazem esse trabalho e **ainda serão trabalhados pelo PO**. Até lá, o repositório usa uma descrição funcional provisória:
+**O que o nome não faz sozinho:** ele não explica o produto. "Seeker" soa passivo (quem procura), e o produto é ativo (quem barra). A tagline e o branding fazem esse trabalho e **serão trabalhados pelo PO em paralelo, sem bloquear as sprints** (decisão de 2026-10-27). Até lá, o repositório usa uma descrição funcional provisória:
 
 > *Security gate for AI-generated code.* (provisória, não é a tagline final)
 
@@ -75,7 +76,7 @@ Camadas separadas e nunca misturadas: **dados da fonte** → **conclusões por r
 | **0** | CLI `gateseeker scan` para `package-lock.json` (v2/v3) com consulta OSV, priorização contextual P1–P4, relatório JSON, exit codes de portão, threat model, CI. | Conseguimos construir o núcleo de forma verificável e honesta. Base técnica para tudo o que vem depois. |
 | **1** | Primeiro conjunto de `insecure-pattern` para stacks de vibe coding (segredos em código de cliente, Supabase RLS, variáveis `NEXT_PUBLIC_` sensíveis, CORS aberto). Saída em terminal legível por humano. | Devs de Lovable/Bolt/Cursor acham os achados úteis e acionáveis. Testar com 5 projetos reais. |
 | **2** | `composer.lock` + Packagist/OSV. Sinais de supply chain: dependência apontando para commit/tag em vez de versão publicada, `autoload.files` novo em pacote conhecido, install scripts. | O público PHP responde à história Laravel-Lang. |
-| **3** | GitHub Action oficial com gate configurável. Interface web mínima para ler relatórios e histórico. | Alguém paga por histórico, times e política de portão. |
+| **3** | GitHub Action oficial com gate configurável. Interface web mínima para ler relatórios e histórico, construída sobre shadcn/ui (ou equivalente headless + Tailwind) como base de componentes, decisão do PO em 2026-10-27. | Alguém paga por histórico, times e política de portão. |
 
 Fora de qualquer sprint até validação: autenticação, multiusuário, banco de dados, explicações geradas por IA, correção automática.
 
