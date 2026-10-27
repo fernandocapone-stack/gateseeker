@@ -1,3 +1,4 @@
+/* global process */
 // Prepares a throwaway git repository with two proposed records, then starts
 // the triage server against it. Used as Playwright's webServer command so the
 // repository exists before the server (Playwright starts the server first).
