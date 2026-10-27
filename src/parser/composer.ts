@@ -85,7 +85,8 @@ function classify(pkg: ComposerPackage): { version: string | null; status: Versi
   if (pkg.source?.type === "path" || pkg.dist?.type === "path" || (distUrl !== undefined && !REGISTRY_DIST.test(distUrl))) {
     return { version: normalized, status: "non-registry" };
   }
-  if (!isStrictSemver(normalized)) return { version: null, status: "non-semver" };
+  // Composer accepts 2- to 4-part numeric versions ("2.0", "9.18.1.10"); registries index them as written.
+  if (!isStrictSemver(normalized) && !/^\d+(\.\d+){1,3}(-[0-9A-Za-z.-]+)?$/.test(normalized)) return { version: null, status: "non-semver" };
   return { version: normalized, status: "ok" };
 }
 

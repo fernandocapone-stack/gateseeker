@@ -143,6 +143,25 @@ describe("structural supply-chain rules", () => {
     expect(diffBaseline(current, baseline)).toEqual({ packagesCompared: 3, added: [], removed: [], changed: ["laravel-lang/attributes", "laravel-lang/lang"] });
   });
 
+  it("does not treat a moving dev-* branch as a rewritten tag, and rates new bootstrap code in a version bump as MODERATE", () => {
+    const mk = (version: string, reference: string, files: string[] = []) =>
+      JSON.stringify({ packages: [{ name: "acme/core", version, source: { type: "git", url: "https://github.com/acme/core.git", reference }, dist: { type: "zip", url: `https://api.github.com/repos/acme/core/zipball/${reference}` }, autoload: files.length ? { files } : {}, time: "2026-01-01T00:00:00+00:00" }], "packages-dev": [] });
+    const snap = (lock: string) => {
+      const p = parseComposerLock(lock, null);
+      if (!p.ok) throw new Error(p.error.message);
+      return snapshotFromComposer(p.lockfile, "x", lock);
+    };
+    // Branch version: commit moves with every push; that is GSK-SC-001's business, not a rewrite.
+    const branch = runSupplyChainRules(snap(mk("dev-main", "bbb")), snap(mk("dev-main", "aaa")), opts);
+    expect(ids(branch)).toEqual(["GSK-SC-001 acme/core@dev-main P3"]);
+    // Version bump adding a bootstrap file: MODERATE, not HIGH.
+    const bump = runSupplyChainRules(snap(mk("2.0.0", "bbb", ["src/helpers.php"])), snap(mk("1.9.0", "aaa")), opts);
+    expect(bump.map((f) => `${f.evidence.kind === "supply-chain-anomaly" ? f.evidence.ruleId : ""} ${f.severity.tier}`)).toEqual(["GSK-SC-002 MODERATE"]);
+    // Same version adding a bootstrap file stays HIGH (and SC-003 fires for the commit change).
+    const same = runSupplyChainRules(snap(mk("2.0.0", "bbb", ["src/helpers.php"])), snap(mk("2.0.0", "aaa")), opts);
+    expect(same.map((f) => `${f.evidence.kind === "supply-chain-anomaly" ? f.evidence.ruleId : ""} ${f.severity.tier}`).sort()).toEqual(["GSK-SC-002 HIGH", "GSK-SC-003 CRITICAL"]);
+  });
+
   it("stays silent on an ordinary update and ignores new packages' autoload files", () => {
     const current = composerSnap("composer/normal-update/after.composer.lock");
     const baseline = composerSnap("composer/normal-update/before.composer.lock");

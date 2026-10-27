@@ -46,7 +46,8 @@ describe("parseComposerLock", () => {
     expect(normalizeComposerVersion("dev-main")).toBe("dev-main");
     const lock = JSON.stringify({ packages: [{ name: "a/b", version: "1.2.3.4", dist: { type: "zip", url: "https://api.github.com/repos/a/b/zipball/x" } }, { name: "c/d", version: "2.0.x-dev", dist: { type: "zip", url: "https://api.github.com/repos/c/d/zipball/y" } }] });
     const lf = ok(lock, null);
-    expect(lf.dependencies.map((d) => [d.name, d.versionStatus])).toEqual([["a/b", "non-semver"], ["c/d", "non-semver"]]);
+    // Four-part numeric versions are valid Composer versions and are queried as written; branch aliases are not.
+    expect(lf.dependencies.map((d) => [d.name, d.versionStatus])).toEqual([["a/b", "ok"], ["c/d", "non-semver"]]);
     expect(lf.warnings[0]).toMatch(/composer.json not found/);
   });
 

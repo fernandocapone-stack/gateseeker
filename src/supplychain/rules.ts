@@ -88,7 +88,8 @@ function matchesFor(current: LockSnapshot, baseline: LockSnapshot | null, opts: 
     if (!cur || !base) continue;
 
     // GSK-SC-003: same version, different commit/integrity: the signature of a rewritten tag.
-    if (cur.version === base.version && cur.reference && base.reference && cur.reference !== base.reference) {
+    // Branch "versions" (dev-main, 1.x-dev) move with every commit by design; GSK-SC-001 covers those.
+    if (cur.version === base.version && !cur.pinnedToCommit && !base.pinnedToCommit && cur.reference && base.reference && cur.reference !== base.reference) {
       out.push({
         ruleId: "GSK-SC-003",
         title: "Same version now resolves to different content",
@@ -105,12 +106,15 @@ function matchesFor(current: LockSnapshot, baseline: LockSnapshot | null, opts: 
     const newAutoload = cur.autoloadFiles.filter((f) => !base.autoloadFiles.includes(f));
     const newScripts = cur.installScripts.filter((s) => !base.installScripts.includes(s));
     if (newAutoload.length > 0 || newScripts.length > 0) {
+      // Same version with new install-time code is the tag-rewrite pattern (HIGH); a version
+      // bump that adds bootstrap code is usually a legitimate release and only deserves a look (MODERATE).
+      const sameVersion = cur.version === base.version;
       out.push({
         ruleId: "GSK-SC-002",
         title: "New install-time code in an existing dependency",
-        severity: "HIGH",
+        severity: sameVersion ? "HIGH" : "MODERATE",
         pkg: cur,
-        summary: `${name} gained ${[newAutoload.length > 0 ? `autoload files (${newAutoload.join(", ")})` : "", newScripts.length > 0 ? `install scripts (${newScripts.join(", ")})` : ""].filter(Boolean).join(" and ")} compared with the baseline. Code that runs at install or bootstrap is the preferred vehicle for credential stealers.`,
+        summary: `${name} gained ${[newAutoload.length > 0 ? `autoload files (${newAutoload.join(", ")})` : "", newScripts.length > 0 ? `install scripts (${newScripts.join(", ")})` : ""].filter(Boolean).join(" and ")} ${sameVersion ? "without a version change" : `between ${base.version} and ${cur.version}`}. Code that runs at install or bootstrap is the preferred vehicle for credential stealers${sameVersion ? "" : "; in a normal release it still deserves a look"}.`,
         indicators: [...newAutoload.map((f) => `autoload.files + ${f}`), ...newScripts.map((s) => `script + ${s}`)],
         action: "Read the added file or script in the package's repository before installing; if it is not explained by the changelog, treat the release as suspicious and pin the baseline version.",
         details: { fromVersion: base.version, toVersion: cur.version, newAutoloadFiles: newAutoload.join(","), newInstallScripts: newScripts.join(",") },

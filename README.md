@@ -127,6 +127,8 @@ node dist/cli.js scan . --baseline /tmp/base.lock
 
 Gateseeker never runs git itself. The report prints the hashes of both lockfiles.
 
+A dependency pinned to a branch (`dev-main`) cannot be looked up in any registry, so it is reported as not queried and the run ends `incomplete` until it is pinned to a release; the same rule that keeps a failed query from counting as clean applies here.
+
 ## Curated advisory feed
 
 Official vulnerability databases miss a class of incident: a package whose existing tags or versions are rewritten with malicious code, with no new version number and no CVE. Five months after the Laravel-Lang Composer compromise of May 2026, OSV still had no record of it. Gateseeker keeps its own curated set of such incidents under [advisories/](advisories/README.md):
