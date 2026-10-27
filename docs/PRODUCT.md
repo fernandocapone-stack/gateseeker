@@ -96,6 +96,7 @@ Fora de qualquer sprint até validação: autenticação, multiusuário, banco d
 | Risco | Mitigação |
 |---|---|
 | Aikido ou Snyk lançam "modo vibe coder" grátis. | Velocidade e foco. Eles têm centenas de clientes enterprise para atender; nós temos um público. |
+| Projetos open source de nicho já miram Supabase/Lovable (observado em 2026-10-27: supashield 104★, VibeRaven 61★, database-sentinel 50★, vibe-scanner 23★, checklist vibe-coding-security 15★). Nenhum combina dependências + padrões de código + feed curado + gate em CI, e a maioria é só RLS. | Diferenciação pela amplitude integrada e pela priorização explicável; acompanhar esses projetos a cada sprint e considerar contribuição ou interoperabilidade em vez de competição direta onde fizer sentido. |
 | Os checks de `insecure-pattern` geram falsos positivos e o dev desinstala. | Cada regra nasce com fixture positiva e negativa. Regra sem teste não entra. Regras começam em modo aviso, não bloqueio. |
 | OSV indisponível ou lento. | Timeout, concorrência limitada, cache por execução, e veredito "incompleto" que nunca vira "passou". |
 | Feed curado gera ruído ou registro errado a partir de um post exagerado. | Triagem humana obrigatória antes de qualquer registro virar achado; dedup por pacote e janela; cada registro cita a fonte e a data. |
