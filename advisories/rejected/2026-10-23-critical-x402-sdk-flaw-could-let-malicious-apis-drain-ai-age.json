@@ -1,6 +1,6 @@
 {
   "id": "GSK-ADV-2026-0009",
-  "status": "proposed",
+  "status": "rejected",
   "type": "other",
   "severity": "HIGH",
   "ecosystem": "other",
@@ -28,9 +28,9 @@
   "review": {
     "proposed_by": "collector",
     "proposed_at": "2026-10-27T18:03:52.375Z",
-    "reviewed_by": null,
-    "reviewed_at": null,
-    "notes": null
+    "reviewed_by": "fernandocapone-stack",
+    "reviewed_at": "2026-10-27T21:30:00Z",
+    "notes": "Rejected 2026-10-27: a vulnerability in an SDK, not a supply-chain compromise; the path for it is CVE/OSV, not this feed. Source not readable by automated fetch (HTTP 403)."
   },
   "upstream": {
     "osv": null,

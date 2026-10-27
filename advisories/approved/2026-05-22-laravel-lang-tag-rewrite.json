@@ -1,16 +1,55 @@
 {
   "id": "GSK-ADV-2026-0001",
-  "status": "proposed",
+  "status": "approved",
   "type": "tag-rewrite",
   "severity": "CRITICAL",
   "ecosystem": "Packagist",
   "packages": [
-    { "name": "laravel-lang/lang", "affected": { "tags": ["*"], "commits_after": "2026-05-22T22:32:00Z", "fixed_in": null } },
-    { "name": "laravel-lang/attributes", "affected": { "tags": ["*"], "commits_after": "2026-05-22T22:32:00Z", "fixed_in": null } },
-    { "name": "laravel-lang/http-statuses", "affected": { "tags": ["*"], "commits_after": "2026-05-22T22:32:00Z", "fixed_in": null } },
-    { "name": "laravel-lang/actions", "affected": { "tags": ["*"], "commits_after": "2026-05-22T22:32:00Z", "fixed_in": null } }
+    {
+      "name": "laravel-lang/lang",
+      "affected": {
+        "tags": [
+          "*"
+        ],
+        "commits_after": "2026-05-22T22:32:00Z",
+        "fixed_in": null
+      }
+    },
+    {
+      "name": "laravel-lang/attributes",
+      "affected": {
+        "tags": [
+          "*"
+        ],
+        "commits_after": "2026-05-22T22:32:00Z",
+        "fixed_in": null
+      }
+    },
+    {
+      "name": "laravel-lang/http-statuses",
+      "affected": {
+        "tags": [
+          "*"
+        ],
+        "commits_after": "2026-05-22T22:32:00Z",
+        "fixed_in": null
+      }
+    },
+    {
+      "name": "laravel-lang/actions",
+      "affected": {
+        "tags": [
+          "*"
+        ],
+        "commits_after": "2026-05-22T22:32:00Z",
+        "fixed_in": null
+      }
+    }
   ],
-  "window": { "start": "2026-05-22T22:32:00Z", "end": null },
+  "window": {
+    "start": "2026-05-22T22:32:00Z",
+    "end": null
+  },
   "indicators": [
     "Existing git tags force-pushed to new commits instead of new versions being published",
     "composer.json autoload.files gains src/helpers.php, executed on require vendor/autoload.php",
@@ -35,9 +74,12 @@
   "review": {
     "proposed_by": "fernandocapone-stack (engineering, Sprint 2a)",
     "proposed_at": "2026-10-27T18:00:00Z",
-    "reviewed_by": null,
-    "reviewed_at": null,
-    "notes": "Inaugural record. OSV had no entry for any of the four packages on 2026-10-27. Aikido lists three packages, StepSecurity four; the four are recorded. Awaiting PO review: confirm against the laravel-lang repositories, then set status to approved, fill reviewed_by/reviewed_at and move to advisories/approved/."
+    "reviewed_by": "fernandocapone-stack",
+    "reviewed_at": "2026-10-27T21:30:00Z",
+    "notes": "Approved by the PO on 2026-10-27 after checking both sources. Repository state today: tags point to normal October commits, composer.json autoload has no helpers.php, no advisory published by the org, OSV still empty. Matching rule for Sprint 2b: lock reference committed after 2026-05-22T22:32Z and not equal to the tag's current commit."
   },
-  "upstream": { "osv": null, "ghsa": null }
+  "upstream": {
+    "osv": null,
+    "ghsa": null
+  }
 }

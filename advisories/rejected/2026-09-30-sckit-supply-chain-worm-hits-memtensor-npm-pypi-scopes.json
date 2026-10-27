@@ -1,6 +1,6 @@
 {
   "id": "GSK-ADV-2026-0006",
-  "status": "proposed",
+  "status": "rejected",
   "type": "other",
   "severity": "HIGH",
   "ecosystem": "npm",
@@ -28,12 +28,12 @@
   "review": {
     "proposed_by": "collector",
     "proposed_at": "2026-10-27T18:03:52.375Z",
-    "reviewed_by": null,
-    "reviewed_at": null,
-    "notes": null
+    "reviewed_by": "fernandocapone-stack",
+    "reviewed_at": "2026-10-27T21:30:00Z",
+    "notes": "Rejected 2026-10-27: @memtensor/memos-cloud-openclaw-plugin 0.1.21/0.1.23/0.1.25 and MemoryOS 2.0.34 are covered by OSV MAL-2026-16476 and MAL-2026-16475 (published 2026-09-23)."
   },
   "upstream": {
-    "osv": null,
-    "ghsa": null
+    "osv": "MAL-2026-16476",
+    "ghsa": "GHSA-mhjf-v53x-7p87"
   }
 }

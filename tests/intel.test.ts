@@ -20,14 +20,15 @@ function clone<T>(x: T): T {
 }
 
 describe("advisory schema", () => {
-  it("accepts the synthetic approved and proposed records and the inaugural Laravel-Lang proposal", async () => {
+  it("accepts the synthetic approved and proposed records and the approved Laravel-Lang record", async () => {
     expect(validateAdvisory(APPROVED).ok).toBe(true);
     expect(validateAdvisory(PROPOSED).ok).toBe(true);
-    const laravel = JSON.parse(await readFile(join(fixturePath(".."), "advisories", "proposed", "2026-05-22-laravel-lang-tag-rewrite.json"), "utf8")) as unknown;
+    const laravel = JSON.parse(await readFile(join(fixturePath(".."), "advisories", "approved", "2026-05-22-laravel-lang-tag-rewrite.json"), "utf8")) as unknown;
     const v = validateAdvisory(laravel);
     expect(v.ok, JSON.stringify(v)).toBe(true);
     if (v.ok) {
-      expect(v.advisory.status).toBe("proposed");
+      expect(v.advisory.status).toBe("approved");
+      expect(v.advisory.review.reviewed_by).toBe("fernandocapone-stack");
       expect(v.advisory.packages.map((p) => p.name)).toEqual(["laravel-lang/lang", "laravel-lang/attributes", "laravel-lang/http-statuses", "laravel-lang/actions"]);
     }
   });

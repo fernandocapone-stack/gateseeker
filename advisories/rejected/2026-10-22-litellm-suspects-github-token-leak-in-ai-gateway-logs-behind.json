@@ -1,6 +1,6 @@
 {
   "id": "GSK-ADV-2026-0010",
-  "status": "proposed",
+  "status": "rejected",
   "type": "other",
   "severity": "HIGH",
   "ecosystem": "other",
@@ -28,12 +28,12 @@
   "review": {
     "proposed_by": "collector",
     "proposed_at": "2026-10-27T18:03:52.375Z",
-    "reviewed_by": null,
-    "reviewed_at": null,
-    "notes": null
+    "reviewed_by": "fernandocapone-stack",
+    "reviewed_at": "2026-10-27T21:30:00Z",
+    "notes": "Rejected 2026-10-27: same litellm 1.107.0 incident as GSK-ADV-2026-0002, covered by OSV. Source not readable by automated fetch (HTTP 403)."
   },
   "upstream": {
-    "osv": null,
+    "osv": "MAL-2026-2144",
     "ghsa": null
   }
 }

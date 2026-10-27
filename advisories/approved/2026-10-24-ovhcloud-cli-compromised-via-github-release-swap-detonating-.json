@@ -1,0 +1,59 @@
+{
+  "id": "GSK-ADV-2026-0003",
+  "status": "approved",
+  "type": "other",
+  "severity": "CRITICAL",
+  "ecosystem": "other",
+  "packages": [
+    {
+      "name": "ovh/ovhcloud-cli (GitHub release binaries)",
+      "affected": {
+        "versions": [
+          "0.11.0",
+          "0.12.0",
+          "0.13.0",
+          "0.14.0",
+          "0.15.0"
+        ],
+        "fixed_in": "0.16.0"
+      }
+    }
+  ],
+  "window": {
+    "start": "2026-10-19T12:47:00Z",
+    "end": "2026-10-19T14:21:00Z"
+  },
+  "indicators": [
+    "Release assets of five existing GitHub releases replaced; source, tags and CI unchanged",
+    "Malicious build reports `ovhcloud version` as undefined with commit 5ead8ef",
+    "Leaves /tmp/envchecker-* directories on the host"
+  ],
+  "summary": "Binaries attached to five existing GitHub releases of the OVHcloud CLI (v0.11.0 to v0.15.0) were swapped for a credential stealer for about 94 minutes on 2026-10-19; source code and tags were untouched, so no registry advisory exists.",
+  "remediation": "If an ovhcloud binary was downloaded from GitHub releases between 12:47 and 14:21 UTC on 2026-10-19, treat the host as compromised: rotate every secret it could read from another machine, delete the binary and /tmp/envchecker-*, reinstall v0.16.0 and verify it with gh release verify-asset. Audit CI jobs that fetched those assets in the window.",
+  "sources": [
+    {
+      "url": "https://www.stepsecurity.io/blog/ovhcloud-cli-github-release-swap-glassworm",
+      "publisher": "StepSecurity",
+      "title": "OVHcloud CLI Compromised via GitHub Release Swap: Detonating the Real GlassWorm Loader and What We Found",
+      "published_at": "2026-10-24"
+    },
+    {
+      "url": "https://github.com/ovh/ovhcloud-cli/releases/tag/v0.16.0",
+      "publisher": "OVHcloud (GitHub releases)",
+      "title": "ovhcloud-cli v0.16.0 release",
+      "published_at": "2026-10-19",
+      "primary": true
+    }
+  ],
+  "review": {
+    "proposed_by": "collector",
+    "proposed_at": "2026-10-27T18:03:52.375Z",
+    "reviewed_by": "fernandocapone-stack",
+    "reviewed_at": "2026-10-27T21:30:00Z",
+    "notes": "Approved by the PO on 2026-10-27. Not a package-registry incident, so OSV will never carry it; this record exists for that reason. Homebrew, go install and Docker were not exposed."
+  },
+  "upstream": {
+    "osv": null,
+    "ghsa": null
+  }
+}

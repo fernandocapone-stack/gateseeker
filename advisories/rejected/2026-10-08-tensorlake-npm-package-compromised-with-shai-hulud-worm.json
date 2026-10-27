@@ -1,6 +1,6 @@
 {
   "id": "GSK-ADV-2026-0007",
-  "status": "proposed",
+  "status": "rejected",
   "type": "other",
   "severity": "HIGH",
   "ecosystem": "npm",
@@ -28,12 +28,12 @@
   "review": {
     "proposed_by": "collector",
     "proposed_at": "2026-10-27T18:03:52.375Z",
-    "reviewed_by": null,
-    "reviewed_at": null,
-    "notes": null
+    "reviewed_by": "fernandocapone-stack",
+    "reviewed_at": "2026-10-27T21:30:00Z",
+    "notes": "Rejected 2026-10-27: duplicate of GSK-ADV-2026-0005 (tensorlake@0.5.144), covered by OSV MAL-2026-17650."
   },
   "upstream": {
-    "osv": null,
-    "ghsa": null
+    "osv": "MAL-2026-17650",
+    "ghsa": "GHSA-rqxj-g25x-4v9v"
   }
 }
