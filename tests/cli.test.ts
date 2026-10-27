@@ -167,7 +167,7 @@ describe("gateseeker scan (CLI)", () => {
 
     const g = capture();
     expect(await main(["--version"], g.io)).toBe(EXIT.pass);
-    expect(g.stdout()).toMatch(/^\d+\.\d+\.\d+\n$/);
+    expect(g.stdout()).toMatch(/^\d+\.\d+\.\d+(-[0-9A-Za-z.]+)?\n$/);
   });
 });
 

@@ -9,6 +9,55 @@ permissions:
   contents: read
 
 jobs:
+  dogfood:
+    # The Action itself, run from this checkout, on the two fixture projects.
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      pull-requests: write
+      security-events: write
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Clean fixture must pass with everything gated
+        id: clean
+        uses: ./
+        with:
+          path: fixtures/projects/clean-vite
+          patterns: gate
+          supply-chain: gate
+          local-build: "true"
+          comment: "false"
+          sarif: "false"
+          output-dir: .gateseeker-clean
+
+      - name: Vibe fixture must fail (expected)
+        id: vibe
+        uses: ./
+        continue-on-error: true
+        with:
+          path: fixtures/projects/vibe-next-supabase
+          patterns: gate
+          supply-chain: gate
+          local-build: "true"
+          comment: "false"
+          output-dir: .gateseeker-vibe
+
+      - name: Check the two verdicts
+        env:
+          CLEAN: ${{ steps.clean.outputs.verdict }}
+          VIBE: ${{ steps.vibe.outputs.verdict }}
+          VIBE_OUTCOME: ${{ steps.vibe.outcome }}
+          VIBE_P1: ${{ steps.vibe.outputs.p1 }}
+        run: |
+          set -euo pipefail
+          echo "clean=$CLEAN vibe=$VIBE ($VIBE_OUTCOME) p1=$VIBE_P1"
+          test "$CLEAN" = "pass"
+          test "$VIBE" = "fail"
+          test "$VIBE_OUTCOME" = "failure"
+          test "$VIBE_P1" -gt 0
+
   check:
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -31,6 +80,19 @@ jobs:
       - run: pnpm build
       - name: Validate advisory records
         run: node dist/intel-cli.js validate
+
+      - name: Verify package contents
+        run: |
+          set -euo pipefail
+          npm pack --dry-run --json > /tmp/pack.json
+          node -e '
+            const files = require("/tmp/pack.json")[0].files.map((f) => f.path);
+            const bad = files.filter((f) => /^(fixtures|tests|e2e|src|docs|advisories\/(approved|proposed|rejected|\.state))\//.test(f) || /\.test\./.test(f));
+            if (bad.length) { console.error("unexpected files in package:", bad); process.exit(1); }
+            const must = ["dist/cli.js", "dist/intel-cli.js", "dist/action-cli.js", "dist/advisories.json", "action.yml", "README.md", "LICENSE", "advisories/LICENSE"];
+            for (const m of must) if (!files.includes(m)) { console.error("missing from package:", m); process.exit(1); }
+            console.log(files.length, "files ok");
+          '
 
       - name: Install Playwright browser
         run: pnpm exec playwright install --with-deps chromium

@@ -1,4 +1,4 @@
-# Architecture (after Sprint 2b)
+# Architecture (after Sprint 3)
 
 ## Data flow
 
@@ -60,6 +60,10 @@ The only runtime dependency is Zod. HTTP uses Node's global `fetch`; argument pa
 | `patterns/redact.ts` | Secret redaction (first 4 chars + length), dotenv value hiding, entropy, placeholder detection. | Store values. |
 | `scan.ts` | Orchestrate `scan()` (lockfile only) and `scanDirectory()` (patterns + optional deps); produce `QueryRecord`s, summary, verdict. | File or network I/O of its own beyond reading the root lockfile. |
 | `report/text.ts` | Human-readable output; strips control characters from every untrusted string. | Colour, interactivity. |
+| `report/sarif.ts` | SARIF 2.1.0: one result per finding, levels by priority, stable fingerprints, file:line for patterns and the lockfile for the rest. | Upload (the Action does that). |
+| `report/summary.ts` | Markdown for the job summary and the sticky PR comment; untrusted strings escaped, table capped at 20 rows. | Links built from project data. |
+| `action/run.ts`, `action/github.ts`, `action-cli.ts` | The GitHub Action runner: reads `INPUT_*`, fetches the baseline lockfile from the base branch with `git show` (the only git call in the product, inside the user's workflow), runs `scanDirectory`, writes report/SARIF/summary/outputs, upserts the sticky comment, maps the verdict to the exit code. | Anything the CLI does not. |
+| `action.yml` | Composite action: setup-node, pinned `npx --package=gateseeker@<version> gateseeker-action` (or a local build for this repository), base-branch fetch, SARIF upload. | Third-party actions beyond checkout/setup-node/codeql upload. |
 | `cli.ts` | Arguments, path type detection, report writing, exit code. | Business logic. |
 
 ## Curated advisory flow
@@ -83,7 +87,8 @@ The workflow is the only one with write permissions and uses the repository's ow
 6. **Public feeds → collector.** Feed bodies are attacker-influenceable text. Controls: allow-listed `https` sources only, 2 MB and 10 s limits, no cross-host redirects, parser refuses DOCTYPE/ENTITY, only title/link/date retained, titles sanitized, output is a `proposed` record that a human must act on.
 7. **Advisory records → scanner.** Records are data in the repository, reviewed in PRs and validated by schema in CI and at load time; credential-looking tokens are rejected; only `approved` records match.
 8. **Browser → triage server.** Only 127.0.0.1; every API call needs the session token printed by the CLI (the page strips it from the address bar); CSP and nosniff headers; static files are confined to `ui/dist`; request bodies capped at 512 KB; the record id in a decision is taken from the server-side pending record, not from the client; approve/reject refuse to run when git has no `user.name`.
-9. **Report → terminal / file.** `sanitize()` removes control characters and newlines, truncates long values. Secrets never appear in full in any output; tests assert this for the JSON report and the terminal text.
+9. **User workflow → Action.** Inputs are untrusted strings: enumerations are validated, numbers parsed, paths resolved under the workspace; the baseline is read with `git show` of a ref the user named and written into the output directory; the comment body is Markdown-escaped; failures to comment or upload never change the verdict.
+10. **Report → terminal / file.** `sanitize()` removes control characters and newlines, truncates long values. Secrets never appear in full in any output; tests assert this for the JSON report and the terminal text.
 
 ## Query states and the verdict
 

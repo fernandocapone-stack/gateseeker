@@ -6,6 +6,47 @@ Gateseeker points at a project directory, checks the code for the security mista
 
 **Status after Sprint 2b:** npm (`package-lock.json` v2/v3) and Composer (`composer.lock`) dependencies checked against OSV **and** a curated, human-approved advisory feed, with tag-rewrite verification against Packagist; structural supply-chain rules that compare a lockfile with a baseline; eight code-pattern rules for JavaScript/TypeScript projects. CLI only. See [docs/PRODUCT.md](docs/PRODUCT.md) for direction and `docs/SPRINT_*.md` for the scope this code implements.
 
+## Use in GitHub Actions
+
+```yaml
+- uses: fernandocapone-stack/gateseeker@v1
+```
+
+That single step, after your checkout, runs the scanner on every pull request: known vulnerabilities for npm and Composer, curated supply-chain advisories, structural lockfile signals (compared with the base branch automatically), and code-pattern rules. It writes a job summary, keeps one sticky comment on the pull request up to date (needs `pull-requests: write`), uploads SARIF to code scanning (needs `security-events: write`), and fails the job when the gate fails. An incomplete analysis fails too, by design; set `allow-incomplete: true` to accept that risk.
+
+```yaml
+permissions:
+  contents: read
+  pull-requests: write
+  security-events: write
+
+steps:
+  - uses: actions/checkout@v7
+  - uses: fernandocapone-stack/gateseeker@v1
+    with:
+      fail-on: P2          # P1 | P2 | P3 | P4
+      patterns: warn       # warn | gate
+      supply-chain: warn   # warn | gate
+```
+
+| Input | Default | Meaning |
+|---|---|---|
+| `path` | `.` | Project directory. |
+| `fail-on` | `P2` | Lowest priority that fails the gate. |
+| `patterns`, `supply-chain` | `warn` | `gate` makes those rules count towards the verdict. |
+| `only` | | `deps` or `patterns`. |
+| `baseline-ref` | base branch on PRs | Ref holding the previous lockfile; empty disables the comparison. |
+| `allow-incomplete` | `false` | Do not fail the job on an incomplete analysis. |
+| `comment` | `true` | Sticky summary comment on the pull request. |
+| `sarif` | `true` | Upload findings to code scanning. |
+| `advisories` | | Local curated advisory set. |
+| `output-dir` | `.gateseeker` | Where `report.json`, `gateseeker.sarif` and the baseline copy go. |
+| `version` | pinned | npm version of the scanner the action runs. |
+
+Outputs: `verdict`, `findings`, `p1`..`p4`, `report`, `sarif`.
+
+The Action is the only part of Gateseeker that runs git (to read the base branch's lockfile inside your own workflow); the scanner never does.
+
 ## Requirements
 
 - Node.js 24 or later
@@ -40,7 +81,9 @@ gateseeker scan <project-dir | package-lock.json | composer.lock> [options]
   composer.lock at its root, the dependency analysis. A lockfile path runs
   dependencies only.
 
-  --format <text|json>      Output format (default: text)
+  --format <text|json|sarif|summary>
+                            Output format (default: text). sarif: SARIF 2.1.0 for
+                            code scanning; summary: Markdown for job summaries.
   --output <file>           Also write the JSON report to <file>
   --fail-on <P1|P2|P3|P4>   Priority threshold for a failing gate (default: P2)
   --only <deps|patterns>    Run a single analysis (directory scans only)

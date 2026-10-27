@@ -1,0 +1,78 @@
+name: Release
+
+# Publishes the npm package with provenance and creates the GitHub release.
+# Triggered only by a version tag pushed by a maintainer. Requires npm trusted
+# publishing to be configured for this repository and workflow (docs/RELEASE.md);
+# no npm token is stored in the repository.
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+  id-token: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+          registry-url: "https://registry.npmjs.org"
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm check
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm test:e2e
+
+      - name: Tag must match package.json version
+        run: |
+          set -euo pipefail
+          PKG="$(node -p "require('./package.json').version")"
+          TAG="${GITHUB_REF_NAME#v}"
+          if [ "$PKG" != "$TAG" ]; then echo "package.json is $PKG but tag is $TAG"; exit 1; fi
+
+      - name: Verify package contents
+        run: |
+          set -euo pipefail
+          npm pack --dry-run --json > /tmp/pack.json
+          node -e '
+            const files = require("/tmp/pack.json")[0].files.map((f) => f.path);
+            const bad = files.filter((f) => /^(fixtures|tests|e2e|src|docs|advisories\/(approved|proposed|rejected|\.state))\//.test(f) || /\.test\./.test(f));
+            if (bad.length) { console.error("unexpected files in package:", bad); process.exit(1); }
+            const must = ["dist/cli.js", "dist/intel-cli.js", "dist/action-cli.js", "dist/advisories.json", "action.yml", "README.md", "LICENSE", "advisories/LICENSE"];
+            for (const m of must) if (!files.includes(m)) { console.error("missing from package:", m); process.exit(1); }
+            console.log(files.length, "files ok");
+          '
+
+      - name: Publish to npm with provenance
+        run: pnpm publish --no-git-checks --access public --provenance
+        env:
+          NODE_AUTH_TOKEN: ""
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          PRERELEASE=""
+          case "$GITHUB_REF_NAME" in *-*) PRERELEASE="--prerelease";; esac
+          gh release create "$GITHUB_REF_NAME" --generate-notes $PRERELEASE --title "$GITHUB_REF_NAME"
+
+      - name: Move the floating major tag
+        run: |
+          set -euo pipefail
+          MAJOR="v${GITHUB_REF_NAME#v}"; MAJOR="${MAJOR%%.*}"
+          git config user.name "gateseeker-release[bot]"
+          git config user.email "gateseeker-release@users.noreply.github.com"
+          git tag -f "$MAJOR" "$GITHUB_REF_NAME"
+          git push -f origin "$MAJOR"

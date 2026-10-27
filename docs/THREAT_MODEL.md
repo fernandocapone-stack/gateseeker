@@ -1,4 +1,4 @@
-# Threat model (after Sprint 2b)
+# Threat model (after Sprint 3)
 
 Gateseeker processes attacker-controlled input (any project's files and lockfile), data from an external service (OSV), and prints results into a terminal and a file. This document lists what we protect, who might attack, where, how we mitigate, and which test proves each mitigation.
 
@@ -96,14 +96,25 @@ Residual: Gateseeker trusts TLS and OSV itself.
 | Decisions without an accountable reviewer | Reviewer is read from git `user.name`; approve/reject are refused when it is missing. | `ui-server.test.ts` "refuses to approve when git has no user.name" |
 | Embedded source page attacks the interface | The source is shown in a sandboxed iframe (`allow-scripts allow-same-origin` on the remote origin only), with `referrerpolicy=no-referrer`; the app itself never reads from it. | By construction (`ReviewForm.tsx`) |
 
-### 8. Output
+### 8. GitHub Action and publication
+
+| Threat | Mitigation | Test |
+|---|---|---|
+| The Action runs a scanner version other than the one released with it | `action.yml` pins the npm version; `release.yml` refuses a tag that does not match `package.json`; the floating major tag only moves on release. | By construction; release workflow check |
+| Published package carries fixtures, tests or feed data | `files` allow-list in `package.json`; CI and the release workflow run `npm pack --dry-run` and fail on unexpected paths. | CI step "Verify package contents" |
+| Package tampered between build and registry | npm provenance (OIDC) on every publish; consumers verify with `npm audit signatures`. | By construction (`publishConfig.provenance`) |
+| Crafted Action inputs | Enumerations validated, numbers parsed, path resolved under the workspace; the only git call is `git show <ref>:<lockfile>` with the ref the user configured. | `action.test.ts` (invalid path → exit 3) |
+| Summary comment used to inject Markdown or links from project data | Untrusted strings sanitized and Markdown-escaped; no links built from project data; comment and upload failures only warn. | `action.test.ts` summary escaping; "warns instead of failing when the comment cannot be posted" |
+| Incomplete analysis silently passes in CI | Exit code 2 fails the job unless `allow-incomplete` is set, and the summary says so in both cases. | `action.test.ts` "incomplete fails by default and passes with allow-incomplete" |
+
+### 9. Output
 
 | Threat | Mitigation | Test |
 |---|---|---|
 | Package name, advisory summary or code snippet containing ANSI escapes or newlines spoofs a `GATE: PASS` line | `sanitize()` strips C0/C1 controls, DEL, U+2028/2029 and collapses newlines before any untrusted string is printed; values are truncated. | `cli.test.ts` "strips control characters", "renders an untrusted summary without letting it break lines" |
 | Attacker-controlled URL in `ref:` or in an advisory source is auto-opened | Nothing is opened; URLs are printed as text only. | By construction |
 
-### 9. Language and interpretation
+### 10. Language and interpretation
 
 | Threat | Mitigation | Test |
 |---|---|---|

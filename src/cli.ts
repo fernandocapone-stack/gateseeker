@@ -5,6 +5,8 @@ import { parseArgs } from "node:util";
 import { loadAdvisories } from "./intel/advisories.js";
 import { DEFAULT_PARSER_LIMITS } from "./parser/lockfile.js";
 import { DEFAULT_WALK_LIMITS } from "./patterns/walker.js";
+import { renderSarif } from "./report/sarif.js";
+import { renderSummary } from "./report/summary.js";
 import { renderText } from "./report/text.js";
 import { PRIORITIES } from "./rules/priority.js";
 import { scan, scanDirectory, type ScanResult } from "./scan.js";
@@ -28,7 +30,9 @@ Usage: gateseeker scan <project-dir | package-lock.json | composer.lock> [option
   dependencies only.
 
 Options:
-  --format <text|json>      Output format (default: text)
+  --format <text|json|sarif|summary>
+                            Output format (default: text). sarif: SARIF 2.1.0 for
+                            code scanning; summary: Markdown for job summaries.
   --output <file>           Also write the JSON report to <file>
   --fail-on <P1|P2|P3|P4>   Priority threshold for a failing gate (default: P2)
   --only <deps|patterns>    Run a single analysis (directory scans only)
@@ -126,7 +130,7 @@ export async function main(argv: string[], io: Io): Promise<number> {
   }
 
   try {
-    const format = oneOf(values.format, ["text", "json"] as const, "format", "text");
+    const format = oneOf(values.format, ["text", "json", "sarif", "summary"] as const, "format", "text");
     const failOn = oneOf(values["fail-on"]?.toUpperCase(), PRIORITIES, "fail-on", "P2");
     const only = values.only === undefined ? undefined : oneOf(values.only, ["deps", "patterns"] as const, "only", "deps");
     const patternsMode = oneOf(values.patterns, ["warn", "gate"] as const, "patterns", "warn");
@@ -214,7 +218,8 @@ export async function main(argv: string[], io: Io): Promise<number> {
 
     const json = JSON.stringify(result.report, null, 2);
     if (values.output !== undefined) await writeFile(resolve(values.output), `${json}\n`, "utf8");
-    io.stdout(format === "json" ? `${json}\n` : `${renderText(result.report)}\n`);
+    const rendered = format === "json" ? json : format === "sarif" ? JSON.stringify(renderSarif(result.report), null, 2) : format === "summary" ? renderSummary(result.report) : renderText(result.report);
+    io.stdout(`${rendered}\n`);
 
     return EXIT[result.report.gate.verdict];
   } catch (err) {

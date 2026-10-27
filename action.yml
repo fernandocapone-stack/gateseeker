@@ -1,0 +1,154 @@
+name: "Gateseeker"
+description: "Security gate for AI-generated code: known vulnerabilities (npm, Composer), supply-chain signals and insecure code patterns, with a configurable pass/fail gate."
+author: "Gateseeker"
+branding:
+  icon: "shield"
+  color: "purple"
+
+inputs:
+  path:
+    description: "Project directory to analyze."
+    default: "."
+  fail-on:
+    description: "Lowest priority that fails the gate: P1, P2, P3 or P4."
+    default: "P2"
+  patterns:
+    description: "Code-pattern rules: warn (report only) or gate (count towards the verdict)."
+    default: "warn"
+  supply-chain:
+    description: "Structural supply-chain rules: warn or gate. Curated advisory matches are always gated."
+    default: "warn"
+  only:
+    description: "Run a single analysis: deps or patterns. Empty runs both."
+    default: ""
+  baseline-ref:
+    description: "Git ref holding the previous lockfile for the comparison rules. Defaults to origin/<base branch> on pull requests. Empty disables the comparison."
+    default: ""
+  allow-incomplete:
+    description: "If true, an incomplete analysis (a failed or impossible query) does not fail the job. Default false: never treat an unverified dependency as clean."
+    default: "false"
+  comment:
+    description: "Post or update one sticky summary comment on the pull request (needs pull-requests: write)."
+    default: "true"
+  sarif:
+    description: "Write a SARIF file and upload it to code scanning when security-events: write is granted."
+    default: "true"
+  advisories:
+    description: "Path to a local curated advisory set (JSON) instead of the bundled one."
+    default: ""
+  output-dir:
+    description: "Where to write report.json, gateseeker.sarif and the baseline copy."
+    default: ".gateseeker"
+  version:
+    description: "gateseeker npm version to run. Pinned to the version this action was released with."
+    default: "1.0.0-beta.1"
+  local-build:
+    description: "Build and run the scanner from this action's own checkout instead of npm (used by the Gateseeker repository itself)."
+    default: "false"
+  max-size:
+    description: "Reject lockfiles larger than this many bytes."
+    default: ""
+  max-deps:
+    description: "Reject lockfiles with more packages than this."
+    default: ""
+  max-files:
+    description: "Abort directory scans with more files than this."
+    default: ""
+  max-file-size:
+    description: "Abort directory scans on a text file larger than this many bytes."
+    default: ""
+  timeout:
+    description: "Per-request timeout for OSV and Packagist, in milliseconds."
+    default: ""
+  concurrency:
+    description: "Maximum simultaneous registry requests."
+    default: ""
+
+outputs:
+  verdict:
+    description: "pass, fail or incomplete."
+    value: ${{ steps.scan.outputs.verdict }}
+  findings:
+    description: "Total number of findings."
+    value: ${{ steps.scan.outputs.findings }}
+  p1:
+    description: "Findings at priority P1."
+    value: ${{ steps.scan.outputs.p1 }}
+  p2:
+    description: "Findings at priority P2."
+    value: ${{ steps.scan.outputs.p2 }}
+  p3:
+    description: "Findings at priority P3."
+    value: ${{ steps.scan.outputs.p3 }}
+  p4:
+    description: "Findings at priority P4."
+    value: ${{ steps.scan.outputs.p4 }}
+  report:
+    description: "Path of the JSON report."
+    value: ${{ steps.scan.outputs.report }}
+  sarif:
+    description: "Path of the SARIF file (empty when sarif is false)."
+    value: ${{ steps.scan.outputs.sarif }}
+
+runs:
+  using: "composite"
+  steps:
+    - uses: actions/setup-node@v7
+      with:
+        node-version: "24"
+
+    - name: Prepare scanner
+      id: prepare
+      shell: bash
+      env:
+        ACTION_PATH: ${{ github.action_path }}
+        LOCAL_BUILD: ${{ inputs.local-build }}
+        VERSION: ${{ inputs.version }}
+      run: |
+        set -euo pipefail
+        if [ "$LOCAL_BUILD" = "true" ]; then
+          npm install -g pnpm@12 >/dev/null 2>&1
+          (cd "$ACTION_PATH" && pnpm install --frozen-lockfile >/dev/null && pnpm exec tsc -p tsconfig.build.json && node dist/intel-cli.js build >/dev/null)
+          echo "bin=node $ACTION_PATH/dist/action-cli.js" >> "$GITHUB_OUTPUT"
+        else
+          echo "bin=npx --yes --package=gateseeker@${VERSION} gateseeker-action" >> "$GITHUB_OUTPUT"
+        fi
+
+    - name: Fetch base branch for the baseline lockfile
+      if: ${{ github.event_name == 'pull_request' && inputs.baseline-ref == '' }}
+      shell: bash
+      env:
+        BASE_REF: ${{ github.base_ref }}
+      run: git fetch --no-tags --depth=1 origin "+refs/heads/${BASE_REF}:refs/remotes/origin/${BASE_REF}" || true
+
+    - name: Scan
+      id: scan
+      shell: bash
+      env:
+        INPUT_PATH: ${{ inputs.path }}
+        INPUT_FAIL_ON: ${{ inputs.fail-on }}
+        INPUT_PATTERNS: ${{ inputs.patterns }}
+        INPUT_SUPPLY_CHAIN: ${{ inputs.supply-chain }}
+        INPUT_ONLY: ${{ inputs.only }}
+        INPUT_BASELINE_REF: ${{ inputs.baseline-ref }}
+        INPUT_ALLOW_INCOMPLETE: ${{ inputs.allow-incomplete }}
+        INPUT_COMMENT: ${{ inputs.comment }}
+        INPUT_SARIF: ${{ inputs.sarif }}
+        INPUT_ADVISORIES: ${{ inputs.advisories }}
+        INPUT_OUTPUT_DIR: ${{ inputs.output-dir }}
+        INPUT_MAX_SIZE: ${{ inputs.max-size }}
+        INPUT_MAX_DEPS: ${{ inputs.max-deps }}
+        INPUT_MAX_FILES: ${{ inputs.max-files }}
+        INPUT_MAX_FILE_SIZE: ${{ inputs.max-file-size }}
+        INPUT_TIMEOUT: ${{ inputs.timeout }}
+        INPUT_CONCURRENCY: ${{ inputs.concurrency }}
+        GITHUB_TOKEN: ${{ github.token }}
+      run: ${{ steps.prepare.outputs.bin }}
+
+    - name: Upload SARIF to code scanning
+      if: ${{ always() && inputs.sarif == 'true' && steps.scan.outputs.sarif != '' }}
+      uses: github/codeql-action/upload-sarif@v3
+      continue-on-error: true
+      with:
+        sarif_file: ${{ steps.scan.outputs.sarif }}
+        category: gateseeker

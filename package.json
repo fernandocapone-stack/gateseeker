@@ -1,6 +1,6 @@
 {
   "name": "gateseeker",
-  "version": "0.1.0",
+  "version": "1.0.0-beta.1",
   "description": "Security gate for AI-generated code. Sprint 0: npm lockfile analysis against OSV with deterministic prioritization.",
   "license": "MIT",
   "type": "module",
@@ -10,12 +10,14 @@
   "packageManager": "pnpm@12.15.0",
   "bin": {
     "gateseeker": "./dist/cli.js",
-    "gateseeker-intel": "./dist/intel-cli.js"
+    "gateseeker-intel": "./dist/intel-cli.js",
+    "gateseeker-action": "./dist/action-cli.js"
   },
   "files": [
     "dist",
     "ui/dist",
     "advisories/LICENSE",
+    "action.yml",
     "README.md",
     "LICENSE"
   ],
@@ -41,5 +43,24 @@
     "typescript": "5.9.3",
     "typescript-eslint": "8.72.1",
     "vitest": "5.0.5"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/fernandocapone-stack/gateseeker.git"
+  },
+  "homepage": "https://github.com/fernandocapone-stack/gateseeker#readme",
+  "keywords": [
+    "security",
+    "supply-chain",
+    "sca",
+    "osv",
+    "composer",
+    "npm",
+    "github-action",
+    "vibe-coding"
+  ],
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
   }
 }
