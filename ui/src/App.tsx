@@ -50,13 +50,9 @@ export function App() {
   return (
     <div className="mx-auto max-w-7xl px-4 py-6 md:px-8">
       <header className="mb-6 flex flex-wrap items-center justify-between gap-3 border-b pb-4">
-        <div>
+        <div className="flex items-center gap-3">
+          <span aria-hidden="true" className="inline-block size-7 shrink-0 rounded-sm border border-primary-stroke bg-primary shadow-solid-sm [--shadow-color:var(--primary-stroke)]" />
           <h1 className="text-xl font-semibold tracking-tight">Gateseeker · Triagem de advisories</h1>
-          <p className="text-sm text-muted-foreground">
-            Revisor: <strong>{state?.gitUser ?? "—"}</strong>
-            {state?.branch && <> · branch <code className="rounded bg-muted px-1">{state.branch}</code></>}
-            {state?.mergedIntelBranch && <> · lote <code className="rounded bg-muted px-1">{state.mergedIntelBranch.replace("origin/", "")}</code> incorporado</>}
-          </p>
         </div>
         <div className="flex items-center gap-2">
           {state && state.unpushed > 0 && <Badge variant="moderate">{state.unpushed} decisão(ões) ainda não enviada(s)</Badge>}
@@ -66,9 +62,9 @@ export function App() {
         </div>
       </header>
 
-      {error && <div className="mb-4 rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm">{error}</div>}
+      {error && <div className="mb-4 rounded-md border border-destructive/60 bg-destructive/15 p-3 text-sm">{error}</div>}
       {notice && (
-        <div className="mb-4 flex items-center justify-between rounded-md border bg-muted p-3 text-sm">
+        <div className="mb-4 flex items-center justify-between rounded-md border border-primary/50 bg-primary/10 p-3 text-sm">
           <span>{notice}</span>
           <Button variant="ghost" size="sm" onClick={() => setNotice(null)}>
             fechar
@@ -76,7 +72,7 @@ export function App() {
         </div>
       )}
       {state && state.warnings.length > 0 && (
-        <details className="mb-4 rounded-md border p-3 text-sm">
+        <details className="mb-4 rounded-md border bg-card p-3 text-sm">
           <summary className="cursor-pointer">{state.warnings.length} aviso(s) do repositório</summary>
           <ul className="mt-2 list-disc pl-5 text-muted-foreground">
             {state.warnings.map((w, i) => (
@@ -110,7 +106,7 @@ export function App() {
                 key={key}
                 type="button"
                 onClick={() => setTab(key)}
-                className={`-mb-px border-b-2 px-3 py-2 text-sm ${tab === key ? "border-primary font-medium" : "border-transparent text-muted-foreground hover:text-foreground"}`}
+                className={`-mb-px border-b-2 px-3 py-2 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${tab === key ? "border-primary font-medium text-foreground" : "border-transparent text-muted-foreground hover:border-border-strong hover:text-foreground"}`}
                 aria-current={tab === key ? "page" : undefined}
               >
                 {label}

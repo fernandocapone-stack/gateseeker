@@ -6,7 +6,7 @@ import { severityVariant } from "./PendingList";
 
 export function History({ records, kind }: { records: UiRecord[]; kind: "approved" | "rejected" }) {
   if (records.length === 0) {
-    return <p className="rounded-md border p-6 text-sm text-muted-foreground">{kind === "approved" ? "Nenhum registro aprovado ainda." : "Nenhum registro rejeitado ainda."}</p>;
+    return <p className="rounded-lg border border-dashed border-border-strong bg-card/50 p-6 text-sm text-muted-foreground">{kind === "approved" ? "Nenhum registro aprovado ainda." : "Nenhum registro rejeitado ainda."}</p>;
   }
   return (
     <div className="grid gap-3">
@@ -35,7 +35,7 @@ export function History({ records, kind }: { records: UiRecord[]; kind: "approve
             <ul className="list-disc pl-5 text-muted-foreground">
               {r.data.sources.map((s) => (
                 <li key={s.url}>
-                  <a className="underline" href={s.url} target="_blank" rel="noopener noreferrer">
+                  <a className="text-foreground underline decoration-border-strong hover:decoration-primary" href={s.url} target="_blank" rel="noopener noreferrer">
                     {s.publisher}: {s.title}
                   </a>{" "}
                   ({s.published_at}){s.primary ? " · fonte primária" : ""}
