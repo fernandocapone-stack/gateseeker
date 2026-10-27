@@ -1,7 +1,7 @@
 # Gateseeker — Posicionamento de produto
 
 > Status: rascunho para aprovação do PO, orienta a Sprint 0. Revisar ao fim de cada sprint.
-> Última atualização: 2026-10-27
+> Última atualização: 2026-10-27 (roadmap: Sprint 2 dividida em 2a feed de inteligência e 2b PHP/supply chain)
 
 ## 1. Nome
 
@@ -75,7 +75,8 @@ Camadas separadas e nunca misturadas: **dados da fonte** → **conclusões por r
 |---|---|---|
 | **0** | CLI `gateseeker scan` para `package-lock.json` (v2/v3) com consulta OSV, priorização contextual P1–P4, relatório JSON, exit codes de portão, threat model, CI. | Conseguimos construir o núcleo de forma verificável e honesta. Base técnica para tudo o que vem depois. |
 | **1** | Primeiro conjunto de `insecure-pattern` para stacks de vibe coding (segredos em código de cliente, Supabase RLS, variáveis `NEXT_PUBLIC_` sensíveis, CORS aberto). Saída em terminal legível por humano. | Devs de Lovable/Bolt/Cursor acham os achados úteis e acionáveis. Testar com 5 projetos reais. |
-| **2** | `composer.lock` + Packagist/OSV. Sinais de supply chain: dependência apontando para commit/tag em vez de versão publicada, `autoload.files` novo em pacote conhecido, install scripts. | O público PHP responde à história Laravel-Lang. |
+| **2a** | **Feed de inteligência curado.** Formato próprio de advisory (ecossistema, pacote, versões/tags/commits afetados, janela, indicador, fonte, data). Job agendado coleta fontes que publicam incidentes antes das bases oficiais (StepSecurity, Socket, Aikido, Phoenix, Snyk, Wiz, The Hacker News, listas do Packagist e npm), deduplica e abre PR propondo registros; humano aprova; só então o scanner consulta o feed ao lado do OSV, com `source: gateseeker-advisories`. Laravel-Lang (maio/2026) é o registro inaugural. Registros aprovados são submetidos ao OSV/GHSA. | Fontes estruturadas não cobrem ataques por reescrita de tag (OSV sem registro dos pacotes Laravel-Lang cinco meses depois, verificado em 2026-10-27). Um feed curado detecta o que `npm audit` e `composer audit` não detectam e gera conteúdo público. |
+| **2b** | `composer.lock` + Packagist/OSV + feed. Heurísticas estruturais de supply chain sem depender de notícia: referência de commit no lock divergente da tag atual na origem, `autoload.files` novo em pacote conhecido, install scripts. | O público PHP responde à história Laravel-Lang. |
 | **3** | GitHub Action oficial com gate configurável. Interface web mínima para ler relatórios e histórico, construída sobre shadcn/ui (ou equivalente headless + Tailwind) como base de componentes, decisão do PO em 2026-10-27. | Alguém paga por histórico, times e política de portão. |
 
 Fora de qualquer sprint até validação: autenticação, multiusuário, banco de dados, explicações geradas por IA, correção automática.
@@ -84,8 +85,10 @@ Fora de qualquer sprint até validação: autenticação, multiusuário, banco d
 
 - **npm primeiro, PHP depois.** As ferramentas de vibe coding geram quase só JavaScript/TypeScript. É onde o público está hoje. PHP é a segunda aposta, não a primeira, apesar de ter sido a inspiração.
 - **CLI primeiro, web depois.** Interface web na Sprint 0 adicionaria Next.js e Playwright sem validar nada. O público-alvo vive no terminal e no CI.
-- **OSV como única fonte de CVE.** Gratuita, oficial, com API estável. Limitação registrada: OSV não detecta pacote malicioso que reescreveu tag existente sem versão nova (caso Laravel-Lang). Isso é tratado por `supply-chain-anomaly` na Sprint 2, não por CVE.
+- **OSV como única fonte de CVE na Sprint 0.** Gratuita, oficial, com API estável. Limitação verificada: OSV não tem registro algum dos pacotes Laravel-Lang comprometidos (consulta em 2026-10-27, cinco meses após o ataque). Isso é tratado pelo feed curado (Sprint 2a) e por `supply-chain-anomaly` (Sprint 2b), não por CVE.
 - **Prioridade por regras, não por modelo.** Confiança e auditabilidade são o produto. Um LLM pode um dia *explicar* um achado; nunca vai *decidir* se ele existe ou qual é sua prioridade.
+- **Inteligência da web entra por pipeline separado, nunca na varredura (decisão do PO, 2026-10-27).** O robô coleta e propõe; um humano aprova; o scanner consome só registros aprovados, de forma determinística. Só fatos estruturados e o link da fonte são armazenados, nunca o texto dos posts. Se a extração usar um modelo de linguagem, é serviço pago e exige aprovação; a alternativa sem custo é coleta e dedup automáticas com extração manual na triagem. O pipeline roda por GitHub Action agendada, sem depender de sessão interativa.
+- **Ordem das sprints: 1 → 2a → 2b → 3.** Padrões de código gerado por IA primeiro, por ser o público maior e mais imediato; feed de inteligência antes do suporte a PHP, porque o feed é pré-requisito para a história de supply chain fazer sentido.
 - **Open core.** CLI e regras abertas (MIT ou Apache-2.0). Monetização futura em histórico, times, política de portão e suporte. Sem código aberto, ninguém do nosso público instala uma ferramenta de segurança desconhecida.
 
 ## 9. Riscos
@@ -95,11 +98,14 @@ Fora de qualquer sprint até validação: autenticação, multiusuário, banco d
 | Aikido ou Snyk lançam "modo vibe coder" grátis. | Velocidade e foco. Eles têm centenas de clientes enterprise para atender; nós temos um público. |
 | Os checks de `insecure-pattern` geram falsos positivos e o dev desinstala. | Cada regra nasce com fixture positiva e negativa. Regra sem teste não entra. Regras começam em modo aviso, não bloqueio. |
 | OSV indisponível ou lento. | Timeout, concorrência limitada, cache por execução, e veredito "incompleto" que nunca vira "passou". |
+| Feed curado gera ruído ou registro errado a partir de um post exagerado. | Triagem humana obrigatória antes de qualquer registro virar achado; dedup por pacote e janela; cada registro cita a fonte e a data. |
+| Feed cria falsa sensação de cobertura total. | A linguagem continua "nenhuma vulnerabilidade conhecida nas fontes consultadas" e cada relatório lista as fontes consultadas. |
 | Ninguém paga. | Open core valida uso antes de validar receita. Métrica da Sprint 1 é instalação e retenção, não dinheiro. |
 
 ## 10. Métricas de validação
 
 - Sprint 0: critérios de aceite técnicos (ver `docs/SPRINT_0.md`).
 - Sprint 1: 5 projetos reais de vibe coding analisados; pelo menos 3 devs dizem que corrigiriam algo apontado.
-- Sprint 2: 50 instalações orgânicas via npm; 1 relato de supply chain detectado em projeto real.
+- Sprint 2a: pipeline rodando sozinho por 4 semanas; ao menos 5 registros aprovados além do Laravel-Lang; ao menos 1 registro aceito upstream no OSV/GHSA.
+- Sprint 2b: 50 instalações orgânicas via npm; 1 relato de supply chain detectado em projeto real.
 - Sprint 3: 10 repositórios com a GitHub Action ativa por 30 dias.
