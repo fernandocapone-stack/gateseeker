@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 import { classifyFile, detectProjectKind } from "../src/patterns/classify.js";
 import { runRules } from "../src/patterns/engine.js";
 import { makeGitignoreMatcher } from "../src/patterns/gitignore.js";
-import { entropyBitsPerChar, looksLikePlaceholder, redactEnvLine, redactInLine, redactSecret } from "../src/patterns/redact.js";
+import { entropyBitsPerChar, looksLikePlaceholder, maskQuotedLiterals, redactEnvLine, redactInLine, redactSecret } from "../src/patterns/redact.js";
 import { RULES } from "../src/patterns/rules/index.js";
 import { SECRET_PATTERNS, decodeJwtRole } from "../src/patterns/rules/secret-hardcoded.js";
 import { isSuspiciousPublicVar } from "../src/patterns/rules/secret-public-env.js";
@@ -185,8 +185,11 @@ describe("rules on the vibe-next-supabase fixture", () => {
   it("GSK-SECRET-002 flags secret-named public vars and allows public ones", async () => {
     const { findings } = await patternFindings(VIBE);
     const f = byRule(findings, "GSK-SECRET-002");
-    expect(subjects(f)).toEqual([".env:6"]);
-    expect(f[0]?.evidence.kind === "insecure-pattern" ? f[0].evidence.snippet : "").toBe("NEXT_PUBLIC_STRIPE_SECRET_KEY=<redacted 36 chars>");
+    expect(subjects(f)).toEqual([".env:6", "lib/mailer.ts:3"]);
+    const snippets = Object.fromEntries(f.map((x) => [x.subject, x.evidence.kind === "insecure-pattern" ? x.evidence.snippet : ""]));
+    expect(snippets[".env:6"]).toBe("NEXT_PUBLIC_STRIPE_SECRET_KEY=<redacted 36 chars>");
+    // A hardcoded fallback value next to the variable is masked, the variable name stays visible.
+    expect(snippets["lib/mailer.ts:3"]).toBe("auth: { user: process.env.SMTP_USER, pass: process.env.NEXT_PUBLIC_SMTP_PASSWORD || '<redacted 29 chars>' },");
     expect(isSuspiciousPublicVar("NEXT_PUBLIC_SUPABASE_ANON_KEY")).toBe(false);
     expect(isSuspiciousPublicVar("NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY")).toBe(false);
     expect(isSuspiciousPublicVar("VITE_OPENAI_API_KEY")).toBe(true);
@@ -231,8 +234,14 @@ describe("rules on the vibe-next-supabase fixture", () => {
     // app/api/public/route.ts: suppression without reason is invalid -> still reported.
     // app/api/webhook/route.ts: suppressed with a reason -> not reported.
     expect(subjects(f)).toEqual(["app/api/public/route.ts:5", "next.config.mjs:10"]);
-    expect(f.find((x) => x.subject === "next.config.mjs:10")?.severity.tier).toBe("HIGH");
-    expect(f.find((x) => x.subject === "app/api/public/route.ts:5")?.severity.tier).toBe("MODERATE");
+    const withCreds = f.find((x) => x.subject === "next.config.mjs:10");
+    const noCreds = f.find((x) => x.subject === "app/api/public/route.ts:5");
+    expect(withCreds?.severity.tier).toBe("HIGH");
+    expect(withCreds?.priority).toBe("P1");
+    // Without credentials a wildcard is informational: LOW, P3, never gated by the default threshold.
+    expect(noCreds?.severity.tier).toBe("LOW");
+    expect(noCreds?.priority).toBe("P3");
+    expect(noCreds?.evidence.kind === "insecure-pattern" ? noCreds.evidence.message : "").toMatch(/No credentials are enabled in this file/);
     expect(summary.suppressions).toEqual([{ file: "app/api/webhook/route.ts", line: 5, ruleId: "GSK-CORS-001", reason: "public webhook, no cookies involved" }]);
     expect(summary.invalidSuppressions).toEqual([{ file: "app/api/public/route.ts", line: 4, text: "// gateseeker-ignore GSK-CORS-001" }]);
   });
@@ -260,6 +269,15 @@ describe("rules on the vibe-next-supabase fixture", () => {
       expect(json, `secret ${name} leaked`).not.toContain(value);
     }
     expect(json).toContain("sk_l…[32 chars]");
+    expect(json).not.toContain("fixture-fallback-password-123");
+  });
+
+  it("masks long quoted literals in code snippets but keeps short ones", () => {
+    expect(maskQuotedLiterals("cors({ origin: '*' })")).toBe("cors({ origin: '*' })");
+    expect(maskQuotedLiterals("const p = process.env.X || 'super-secret-value';")).toBe("const p = process.env.X || '<redacted 18 chars>';");
+    expect(maskQuotedLiterals('a("it\'s ok", "another long literal here")')).toBe('a("<redacted 7 chars>", "<redacted 25 chars>")'.replace("<redacted 7 chars>", "it's ok"));
+    expect(maskQuotedLiterals("x = `template literal value`")).toBe("x = `<redacted 22 chars>`");
+    expect(maskQuotedLiterals("unterminated 'quote")).toBe("unterminated 'quote");
   });
 
   it("runs every rule and records them", async () => {

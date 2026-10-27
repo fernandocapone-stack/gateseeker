@@ -103,6 +103,7 @@ Code patterns:
 - The `.gitignore` matcher ignores negations and nested `.gitignore` files. Gateseeker never runs git, so "likely committed" must be confirmed by the user.
 - Secret detection covers only provider formats with unambiguous prefixes. Generic high-entropy strings and Google `AIza` keys are not reported.
 - `GSK-SUPABASE-001` understands `create table` / `alter table ... row level security` in migration files; tables created through other tooling or SQL run outside migrations are invisible to it. Migration order is file-path order.
-- `GSK-CORS-001` reads header literals and `cors()` calls; CORS configured through variables or platform dashboards is not seen.
+- `GSK-CORS-001` reads header literals and `cors()` calls; CORS configured through variables or platform dashboards is not seen. Without credentials in the same file the finding is LOW: validation on real projects showed the Supabase Edge Function template ships a wildcard header, and a wildcard without cookies mostly exposes what a bearer-token API exposes anyway.
+- `GSK-SECRET-002` cannot see hardcoded fallback values (`process.env.X || 'literal'`); it masks them in the snippet but does not report the literal itself, because generic literal detection is out of scope.
 - A wildcard-origin suppression covers its own line and the next one only.
 - Rules were validated on synthetic fixtures; validation on real projects is tracked in `docs/VALIDATION_SPRINT_1.md` and rules below the precision bar are marked experimental there.

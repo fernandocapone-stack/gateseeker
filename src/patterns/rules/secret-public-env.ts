@@ -1,5 +1,5 @@
 import { sanitize } from "../../report/text.js";
-import { redactEnvLine } from "../redact.js";
+import { maskQuotedLiterals, redactEnvLine } from "../redact.js";
 import type { Rule, RuleMatch } from "../types.js";
 
 /**
@@ -26,6 +26,7 @@ export function isSuspiciousPublicVar(name: string): boolean {
 }
 
 const CODE_OR_CONFIG = new Set(["client", "server", "config", "env", "other"]);
+const EXAMPLE_ENV = /\.env(\.[\w.-]+)?\.(example|sample|template|dist)$/i;
 
 export const secretPublicEnvRule: Rule = {
   id: "GSK-SECRET-002",
@@ -35,7 +36,7 @@ export const secretPublicEnvRule: Rule = {
     "Variables prefixed NEXT_PUBLIC_, VITE_, REACT_APP_, EXPO_PUBLIC_, NUXT_PUBLIC_ or PUBLIC_ are inlined into browser code. This one is named like a secret.",
   action:
     "Rename the variable without the public prefix, read it only in server code (API route, server action, edge function), and rotate the value since it may already have shipped.",
-  appliesTo: (file) => CODE_OR_CONFIG.has(file.fileClass) && !/\.(md|mdx|txt)$/i.test(file.path),
+  appliesTo: (file) => CODE_OR_CONFIG.has(file.fileClass) && !/\.(md|mdx|txt)$/i.test(file.path) && !EXAMPLE_ENV.test(file.path),
   check: ({ file }) => {
     const matches: RuleMatch[] = [];
     const seen = new Set<string>();
@@ -54,7 +55,8 @@ export const secretPublicEnvRule: Rule = {
         seen.add(name);
         matches.push({
           line: i + 1,
-          snippet: file.fileClass === "env" ? redactEnvLine(line) : sanitize(line.trim(), 160),
+          // Code lines may carry a hardcoded fallback value next to the variable; never show it.
+          snippet: file.fileClass === "env" ? redactEnvLine(line) : sanitize(maskQuotedLiterals(line.trim()), 160),
           message: `"${name}" is inlined into the client bundle and its name indicates a secret.`,
           details: { variable: name },
         });

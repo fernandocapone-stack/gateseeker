@@ -9,7 +9,7 @@ import type { Rule, RuleMatch } from "../types.js";
  * says what to verify.
  */
 
-const EXAMPLE = /^\.env\.(example|sample|template|dist)$/i;
+const EXAMPLE = /^\.env(\.[\w.-]+)?\.(example|sample|template|dist)$/i;
 
 function isRootEnvFile(path: string): boolean {
   return !path.includes("/") && (path === ".env" || path.startsWith(".env.")) && !EXAMPLE.test(path);

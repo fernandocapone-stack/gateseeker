@@ -2,9 +2,16 @@ import { sanitize } from "../../report/text.js";
 import type { Rule, RuleMatch } from "../types.js";
 
 /**
- * GSK-CORS-001: a wildcard CORS origin on server or config code. MODERATE on
- * its own; HIGH when the same file also enables credentials, which lets any
- * site drive authenticated requests.
+ * GSK-CORS-001: a wildcard CORS origin on server or config code.
+ *
+ * Severity, decided per file:
+ *   - HIGH when the same file also enables credentials: any site can drive
+ *     authenticated (cookie) requests and read the responses.
+ *   - LOW otherwise. Without credentials the browser sends no cookies, so a
+ *     wildcard mostly exposes data that a bearer-token API already exposes to
+ *     any caller. It is still worth restricting, hence a finding, but it must
+ *     not block builds: validation on real projects (docs/VALIDATION_SPRINT_1.md)
+ *     showed the Supabase Edge Function template ships this header by default.
  */
 
 const HEADER_WILDCARD = /Access-Control-Allow-Origin["']?\s*(?:[:,]|=>)\s*(?:value\s*:\s*)?["']\*["']/i;
@@ -19,15 +26,14 @@ const APPLICABLE = new Set(["server", "config", "other"]);
 export const corsWildcardRule: Rule = {
   id: "GSK-CORS-001",
   title: "CORS allows any origin",
-  severity: "MODERATE",
-  description: "A response header or CORS middleware sets Access-Control-Allow-Origin to *, or uses the default cors() which does the same.",
+  severity: "LOW",
+  description: "A response header or CORS middleware sets Access-Control-Allow-Origin to *, or uses the default cors() which does the same. HIGH when the same file also enables credentials.",
   action: "Restrict the origin to the exact domains that need access. Never combine a wildcard or reflected origin with credentials.",
   appliesTo: (file) => APPLICABLE.has(file.fileClass) && /\.(ts|tsx|js|jsx|mjs|cjs|json|toml)$/i.test(file.path),
   check: ({ file }) => {
     const matches: RuleMatch[] = [];
     const withCredentials = CREDENTIALS.test(file.content);
-    const severity = withCredentials ? "HIGH" : undefined;
-    const suffix = withCredentials ? " The same file also enables credentials." : "";
+    const suffix = withCredentials ? " The same file also enables credentials." : " No credentials are enabled in this file, so the risk is limited to data a bearer-token API already exposes.";
     for (let i = 0; i < file.lines.length; i++) {
       const line = file.lines[i] ?? "";
       if (line.length > 5000) continue;
@@ -42,7 +48,7 @@ export const corsWildcardRule: Rule = {
         line: i + 1,
         snippet: sanitize(line.trim(), 160),
         message: message + suffix,
-        ...(severity ? { severity } : {}),
+        severity: withCredentials ? "HIGH" : "LOW",
         details: { withCredentials },
       });
     }

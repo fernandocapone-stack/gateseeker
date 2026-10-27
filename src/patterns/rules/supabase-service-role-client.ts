@@ -1,4 +1,5 @@
 import { sanitize } from "../../report/text.js";
+import { maskQuotedLiterals } from "../redact.js";
 import type { Rule, RuleMatch } from "../types.js";
 
 /**
@@ -30,7 +31,7 @@ export const supabaseServiceRoleClientRule: Rule = {
       seen.add(i);
       matches.push({
         line: i + 1,
-        snippet: sanitize(line.trim(), 160),
+        snippet: sanitize(maskQuotedLiterals(line.trim()), 160),
         message: `Client file references "${hit[1] ?? "SERVICE_ROLE"}".`,
         details: { variable: hit[1] ?? null },
       });

@@ -1,6 +1,6 @@
 # Gateseeker — Sprint 1: padrões inseguros em código gerado por IA
 
-> Status: **aprovada pelo PO em 2026-10-27** (escopo, clonagem de repositórios públicos para validação, padrões de detecção públicos). Implementação em andamento; validação em projetos reais pendente da aprovação da lista de 5 repositórios.
+> Status: **implementada e validada em 2026-10-27**. Resultado da validação em 5 projetos reais em `docs/VALIDATION_SPRINT_1.md` (nenhuma regra abaixo de 90%; quatro regras não exercitadas pela amostra). Pendente para o PO: a parte da hipótese que depende de falar com desenvolvedores (seção 1).
 > Última atualização: 2026-10-27
 
 Você é o Software Engineer responsável pelo Gateseeker. O stakeholder, Product Owner, Product Designer e auditor é o usuário humano. As regras de trabalho, a stack e os controles de segurança da Sprint 0 (`docs/SPRINT_0.md`, seções 2, 3 e 5) continuam valendo integralmente e não são repetidos aqui.

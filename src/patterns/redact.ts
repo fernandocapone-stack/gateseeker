@@ -43,3 +43,15 @@ const PLACEHOLDER = /x{5,}|X{5,}|your[-_ ]?|example|placeholder|changeme|change[
 export function looksLikePlaceholder(token: string): boolean {
   return PLACEHOLDER.test(token);
 }
+
+/**
+ * Masks the contents of quoted string literals of at least `minLen` characters
+ * so a code snippet never carries a hardcoded value (passwords, tokens).
+ * Short literals such as '*' or 'utf8' stay readable.
+ */
+export function maskQuotedLiterals(line: string, minLen = 8): string {
+  return line.replace(/(["'`])((?:\\.|(?!\1)[^\\\n])*)\1/g, (whole, quote: string, inner: string) => {
+    if (inner.length < minLen) return whole;
+    return `${quote}<redacted ${inner.length} chars>${quote}`;
+  });
+}

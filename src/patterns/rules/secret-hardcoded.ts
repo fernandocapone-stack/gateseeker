@@ -51,7 +51,7 @@ export const SECRET_PATTERNS: SecretPattern[] = [
   },
 ];
 
-const EXAMPLE_ENV = /\.env\.(example|sample|template|dist)$/i;
+const EXAMPLE_ENV = /\.env(\.[\w.-]+)?\.(example|sample|template|dist)$/i;
 const DOC_EXT = /\.(md|mdx|txt|rst)$/i;
 
 function randomPart(token: string): string {
