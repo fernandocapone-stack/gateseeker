@@ -117,6 +117,14 @@ opens a local triage interface in the browser (127.0.0.1 only, with a per-sessio
 
 The interface lives in `ui/` (Vite, React, Tailwind, shadcn-style components) and is served by the `gateseeker-intel ui` command from `src/intel/ui/`. It only runs `git add`, `commit`, `push`, `fetch` and `merge --no-edit`; everything else is refused.
 
+![Pending proposals in the triage interface](docs/ui/pending-list.png)
+
+![Review form with the original source beside it](docs/ui/review-form.png)
+
+![Decision buttons at the end of the review form](docs/ui/review-form-decision.png)
+
+The theme is dark by default, with a light variant selected by the operating system's `prefers-color-scheme`. Colours, radius and the solid-offset shadows are design tokens in `ui/src/index.css` (`:root` and `@theme inline`); the screenshots use the synthetic fixture from `fixtures/intel/advisories/`.
+
 ## Code-pattern rules
 
 Rules are lexical and structural checks on text files. They never execute project code and never follow data flow. Each one ships with positive and negative fixtures in `fixtures/projects/`.

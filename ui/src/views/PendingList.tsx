@@ -11,7 +11,7 @@ export function severityVariant(s: UiRecord["data"]["severity"]): "critical" | "
 
 export function PendingList({ records, onOpen }: { records: UiRecord[]; onOpen: (r: UiRecord) => void }) {
   if (records.length === 0) {
-    return <p className="rounded-md border p-6 text-sm text-muted-foreground">Nenhuma proposta pendente. O coletor roda a cada 6 horas; novas propostas chegam por pull request e aparecem aqui.</p>;
+    return <p className="rounded-lg border border-dashed border-border-strong bg-card/50 p-6 text-sm text-muted-foreground">Nenhuma proposta pendente. O coletor roda a cada 6 horas; novas propostas chegam por pull request e aparecem aqui.</p>;
   }
   return (
     <div className="grid gap-3">

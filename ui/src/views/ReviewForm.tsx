@@ -101,7 +101,7 @@ export function ReviewForm({ record, onBack, onDecided }: { record: UiRecord; on
         </div>
 
         {draft && draftKeys.size > 0 && (
-          <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-warning bg-warning/15 p-3 text-sm">
+          <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-warning/60 bg-warning/10 p-3 text-sm">
             <span>A engenharia pré-preencheu um rascunho para {draftKeys.size} campo(s). Nada vale até você confirmar.</span>
             <Button size="sm" variant="outline" onClick={applyDraft}>
               Usar rascunho
@@ -156,7 +156,7 @@ export function ReviewForm({ record, onBack, onDecided }: { record: UiRecord; on
           </CardHeader>
           <CardContent className="grid gap-4">
             {form.packages.map((p, i) => (
-              <div key={i} className="grid gap-2 rounded-md border p-3">
+              <div key={i} className="grid gap-2 rounded-md border bg-background/40 p-3">
                 <div className="flex items-center gap-2">
                   <Input aria-label={`nome do pacote ${i + 1}`} placeholder="nome exato do pacote (ex.: laravel-lang/lang)" value={p.name} onChange={(e) => setPackage(i, { name: e.target.value })} />
                   <Button variant="ghost" size="icon" aria-label="remover pacote" onClick={() => set("packages", form.packages.filter((_, idx) => idx !== i))}>
@@ -227,13 +227,13 @@ export function ReviewForm({ record, onBack, onDecided }: { record: UiRecord; on
           </CardHeader>
           <CardContent className="grid gap-3">
             {form.sources.map((s, i) => (
-              <div key={i} className="grid gap-2 rounded-md border p-3 md:grid-cols-2">
+              <div key={i} className="grid gap-2 rounded-md border bg-background/40 p-3 md:grid-cols-2">
                 <Input aria-label={`editor da fonte ${i + 1}`} placeholder="editor (ex.: StepSecurity)" value={s.publisher} onChange={(e) => setSource(i, { publisher: e.target.value })} />
                 <Input aria-label={`data da fonte ${i + 1}`} type="date" value={s.published_at} onChange={(e) => setSource(i, { published_at: e.target.value })} />
                 <Input className="md:col-span-2" aria-label={`título da fonte ${i + 1}`} placeholder="título" value={s.title} onChange={(e) => setSource(i, { title: e.target.value })} />
                 <Input className="md:col-span-2" aria-label={`link da fonte ${i + 1}`} placeholder="https://…" value={s.url} onChange={(e) => setSource(i, { url: e.target.value })} />
                 <label className="flex items-center gap-2 text-sm">
-                  <input type="checkbox" aria-label={`fonte primária ${i + 1}`} checked={s.primary === true} onChange={(e) => setSource(i, { primary: e.target.checked || undefined })} />
+                  <input type="checkbox" className="accent-primary" aria-label={`fonte primária ${i + 1}`} checked={s.primary === true} onChange={(e) => setSource(i, { primary: e.target.checked || undefined })} />
                   fonte primária (repositório ou registro do próprio pacote)
                 </label>
                 <div className="flex justify-end">
@@ -250,7 +250,7 @@ export function ReviewForm({ record, onBack, onDecided }: { record: UiRecord; on
         </Card>
 
         {issues.length > 0 && (
-          <div className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm" role="alert">
+          <div className="rounded-md border border-destructive/60 bg-destructive/15 p-3 text-sm" role="alert">
             <p className="font-medium">Não foi possível registrar:</p>
             <ul className="list-disc pl-5">
               {issues.map((x, i) => (
@@ -282,15 +282,15 @@ export function ReviewForm({ record, onBack, onDecided }: { record: UiRecord; on
 
       <div className="grid gap-2 lg:sticky lg:top-4 lg:self-start">
         <div className="flex items-center justify-between">
-          <h2 className="text-sm font-medium">Fonte original</h2>
+          <h2 className="text-sm font-medium text-muted-foreground">Fonte original</h2>
           {primarySource && (
-            <a className="inline-flex items-center gap-1 text-sm underline" href={primarySource.url} target="_blank" rel="noopener noreferrer">
+            <a className="inline-flex items-center gap-1 text-sm text-primary underline" href={primarySource.url} target="_blank" rel="noopener noreferrer">
               abrir em nova aba <ExternalLink className="size-3.5" />
             </a>
           )}
         </div>
         {primarySource ? (
-          <iframe title="fonte original" src={primarySource.url} className="h-[80vh] w-full rounded-md border bg-white" sandbox="allow-scripts allow-same-origin" referrerPolicy="no-referrer" />
+          <iframe title="fonte original" src={primarySource.url} className="h-[80vh] w-full rounded-lg border bg-white" sandbox="allow-scripts allow-same-origin" referrerPolicy="no-referrer" />
         ) : (
           <p className="text-sm text-muted-foreground">Sem fonte.</p>
         )}
