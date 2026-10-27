@@ -53,6 +53,32 @@ function renderPatternFinding(f: Finding): string[] {
   return out;
 }
 
+function renderAdvisoryFinding(f: Finding): string[] {
+  if (f.evidence.kind !== "supply-chain-anomaly") return [];
+  const e = f.evidence;
+  const out = [
+    `  [${f.priority}] ${sanitize(f.subject, 120)}  ${sanitize(e.advisoryId, 40)}  supply-chain: ${sanitize(e.type, 40)}`,
+    `       ${sanitize(e.summary, 300)}`,
+    `       severity: ${f.severity.tier}   why: ${f.rationale.join(", ")}`,
+    `       action:   ${sanitize(f.remediation.action, 500)}`,
+  ];
+  const ref = f.references[0];
+  if (ref) out.push(`       ref:      ${sanitize(ref.url, 200)}`);
+  if (e.reviewedBy) out.push(`       reviewed: ${sanitize(e.reviewedBy, 60)} on ${sanitize(e.reviewedAt ?? "?", 30)}`);
+  return out;
+}
+
+function renderFinding(f: Finding): string[] {
+  switch (f.evidence.kind) {
+    case "insecure-pattern":
+      return renderPatternFinding(f);
+    case "supply-chain-anomaly":
+      return renderAdvisoryFinding(f);
+    default:
+      return renderDependencyFinding(f);
+  }
+}
+
 export function renderText(report: Report): string {
   const s = report.summary;
   const out: string[] = [];
@@ -82,10 +108,10 @@ export function renderText(report: Report): string {
     out.push("No known vulnerabilities or insecure patterns were found in the sources consulted.");
   } else {
     out.push(
-      `Findings: ${report.findings.length}  (P1 ${s.byPriority.P1}, P2 ${s.byPriority.P2}, P3 ${s.byPriority.P3}, P4 ${s.byPriority.P4})  dependencies ${s.byKind["dependency-vulnerability"]}, code patterns ${s.byKind["insecure-pattern"]}`,
+      `Findings: ${report.findings.length}  (P1 ${s.byPriority.P1}, P2 ${s.byPriority.P2}, P3 ${s.byPriority.P3}, P4 ${s.byPriority.P4})  dependencies ${s.byKind["dependency-vulnerability"]}, supply-chain advisories ${s.byKind["supply-chain-anomaly"]}, code patterns ${s.byKind["insecure-pattern"]}`,
     );
     for (const f of report.findings) {
-      out.push(...(f.kind === "insecure-pattern" ? renderPatternFinding(f) : renderDependencyFinding(f)));
+      out.push(...renderFinding(f));
       out.push("");
     }
   }

@@ -103,7 +103,19 @@ export interface PatternEvidence {
   details: Record<string, string | number | boolean | null> | null;
 }
 
-export type Evidence = DependencyEvidence | PatternEvidence;
+/** Facts from a curated Gateseeker advisory (see advisories/). */
+export interface AdvisoryEvidence {
+  kind: "supply-chain-anomaly";
+  advisoryId: string;
+  type: string;
+  summary: string;
+  indicators: string[];
+  window: { start: string | null; end: string | null };
+  reviewedBy: string | null;
+  reviewedAt: string | null;
+}
+
+export type Evidence = DependencyEvidence | PatternEvidence | AdvisoryEvidence;
 
 export interface Finding {
   id: string;

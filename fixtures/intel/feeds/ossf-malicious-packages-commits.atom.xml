@@ -1,0 +1,339 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom" xmlns:media="http://search.yahoo.com/mrss/" xml:lang="en-US">
+  <id>tag:github.com,2008:/ossf/malicious-packages/commits/main</id>
+  <link type="text/html" rel="alternate" href="https://github.com/ossf/malicious-packages/commits/main"/>
+  <link type="application/atom+xml" rel="self" href="https://github.com/ossf/malicious-packages/commits/main.atom"/>
+  <title>Recent Commits to malicious-packages:main</title>
+  <updated>2026-10-27T17:22:35Z</updated>
+  <entry>
+    <id>tag:github.com,2008:Grit::Commit/f2e6aeb36576130d99962de98cc1947743daeb6e</id>
+    <link type="text/html" rel="alternate" href="https://github.com/ossf/malicious-packages/commit/f2e6aeb36576130d99962de98cc1947743daeb6e"/>
+    <title>
+        Assign IDs
+    </title>
+    <updated>2026-10-27T17:22:35Z</updated>
+    <media:thumbnail height="30" width="30" url="https://0.gravatar.com/avatar/58b823ba0861a6ff7b8a1fe80cda1242?d=https%3A%2F%2Fgithub.githubassets.com%2Fimages%2Fgravatars%2Fgravatar-user-420.png&amp;r=g&amp;s=30"/>
+    <author>
+      <name></name>
+      <email>github-actions@github.com</email>
+    </author>
+    <content type="html">
+      &lt;pre style=&#39;white-space:pre-wrap;width:81ex&#39;&gt;Assign IDs&lt;/pre&gt;
+    </content>
+  </entry>
+  <entry>
+    <id>tag:github.com,2008:Grit::Commit/67143b4182edcf59ebe7900532864b3ffe206fe4</id>
+    <link type="text/html" rel="alternate" href="https://github.com/ossf/malicious-packages/commit/67143b4182edcf59ebe7900532864b3ffe206fe4"/>
+    <title>
+        Ingest OSV - GHSA Malware
+    </title>
+    <updated>2026-10-27T17:20:01Z</updated>
+    <media:thumbnail height="30" width="30" url="https://0.gravatar.com/avatar/58b823ba0861a6ff7b8a1fe80cda1242?d=https%3A%2F%2Fgithub.githubassets.com%2Fimages%2Fgravatars%2Fgravatar-user-420.png&amp;r=g&amp;s=30"/>
+    <author>
+      <name></name>
+      <email>github-actions@github.com</email>
+    </author>
+    <content type="html">
+      &lt;pre style=&#39;white-space:pre-wrap;width:81ex&#39;&gt;Ingest OSV - GHSA Malware&lt;/pre&gt;
+    </content>
+  </entry>
+  <entry>
+    <id>tag:github.com,2008:Grit::Commit/696b3abc1fefb55cabfe5f56a818317bee3f32b0</id>
+    <link type="text/html" rel="alternate" href="https://github.com/ossf/malicious-packages/commit/696b3abc1fefb55cabfe5f56a818317bee3f32b0"/>
+    <title>
+        Assign IDs
+    </title>
+    <updated>2026-10-27T17:15:25Z</updated>
+    <media:thumbnail height="30" width="30" url="https://0.gravatar.com/avatar/58b823ba0861a6ff7b8a1fe80cda1242?d=https%3A%2F%2Fgithub.githubassets.com%2Fimages%2Fgravatars%2Fgravatar-user-420.png&amp;r=g&amp;s=30"/>
+    <author>
+      <name></name>
+      <email>github-actions@github.com</email>
+    </author>
+    <content type="html">
+      &lt;pre style=&#39;white-space:pre-wrap;width:81ex&#39;&gt;Assign IDs&lt;/pre&gt;
+    </content>
+  </entry>
+  <entry>
+    <id>tag:github.com,2008:Grit::Commit/903aab9e7985f8e12443e8063c627575145cb0c2</id>
+    <link type="text/html" rel="alternate" href="https://github.com/ossf/malicious-packages/commit/903aab9e7985f8e12443e8063c627575145cb0c2"/>
+    <title>
+        Ingest OSV - Cloud Storage
+    </title>
+    <updated>2026-10-27T17:13:24Z</updated>
+    <media:thumbnail height="30" width="30" url="https://0.gravatar.com/avatar/58b823ba0861a6ff7b8a1fe80cda1242?d=https%3A%2F%2Fgithub.githubassets.com%2Fimages%2Fgravatars%2Fgravatar-user-420.png&amp;r=g&amp;s=30"/>
+    <author>
+      <name></name>
+      <email>github-actions@github.com</email>
+    </author>
+    <content type="html">
+      &lt;pre style=&#39;white-space:pre-wrap;width:81ex&#39;&gt;Ingest OSV - Cloud Storage&lt;/pre&gt;
+    </content>
+  </entry>
+  <entry>
+    <id>tag:github.com,2008:Grit::Commit/04e387aa8e508647ae03d45a765c586777b1bf01</id>
+    <link type="text/html" rel="alternate" href="https://github.com/ossf/malicious-packages/commit/04e387aa8e508647ae03d45a765c586777b1bf01"/>
+    <title>
+        Assign IDs
+    </title>
+    <updated>2026-10-27T16:27:01Z</updated>
+    <media:thumbnail height="30" width="30" url="https://0.gravatar.com/avatar/58b823ba0861a6ff7b8a1fe80cda1242?d=https%3A%2F%2Fgithub.githubassets.com%2Fimages%2Fgravatars%2Fgravatar-user-420.png&amp;r=g&amp;s=30"/>
+    <author>
+      <name></name>
+      <email>github-actions@github.com</email>
+    </author>
+    <content type="html">
+      &lt;pre style=&#39;white-space:pre-wrap;width:81ex&#39;&gt;Assign IDs&lt;/pre&gt;
+    </content>
+  </entry>
+  <entry>
+    <id>tag:github.com,2008:Grit::Commit/e4f35a24ef643c1a31b695892f7cbb7072868d9f</id>
+    <link type="text/html" rel="alternate" href="https://github.com/ossf/malicious-packages/commit/e4f35a24ef643c1a31b695892f7cbb7072868d9f"/>
+    <title>
+        Ingest OSV - GHSA Malware
+    </title>
+    <updated>2026-10-27T16:24:04Z</updated>
+    <media:thumbnail height="30" width="30" url="https://0.gravatar.com/avatar/58b823ba0861a6ff7b8a1fe80cda1242?d=https%3A%2F%2Fgithub.githubassets.com%2Fimages%2Fgravatars%2Fgravatar-user-420.png&amp;r=g&amp;s=30"/>
+    <author>
+      <name></name>
+      <email>github-actions@github.com</email>
+    </author>
+    <content type="html">
+      &lt;pre style=&#39;white-space:pre-wrap;width:81ex&#39;&gt;Ingest OSV - GHSA Malware&lt;/pre&gt;
+    </content>
+  </entry>
+  <entry>
+    <id>tag:github.com,2008:Grit::Commit/ba173ad847100990a565972d3f2548145bcbd1ce</id>
+    <link type="text/html" rel="alternate" href="https://github.com/ossf/malicious-packages/commit/ba173ad847100990a565972d3f2548145bcbd1ce"/>
+    <title>
+        Assign IDs
+    </title>
+    <updated>2026-10-27T15:31:22Z</updated>
+    <media:thumbnail height="30" width="30" url="https://0.gravatar.com/avatar/58b823ba0861a6ff7b8a1fe80cda1242?d=https%3A%2F%2Fgithub.githubassets.com%2Fimages%2Fgravatars%2Fgravatar-user-420.png&amp;r=g&amp;s=30"/>
+    <author>
+      <name></name>
+      <email>github-actions@github.com</email>
+    </author>
+    <content type="html">
+      &lt;pre style=&#39;white-space:pre-wrap;width:81ex&#39;&gt;Assign IDs&lt;/pre&gt;
+    </content>
+  </entry>
+  <entry>
+    <id>tag:github.com,2008:Grit::Commit/10c071b29ca9fec0a37c89a6a685d1e16af4d383</id>
+    <link type="text/html" rel="alternate" href="https://github.com/ossf/malicious-packages/commit/10c071b29ca9fec0a37c89a6a685d1e16af4d383"/>
+    <title>
+        Ingest OSV - GHSA Malware
+    </title>
+    <updated>2026-10-27T15:29:27Z</updated>
+    <media:thumbnail height="30" width="30" url="https://0.gravatar.com/avatar/58b823ba0861a6ff7b8a1fe80cda1242?d=https%3A%2F%2Fgithub.githubassets.com%2Fimages%2Fgravatars%2Fgravatar-user-420.png&amp;r=g&amp;s=30"/>
+    <author>
+      <name></name>
+      <email>github-actions@github.com</email>
+    </author>
+    <content type="html">
+      &lt;pre style=&#39;white-space:pre-wrap;width:81ex&#39;&gt;Ingest OSV - GHSA Malware&lt;/pre&gt;
+    </content>
+  </entry>
+  <entry>
+    <id>tag:github.com,2008:Grit::Commit/79969eab7190442983863dbc24604607f5fad029</id>
+    <link type="text/html" rel="alternate" href="https://github.com/ossf/malicious-packages/commit/79969eab7190442983863dbc24604607f5fad029"/>
+    <title>
+        Assign IDs
+    </title>
+    <updated>2026-10-27T12:29:47Z</updated>
+    <media:thumbnail height="30" width="30" url="https://0.gravatar.com/avatar/58b823ba0861a6ff7b8a1fe80cda1242?d=https%3A%2F%2Fgithub.githubassets.com%2Fimages%2Fgravatars%2Fgravatar-user-420.png&amp;r=g&amp;s=30"/>
+    <author>
+      <name></name>
+      <email>github-actions@github.com</email>
+    </author>
+    <content type="html">
+      &lt;pre style=&#39;white-space:pre-wrap;width:81ex&#39;&gt;Assign IDs&lt;/pre&gt;
+    </content>
+  </entry>
+  <entry>
+    <id>tag:github.com,2008:Grit::Commit/0d7de471307132e4bf8a24d0b1af871a50e05f0c</id>
+    <link type="text/html" rel="alternate" href="https://github.com/ossf/malicious-packages/commit/0d7de471307132e4bf8a24d0b1af871a50e05f0c"/>
+    <title>
+        Ingest OSV - Cloud Storage
+    </title>
+    <updated>2026-10-27T12:27:48Z</updated>
+    <media:thumbnail height="30" width="30" url="https://0.gravatar.com/avatar/58b823ba0861a6ff7b8a1fe80cda1242?d=https%3A%2F%2Fgithub.githubassets.com%2Fimages%2Fgravatars%2Fgravatar-user-420.png&amp;r=g&amp;s=30"/>
+    <author>
+      <name></name>
+      <email>github-actions@github.com</email>
+    </author>
+    <content type="html">
+      &lt;pre style=&#39;white-space:pre-wrap;width:81ex&#39;&gt;Ingest OSV - Cloud Storage&lt;/pre&gt;
+    </content>
+  </entry>
+  <entry>
+    <id>tag:github.com,2008:Grit::Commit/a2062d3ec989bec78c872edcd323b63b7a439f97</id>
+    <link type="text/html" rel="alternate" href="https://github.com/ossf/malicious-packages/commit/a2062d3ec989bec78c872edcd323b63b7a439f97"/>
+    <title>
+        Assign IDs
+    </title>
+    <updated>2026-10-27T11:20:18Z</updated>
+    <media:thumbnail height="30" width="30" url="https://0.gravatar.com/avatar/58b823ba0861a6ff7b8a1fe80cda1242?d=https%3A%2F%2Fgithub.githubassets.com%2Fimages%2Fgravatars%2Fgravatar-user-420.png&amp;r=g&amp;s=30"/>
+    <author>
+      <name></name>
+      <email>github-actions@github.com</email>
+    </author>
+    <content type="html">
+      &lt;pre style=&#39;white-space:pre-wrap;width:81ex&#39;&gt;Assign IDs&lt;/pre&gt;
+    </content>
+  </entry>
+  <entry>
+    <id>tag:github.com,2008:Grit::Commit/ef14fa16c0f399b9c8fd1a2d88834f903fa7fe9e</id>
+    <link type="text/html" rel="alternate" href="https://github.com/ossf/malicious-packages/commit/ef14fa16c0f399b9c8fd1a2d88834f903fa7fe9e"/>
+    <title>
+        Ingest OSV - Cloud Storage
+    </title>
+    <updated>2026-10-27T11:18:14Z</updated>
+    <media:thumbnail height="30" width="30" url="https://0.gravatar.com/avatar/58b823ba0861a6ff7b8a1fe80cda1242?d=https%3A%2F%2Fgithub.githubassets.com%2Fimages%2Fgravatars%2Fgravatar-user-420.png&amp;r=g&amp;s=30"/>
+    <author>
+      <name></name>
+      <email>github-actions@github.com</email>
+    </author>
+    <content type="html">
+      &lt;pre style=&#39;white-space:pre-wrap;width:81ex&#39;&gt;Ingest OSV - Cloud Storage&lt;/pre&gt;
+    </content>
+  </entry>
+  <entry>
+    <id>tag:github.com,2008:Grit::Commit/2a69c4c24bbb1003715e236687fd1bafed513996</id>
+    <link type="text/html" rel="alternate" href="https://github.com/ossf/malicious-packages/commit/2a69c4c24bbb1003715e236687fd1bafed513996"/>
+    <title>
+        Withdraw MAL-2026-17408 whalibmob (false positive) (#1670)
+    </title>
+    <updated>2026-10-27T11:07:27Z</updated>
+    <media:thumbnail height="30" width="30" url="https://avatars.githubusercontent.com/u/295772194?s=30&amp;v=4"/>
+    <author>
+      <name>vitaliichepurko-ox</name>
+      <uri>https://github.com/vitaliichepurko-ox</uri>
+    </author>
+    <content type="html">
+      &lt;pre style=&#39;white-space:pre-wrap;width:81ex&#39;&gt;Withdraw MAL-2026-17408 whalibmob (false positive) (#1670)
+
+The report claimed an injected auto-FOLLOW query (query_id 7871414976211147)
+on connect. Re-review of all 20 listed versions (5.24.0 to 5.33.5) and the
+current latest found no such query id, no call of joinNewsletter outside the
+user-driven CLI command, no hardcoded or encoded channel targets and no
+remote JID list. The package is not a Baileys fork.
+
+Refs ossf/malicious-packages#1667
+
+Signed-off-by: Vitalii Chepurko &amp;lt;vitalii.chepurko@ox.security&amp;gt;
+Co-authored-by: Claude Sonnet 5.5 &amp;lt;noreply@anthropic.com&amp;gt;&lt;/pre&gt;
+    </content>
+  </entry>
+  <entry>
+    <id>tag:github.com,2008:Grit::Commit/cea1d9596fdee64a506c03293d5c81a8e8a8735d</id>
+    <link type="text/html" rel="alternate" href="https://github.com/ossf/malicious-packages/commit/cea1d9596fdee64a506c03293d5c81a8e8a8735d"/>
+    <title>
+        Assign IDs
+    </title>
+    <updated>2026-10-27T08:37:31Z</updated>
+    <media:thumbnail height="30" width="30" url="https://0.gravatar.com/avatar/58b823ba0861a6ff7b8a1fe80cda1242?d=https%3A%2F%2Fgithub.githubassets.com%2Fimages%2Fgravatars%2Fgravatar-user-420.png&amp;r=g&amp;s=30"/>
+    <author>
+      <name></name>
+      <email>github-actions@github.com</email>
+    </author>
+    <content type="html">
+      &lt;pre style=&#39;white-space:pre-wrap;width:81ex&#39;&gt;Assign IDs&lt;/pre&gt;
+    </content>
+  </entry>
+  <entry>
+    <id>tag:github.com,2008:Grit::Commit/f16c3a4633a4e049f5bce2a7f8c29a763f966b27</id>
+    <link type="text/html" rel="alternate" href="https://github.com/ossf/malicious-packages/commit/f16c3a4633a4e049f5bce2a7f8c29a763f966b27"/>
+    <title>
+        Ingest OSV - GHSA Malware
+    </title>
+    <updated>2026-10-27T08:35:19Z</updated>
+    <media:thumbnail height="30" width="30" url="https://0.gravatar.com/avatar/58b823ba0861a6ff7b8a1fe80cda1242?d=https%3A%2F%2Fgithub.githubassets.com%2Fimages%2Fgravatars%2Fgravatar-user-420.png&amp;r=g&amp;s=30"/>
+    <author>
+      <name></name>
+      <email>github-actions@github.com</email>
+    </author>
+    <content type="html">
+      &lt;pre style=&#39;white-space:pre-wrap;width:81ex&#39;&gt;Ingest OSV - GHSA Malware&lt;/pre&gt;
+    </content>
+  </entry>
+  <entry>
+    <id>tag:github.com,2008:Grit::Commit/323d867a549e2bbdbffe8fadfb24919d049ef12d</id>
+    <link type="text/html" rel="alternate" href="https://github.com/ossf/malicious-packages/commit/323d867a549e2bbdbffe8fadfb24919d049ef12d"/>
+    <title>
+        Assign IDs
+    </title>
+    <updated>2026-10-27T04:23:34Z</updated>
+    <media:thumbnail height="30" width="30" url="https://0.gravatar.com/avatar/58b823ba0861a6ff7b8a1fe80cda1242?d=https%3A%2F%2Fgithub.githubassets.com%2Fimages%2Fgravatars%2Fgravatar-user-420.png&amp;r=g&amp;s=30"/>
+    <author>
+      <name></name>
+      <email>github-actions@github.com</email>
+    </author>
+    <content type="html">
+      &lt;pre style=&#39;white-space:pre-wrap;width:81ex&#39;&gt;Assign IDs&lt;/pre&gt;
+    </content>
+  </entry>
+  <entry>
+    <id>tag:github.com,2008:Grit::Commit/490226b9d1ce99fd7e3942a19cc9e1a83dd3d3bd</id>
+    <link type="text/html" rel="alternate" href="https://github.com/ossf/malicious-packages/commit/490226b9d1ce99fd7e3942a19cc9e1a83dd3d3bd"/>
+    <title>
+        Ingest OSV - Cloud Storage
+    </title>
+    <updated>2026-10-27T04:20:57Z</updated>
+    <media:thumbnail height="30" width="30" url="https://0.gravatar.com/avatar/58b823ba0861a6ff7b8a1fe80cda1242?d=https%3A%2F%2Fgithub.githubassets.com%2Fimages%2Fgravatars%2Fgravatar-user-420.png&amp;r=g&amp;s=30"/>
+    <author>
+      <name></name>
+      <email>github-actions@github.com</email>
+    </author>
+    <content type="html">
+      &lt;pre style=&#39;white-space:pre-wrap;width:81ex&#39;&gt;Ingest OSV - Cloud Storage&lt;/pre&gt;
+    </content>
+  </entry>
+  <entry>
+    <id>tag:github.com,2008:Grit::Commit/3773622883bf6f0a0420bec9a2f888cd96efe011</id>
+    <link type="text/html" rel="alternate" href="https://github.com/ossf/malicious-packages/commit/3773622883bf6f0a0420bec9a2f888cd96efe011"/>
+    <title>
+        Assign IDs
+    </title>
+    <updated>2026-10-26T21:27:44Z</updated>
+    <media:thumbnail height="30" width="30" url="https://0.gravatar.com/avatar/58b823ba0861a6ff7b8a1fe80cda1242?d=https%3A%2F%2Fgithub.githubassets.com%2Fimages%2Fgravatars%2Fgravatar-user-420.png&amp;r=g&amp;s=30"/>
+    <author>
+      <name></name>
+      <email>github-actions@github.com</email>
+    </author>
+    <content type="html">
+      &lt;pre style=&#39;white-space:pre-wrap;width:81ex&#39;&gt;Assign IDs&lt;/pre&gt;
+    </content>
+  </entry>
+  <entry>
+    <id>tag:github.com,2008:Grit::Commit/2e46836583919cca98fff80f4a1968973ca99b98</id>
+    <link type="text/html" rel="alternate" href="https://github.com/ossf/malicious-packages/commit/2e46836583919cca98fff80f4a1968973ca99b98"/>
+    <title>
+        Ingest OSV - GHSA Malware
+    </title>
+    <updated>2026-10-26T21:25:20Z</updated>
+    <media:thumbnail height="30" width="30" url="https://0.gravatar.com/avatar/58b823ba0861a6ff7b8a1fe80cda1242?d=https%3A%2F%2Fgithub.githubassets.com%2Fimages%2Fgravatars%2Fgravatar-user-420.png&amp;r=g&amp;s=30"/>
+    <author>
+      <name></name>
+      <email>github-actions@github.com</email>
+    </author>
+    <content type="html">
+      &lt;pre style=&#39;white-space:pre-wrap;width:81ex&#39;&gt;Ingest OSV - GHSA Malware&lt;/pre&gt;
+    </content>
+  </entry>
+  <entry>
+    <id>tag:github.com,2008:Grit::Commit/e2f93b255fdc1045e3deefba0ed388ee3d135c1a</id>
+    <link type="text/html" rel="alternate" href="https://github.com/ossf/malicious-packages/commit/e2f93b255fdc1045e3deefba0ed388ee3d135c1a"/>
+    <title>
+        Assign IDs
+    </title>
+    <updated>2026-10-26T18:58:48Z</updated>
+    <media:thumbnail height="30" width="30" url="https://0.gravatar.com/avatar/58b823ba0861a6ff7b8a1fe80cda1242?d=https%3A%2F%2Fgithub.githubassets.com%2Fimages%2Fgravatars%2Fgravatar-user-420.png&amp;r=g&amp;s=30"/>
+    <author>
+      <name></name>
+      <email>github-actions@github.com</email>
+    </author>
+    <content type="html">
+      &lt;pre style=&#39;white-space:pre-wrap;width:81ex&#39;&gt;Assign IDs&lt;/pre&gt;
+    </content>
+  </entry>
+</feed>

@@ -1,6 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
+import { ADVISORY_SOURCE_NAME, advisoryMatches, buildAdvisoryFinding, loadAdvisories, type AdvisorySet } from "./intel/advisories.js";
 import { OSV_QUERY_ENDPOINT, OSV_SOURCE_NAME, OsvClient, type OsvClientOptions } from "./intel/osv.js";
 import { DEFAULT_PARSER_LIMITS, parseLockfile, type ParseErrorCode, type ParserLimits } from "./parser/lockfile.js";
 import { PATTERN_SOURCE_NAME, runRules } from "./patterns/engine.js";
@@ -25,6 +26,10 @@ export interface ScanCommonOptions {
   limits?: Partial<ParserLimits>;
   walkLimits?: Partial<WalkLimits>;
   osv?: OsvClientOptions;
+  /** Path to a local advisory set; default resolves the bundled/checkout set. */
+  advisoriesPath?: string;
+  /** Preloaded advisory set (tests). */
+  advisories?: AdvisorySet;
   rules?: Rule[];
   now?: () => Date;
   runId?: string;
@@ -53,7 +58,7 @@ const DEPENDENCY_LIMITATIONS = [
   "Only package-lock.json lockfileVersion 2 and 3 are supported.",
   "Only the npm ecosystem is queried; workspace packages and symlinked (file:) packages are not queried.",
   "Dependencies with missing, non-semver or non-registry (git, tarball) versions are not queried.",
-  "OSV is the only intelligence source. A package whose published artifact was tampered with without a new version (supply-chain compromise) is not detected.",
+  "Dependency intelligence comes from OSV plus the curated Gateseeker advisory set listed in sources; an incident absent from both is not detected.",
   "Severity is computed from CVSS 3.x vectors; CVSS 2 and 4 vectors are preserved but not scored.",
   "Priority does not consider whether vulnerable code is actually reachable from the project.",
 ];
@@ -79,6 +84,7 @@ interface DepsOutcome {
   findings: Finding[];
   errors: string[];
   endpoint: string;
+  advisories: AdvisorySet;
 }
 
 async function analyzeDependencies(lockfilePath: string, content: string, opts: ScanCommonOptions, now: () => Date): Promise<{ ok: true; deps: DepsOutcome } | { ok: false; error: ScanError }> {
@@ -89,10 +95,13 @@ async function analyzeDependencies(lockfilePath: string, content: string, opts: 
 
   const client = new OsvClient({ now, ...opts.osv });
   const outcomes = await client.queryAll(lockfile.dependencies);
+  const advisories = opts.advisories ?? (await loadAdvisories(opts.advisoriesPath !== undefined ? { path: opts.advisoriesPath } : {}));
+  const advisoryQueriedAt = now().toISOString();
 
   const queries: QueryRecord[] = [];
   const findings: Finding[] = [];
-  const errors: string[] = [...lockfile.warnings];
+  const errors: string[] = [...lockfile.warnings, ...advisories.problems.map((p) => `Advisory set: ${p}`)];
+
 
   for (const dep of lockfile.dependencies) {
     const key = `${dep.name}@${dep.version ?? "<missing>"}`;
@@ -111,6 +120,20 @@ async function analyzeDependencies(lockfilePath: string, content: string, opts: 
     queries.push({ dependency: key, state: outcome.vulns.length > 0 ? "vulnerable" : "no-known-vulnerabilities", source: OSV_SOURCE_NAME, queriedAt: outcome.queriedAt, error: null });
   }
 
+  // Curated advisories are matched locally for every dependency with a usable version.
+  for (const dep of lockfile.dependencies) {
+    if (dep.versionStatus !== "ok") continue;
+    const hits = advisories.advisories.filter((a) => advisoryMatches(a, dep));
+    for (const a of hits) findings.push(buildAdvisoryFinding(dep, a, advisoryQueriedAt));
+    queries.push({
+      dependency: `${dep.name}@${dep.version ?? "<missing>"}`,
+      state: hits.length > 0 ? "vulnerable" : "no-known-vulnerabilities",
+      source: ADVISORY_SOURCE_NAME,
+      queriedAt: advisoryQueriedAt,
+      error: null,
+    });
+  }
+
   return {
     ok: true,
     deps: {
@@ -123,6 +146,7 @@ async function analyzeDependencies(lockfilePath: string, content: string, opts: 
       findings,
       errors,
       endpoint: opts.osv?.endpoint ?? OSV_QUERY_ENDPOINT,
+      advisories,
     },
   };
 }
@@ -187,8 +211,9 @@ function assemble(args: { root: string; startedAt: string; deps: DepsOutcome | n
   const findings = [...(deps?.findings ?? []), ...(patterns?.findings ?? [])];
   findings.sort((a, b) => (a.priority === b.priority ? a.id.localeCompare(b.id) : a.priority.localeCompare(b.priority)));
 
+  // The verdict counts OSV query states; advisory matching is local and cannot fail per dependency.
   const byQueryState: Record<QueryState, number> = { vulnerable: 0, "no-known-vulnerabilities": 0, "query-failed": 0, "not-queried": 0 };
-  for (const q of deps?.queries ?? []) byQueryState[q.state]++;
+  for (const q of deps?.queries ?? []) if (q.source === OSV_SOURCE_NAME) byQueryState[q.state]++;
 
   const byPriority = Object.fromEntries(PRIORITIES.map((p) => [p, 0])) as Record<Priority, number>;
   for (const f of findings) byPriority[f.priority]++;
@@ -211,7 +236,11 @@ function assemble(args: { root: string; startedAt: string; deps: DepsOutcome | n
   else limitations.push("Code patterns were not analyzed (lockfile-only scan or --only deps).");
 
   const sources: Report["sources"] = [];
-  if (deps) sources.push({ name: OSV_SOURCE_NAME, endpoint: deps.endpoint });
+  if (deps) {
+    sources.push({ name: OSV_SOURCE_NAME, endpoint: deps.endpoint });
+    const approvedCount = deps.advisories.advisories.filter((a) => a.status === "approved").length;
+    sources.push({ name: ADVISORY_SOURCE_NAME, endpoint: `${deps.advisories.origin} (${approvedCount} approved, digest ${deps.advisories.digest})` });
+  }
   if (patterns) sources.push({ name: PATTERN_SOURCE_NAME, endpoint: `builtin rules v${GATESEEKER_VERSION}` });
 
   return {

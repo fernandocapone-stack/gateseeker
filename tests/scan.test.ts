@@ -60,15 +60,18 @@ describe("scan", () => {
       "GHSA-f23m-r3pf-42rh::lodash@4.17.20",
       "GHSA-xxjr-mmjv-4gpg::lodash@4.17.20",
     ]);
-    expect(report.queries).toEqual([
+    expect(report.queries.filter((q) => q.source === "osv.dev")).toEqual([
       { dependency: "lodash@4.17.20", state: "vulnerable", source: "osv.dev", queriedAt: "2026-10-27T12:00:00.000Z", error: null },
       { dependency: "zod@4.6.7", state: "no-known-vulnerabilities", source: "osv.dev", queriedAt: "2026-10-27T12:00:00.000Z", error: null },
     ]);
+    // The curated advisory set is consulted too, as a separate source per dependency.
+    expect(report.queries.filter((q) => q.source === "gateseeker-advisories").map((q) => q.state)).toEqual(["no-known-vulnerabilities", "no-known-vulnerabilities"]);
     expect(report.project).toMatchObject({ lockfileVersion: 3, name: "fixture-direct-only" });
     expect(report.project.lockfileSha256).toMatch(/^[0-9a-f]{64}$/);
     expect(report.errors).toEqual([]);
     expect(report.limitations.length).toBeGreaterThan(0);
-    expect(report.sources).toEqual([{ name: "osv.dev", endpoint: "https://api.osv.dev/v1/query" }]);
+    expect(report.sources[0]).toEqual({ name: "osv.dev", endpoint: "https://api.osv.dev/v1/query" });
+    expect(report.sources[1]?.name).toBe("gateseeker-advisories");
   });
 
   it("passes only when every dependency was queried and nothing reaches the threshold", async () => {
@@ -89,7 +92,7 @@ describe("scan", () => {
     expect(report.findings).toEqual([]);
     expect(report.gate.verdict).toBe("incomplete");
     expect(report.summary.byQueryState["query-failed"]).toBe(1);
-    expect(report.queries.find((q) => q.dependency === "zod@4.6.7")).toMatchObject({
+    expect(report.queries.find((q) => q.dependency === "zod@4.6.7" && q.source === "osv.dev")).toMatchObject({
       state: "query-failed",
       error: "HTTP 503",
     });

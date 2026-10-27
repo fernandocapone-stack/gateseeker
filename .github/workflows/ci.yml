@@ -29,6 +29,8 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm test
       - run: pnpm build
+      - name: Validate advisory records
+        run: node dist/intel-cli.js validate
 
       # Smoke test of the built CLI with offline-safe expectations:
       # a v1 lockfile must be rejected with exit code 3 before any network call.

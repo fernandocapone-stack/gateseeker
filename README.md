@@ -4,7 +4,7 @@ Security gate for AI-generated code. *(working description; branding and tagline
 
 Gateseeker points at a project directory, checks the code for the security mistakes most common in AI-generated apps, asks [OSV](https://osv.dev) which installed npm versions have known vulnerabilities, ranks every finding with deterministic and auditable rules, and returns a gate verdict with an exit code you can wire into CI.
 
-**Status after Sprint 1:** npm lockfiles (v2/v3) and eight code-pattern rules for JavaScript/TypeScript projects (Next.js, Vite, Supabase, Firebase). CLI only. See [docs/PRODUCT.md](docs/PRODUCT.md) for direction, [docs/SPRINT_0.md](docs/SPRINT_0.md) and [docs/SPRINT_1.md](docs/SPRINT_1.md) for the scope this code implements.
+**Status after Sprint 2a:** npm lockfiles (v2/v3) checked against OSV **and** a curated, human-approved advisory feed for supply-chain incidents the databases miss; eight code-pattern rules for JavaScript/TypeScript projects (Next.js, Vite, Supabase, Firebase). CLI only. See [docs/PRODUCT.md](docs/PRODUCT.md) for direction and `docs/SPRINT_*.md` for the scope this code implements.
 
 ## Requirements
 
@@ -49,6 +49,7 @@ gateseeker scan <project-dir | package-lock.json> [options]
   --max-deps <n>            Reject lockfiles with more packages than this (default: 5000)
   --max-files <n>           Abort directory scans with more files (default: 5000)
   --max-file-size <bytes>   Abort directory scans on a larger text file (default: 1048576)
+  --advisories <file>       Use this curated advisory set (JSON) instead of the bundled one
   --timeout <ms>            Per-request timeout for the OSV API (default: 10000)
   --concurrency <n>         Maximum simultaneous OSV requests (default: 5)
 ```
@@ -90,6 +91,17 @@ GATE: PASS (fail-on P2, patterns warn)
 ```
 
 Secrets are never printed: a matched credential is shown as its first four characters and its length.
+
+## Curated advisory feed
+
+Official vulnerability databases miss a class of incident: a package whose existing tags or versions are rewritten with malicious code, with no new version number and no CVE. Five months after the Laravel-Lang Composer compromise of May 2026, OSV still had no record of it. Gateseeker keeps its own curated set of such incidents under [advisories/](advisories/README.md):
+
+- A scheduled workflow (`Intel feed`, every 6 hours) reads public security feeds, keeps entries that look like supply-chain incidents, and opens a pull request with proposed records. It stores only titles, links and dates, never the text of a source.
+- A named reviewer completes each record and marks it `approved` or `rejected`. Nothing is merged or consumed automatically.
+- `pnpm build` compiles `advisories/approved/` into `dist/advisories.json`; `gateseeker scan` matches every npm dependency against it and reports hits as `supply-chain-anomaly` findings with the record's severity, sources and reviewer. Packagist records are stored and validated; they will match once the `composer.lock` parser lands (Sprint 2b).
+- Approved records are offered upstream to OSV/GHSA following [docs/UPSTREAM.md](docs/UPSTREAM.md). Advisory data is CC-BY-4.0.
+
+Maintainer commands: `gateseeker-intel collect | validate | build`.
 
 ## Code-pattern rules
 
@@ -144,7 +156,7 @@ Modifier: when no fixed version exists, demote one level, but never below P2 for
 
 ## What "pass" does and does not mean
 
-A `pass` means: every installed version was queried, the rules that ran found nothing at or above your threshold, and the sources consulted returned no known vulnerability at that level at that moment. It does not mean the project is secure. Gateseeker does not follow data flow, does not detect tampered packages that kept their version number, and does not know whether vulnerable code is reachable. The full list is in the `limitations` field of every JSON report and in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+A `pass` means: every installed version was queried against OSV and the curated advisory set listed in the report's `sources`, the rules that ran found nothing at or above your threshold, and those sources returned no known vulnerability at that level at that moment. It does not mean the project is secure. Gateseeker does not follow data flow, does not detect tampered packages that kept their version number, and does not know whether vulnerable code is reachable. The full list is in the `limitations` field of every JSON report and in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 ## Development
 
@@ -162,6 +174,9 @@ Unit tests never reach the network: the OSV client takes an injected `fetch`, an
 - [docs/SPRINT_0.md](docs/SPRINT_0.md), [docs/SPRINT_1.md](docs/SPRINT_1.md): scope and acceptance criteria implemented here.
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md): modules, data flow, trust boundaries, limitations.
 - [docs/THREAT_MODEL.md](docs/THREAT_MODEL.md): assets, threat agents, attack surfaces, mitigations and the tests that cover them.
+- [docs/VALIDATION_SPRINT_1.md](docs/VALIDATION_SPRINT_1.md): results of the pattern rules on five real projects.
+- [docs/UPSTREAM.md](docs/UPSTREAM.md): how approved advisories are submitted to OSV/GHSA.
+- [advisories/README.md](advisories/README.md): the curated advisory feed, its lifecycle and format.
 
 ## License
 

@@ -1,0 +1,43 @@
+{
+  "id": "GSK-ADV-2026-0001",
+  "status": "proposed",
+  "type": "tag-rewrite",
+  "severity": "CRITICAL",
+  "ecosystem": "Packagist",
+  "packages": [
+    { "name": "laravel-lang/lang", "affected": { "tags": ["*"], "commits_after": "2026-05-22T22:32:00Z", "fixed_in": null } },
+    { "name": "laravel-lang/attributes", "affected": { "tags": ["*"], "commits_after": "2026-05-22T22:32:00Z", "fixed_in": null } },
+    { "name": "laravel-lang/http-statuses", "affected": { "tags": ["*"], "commits_after": "2026-05-22T22:32:00Z", "fixed_in": null } },
+    { "name": "laravel-lang/actions", "affected": { "tags": ["*"], "commits_after": "2026-05-22T22:32:00Z", "fixed_in": null } }
+  ],
+  "window": { "start": "2026-05-22T22:32:00Z", "end": null },
+  "indicators": [
+    "Existing git tags force-pushed to new commits instead of new versions being published",
+    "composer.json autoload.files gains src/helpers.php, executed on require vendor/autoload.php",
+    "Second-stage PHP credential stealer targeting CI and developer machines"
+  ],
+  "summary": "Existing tags of four laravel-lang Composer packages were rewritten with a credential stealer that runs during Composer bootstrap; no new version number and no CVE were issued.",
+  "remediation": "Pin each laravel-lang package to a commit SHA verified to predate 2026-05-22T22:32Z, reinstall vendor from scratch, and rotate every credential present on machines or CI runners that installed these packages after that time.",
+  "sources": [
+    {
+      "url": "https://www.stepsecurity.io/blog/laravel-lang-supply-chain-attack",
+      "publisher": "StepSecurity",
+      "title": "Laravel-Lang Supply Chain Attack: Every Tag Across Multiple Composer Packages Rewritten to Steal CI Secrets",
+      "published_at": "2026-05-22"
+    },
+    {
+      "url": "https://www.aikido.dev/blog/supply-chain-attack-targets-laravel-lang-packages-with-credential-stealer",
+      "publisher": "Aikido Security",
+      "title": "Supply Chain Attack Targets Laravel-Lang Packages with Credential Stealer",
+      "published_at": "2026-05-23"
+    }
+  ],
+  "review": {
+    "proposed_by": "fernandocapone-stack (engineering, Sprint 2a)",
+    "proposed_at": "2026-10-27T18:00:00Z",
+    "reviewed_by": null,
+    "reviewed_at": null,
+    "notes": "Inaugural record. OSV had no entry for any of the four packages on 2026-10-27. Aikido lists three packages, StepSecurity four; the four are recorded. Awaiting PO review: confirm against the laravel-lang repositories, then set status to approved, fill reviewed_by/reviewed_at and move to advisories/approved/."
+  },
+  "upstream": { "osv": null, "ghsa": null }
+}

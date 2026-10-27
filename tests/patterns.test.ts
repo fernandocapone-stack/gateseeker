@@ -312,7 +312,7 @@ describe("scanDirectory", () => {
     expect(rep.gate).toMatchObject({ patternsMode: "warn", verdict: "fail", reason: "5 finding(s) at priority P2 or higher." });
     expect(rep.project.lockfileVersion).toBe(3);
     expect(rep.patterns?.rulesRun.length).toBe(RULES.length);
-    expect(rep.sources.map((s) => s.name)).toEqual(["osv.dev", "gateseeker-rules"]);
+    expect(rep.sources.map((s) => s.name)).toEqual(["osv.dev", "gateseeker-advisories", "gateseeker-rules"]);
     expect(rep.errors).toContain("Suppression without a reason ignored at app/api/public/route.ts:4.");
   });
 

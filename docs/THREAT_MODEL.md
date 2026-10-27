@@ -1,4 +1,4 @@
-# Threat model (after Sprint 1)
+# Threat model (after Sprint 2a)
 
 Gateseeker processes attacker-controlled input (any project's files and lockfile), data from an external service (OSV), and prints results into a terminal and a file. This document lists what we protect, who might attack, where, how we mitigate, and which test proves each mitigation.
 
@@ -63,14 +63,26 @@ Gateseeker processes attacker-controlled input (any project's files and lockfile
 
 Residual: Gateseeker trusts TLS and OSV itself.
 
-### 5. Output
+### 5. Public feeds and the curated advisory set
+
+| Threat | Mitigation | Test |
+|---|---|---|
+| A feed serves a huge body, hangs, or redirects to another host | 2 MB limit (declared and actual), 10 s timeout, `redirect: manual` with same-host check only. | `intel.test.ts` "refuses oversized bodies, timeouts and cross-host redirects" |
+| XML external entities or DOCTYPE tricks in a feed | Parser refuses any document containing `<!DOCTYPE` or `<!ENTITY`; no XML library is used. | `intel.test.ts` "refuses documents with DOCTYPE or ENTITY" |
+| HTML or control characters in titles reach the repository or terminal | Tags stripped, entities decoded with a fixed table, `sanitize()` applied, length capped. | `intel.test.ts` "flattens HTML in titles..." |
+| A crafted feed entry floods the repository with proposals | Entry cap per feed (200), keyword filter, dedup by canonical URL and title hash, one PR per run reviewed by a human. | `intel.test.ts` collector tests |
+| A malicious or mistaken record becomes a finding | Only `approved` records with a named reviewer and two publishers (or a primary source) are matched; `proposed`/`rejected` never match; CI validates on every push; the scanner validates again at load time and rejects a bad `--advisories` file with exit 3. | `intel.test.ts` schema and matching tests; `cli.test.ts` --advisories tests |
+| Third-party text or credentials pasted into a record | Text limits on `summary`/`notes`, credential-pattern rejection over the whole record, review guidance in `advisories/README.md`. | `intel.test.ts` "credential-looking token in notes", "summary over 300 chars" |
+| The workflow token is abused | Write permissions only in the `Intel feed` workflow, scoped to contents and pull requests; the main CI stays read-only; nothing merges automatically. | By construction (`.github/workflows/intel.yml`) |
+
+### 6. Output
 
 | Threat | Mitigation | Test |
 |---|---|---|
 | Package name, advisory summary or code snippet containing ANSI escapes or newlines spoofs a `GATE: PASS` line | `sanitize()` strips C0/C1 controls, DEL, U+2028/2029 and collapses newlines before any untrusted string is printed; values are truncated. | `cli.test.ts` "strips control characters", "renders an untrusted summary without letting it break lines" |
-| Attacker-controlled URL in `ref:` is auto-opened | Nothing is opened; URLs are printed as text only. | By construction |
+| Attacker-controlled URL in `ref:` or in an advisory source is auto-opened | Nothing is opened; URLs are printed as text only. | By construction |
 
-### 6. Language and interpretation
+### 7. Language and interpretation
 
 | Threat | Mitigation | Test |
 |---|---|---|
@@ -82,7 +94,7 @@ Residual: Gateseeker trusts TLS and OSV itself.
 ## Residual risks
 
 - A dependency that is vulnerable but not yet in OSV yields `no-known-vulnerabilities`.
-- Supply-chain compromises that keep the version number are invisible to this version.
+- Supply-chain compromises that keep the version number are detected only once a reviewer has approved a record about them; the curated set is as good as its sources and reviewers.
 - Pattern rules miss anything expressed indirectly (configuration through variables, SQL outside migrations, secrets without a recognisable prefix) and may misclassify files in unconventional layouts.
 - A `pass` is a statement about the sources and rules at scan time only.
 - Priority does not account for reachability or for how the application is deployed.

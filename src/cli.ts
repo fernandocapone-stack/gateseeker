@@ -2,6 +2,7 @@
 import { readFile, stat, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { parseArgs } from "node:util";
+import { loadAdvisories } from "./intel/advisories.js";
 import { DEFAULT_PARSER_LIMITS } from "./parser/lockfile.js";
 import { DEFAULT_WALK_LIMITS } from "./patterns/walker.js";
 import { renderText } from "./report/text.js";
@@ -36,6 +37,7 @@ Options:
   --max-deps <n>            Reject lockfiles with more packages than this (default: ${DEFAULT_PARSER_LIMITS.maxDependencies})
   --max-files <n>           Abort directory scans with more files (default: ${DEFAULT_WALK_LIMITS.maxFiles})
   --max-file-size <bytes>   Abort directory scans on a larger text file (default: ${DEFAULT_WALK_LIMITS.maxFileBytes})
+  --advisories <file>       Use this curated advisory set (JSON) instead of the bundled one
   --timeout <ms>            Per-request timeout for the OSV API (default: 10000)
   --concurrency <n>         Maximum simultaneous OSV requests (default: 5)
   --help, -h                Show this help
@@ -74,6 +76,7 @@ const optionSpec = {
   "max-deps": { type: "string" },
   "max-files": { type: "string" },
   "max-file-size": { type: "string" },
+  advisories: { type: "string" },
   timeout: { type: "string" },
   concurrency: { type: "string" },
   // Undocumented: lets tests point the client at a local server.
@@ -127,9 +130,18 @@ export async function main(argv: string[], io: Io): Promise<number> {
       throw new UsageError(`Cannot read ${targetPath}: ${err instanceof Error ? err.message : String(err)}`);
     }
 
+    let advisories;
+    if (values.advisories !== undefined) {
+      advisories = await loadAdvisories({ path: resolve(values.advisories) });
+      if (advisories.problems.length > 0) {
+        throw new UsageError(`--advisories file rejected:\n  - ${advisories.problems.join("\n  - ")}`);
+      }
+    }
+
     const common = {
       failOn,
       patternsMode,
+      ...(advisories !== undefined ? { advisories } : {}),
       limits: {
         ...(maxBytes !== undefined ? { maxBytes } : {}),
         ...(maxDependencies !== undefined ? { maxDependencies } : {}),

@@ -1,0 +1,15 @@
+{
+  "id": "GSK-ADV-2026-9002",
+  "status": "proposed",
+  "type": "other",
+  "severity": "HIGH",
+  "ecosystem": "npm",
+  "packages": [{ "name": "gsk-fixture-clean-pkg", "affected": { "versions": ["3.0.0"] } }],
+  "window": { "start": null, "end": null },
+  "indicators": [],
+  "summary": "SYNTHETIC: a proposed, unreviewed record. Must never produce a finding.",
+  "remediation": "TODO",
+  "sources": [{ "url": "https://example.com/unreviewed", "publisher": "Example Publisher A", "title": "Unreviewed", "published_at": "2026-02-01" }],
+  "review": { "proposed_by": "collector", "proposed_at": "2026-02-01T00:00:00Z", "reviewed_by": null, "reviewed_at": null, "notes": null },
+  "upstream": { "osv": null, "ghsa": null }
+}

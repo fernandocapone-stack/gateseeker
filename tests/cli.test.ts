@@ -171,6 +171,31 @@ describe("gateseeker scan (CLI)", () => {
   });
 });
 
+describe("gateseeker scan with --advisories (CLI)", () => {
+  it("reports curated advisory matches and fails the gate", async () => {
+    responses["gsk-fixture-malicious-pkg"] = { status: 200, body: "{}" };
+    responses["gsk-fixture-wrapper"] = { status: 200, body: "{}" };
+    responses["gsk-fixture-clean-pkg"] = { status: 200, body: "{}" };
+    const c = capture();
+    const code = await main(["scan", fixturePath("lockfiles/advisory-match.package-lock.json"), "--osv-endpoint", endpoint, "--advisories", fixturePath("intel/advisories/approved-npm-synthetic.json")], c.io);
+    expect(code).toBe(EXIT.fail);
+    const text = c.stdout();
+    expect(text).toContain("[P1] gsk-fixture-malicious-pkg@1.2.3  GSK-ADV-2026-9001  supply-chain: malicious-version");
+    expect(text).toContain("reviewed: test-reviewer");
+    expect(text).toContain("supply-chain advisories 2");
+    expect(text).toContain("gateseeker-advisories");
+  });
+
+  it("rejects an invalid or unreadable --advisories file with exit 3", async () => {
+    const a = capture();
+    expect(await main(["scan", fixturePath("lockfiles/direct-only.package-lock.json"), "--advisories", fixturePath("intel/advisories/missing.json")], a.io)).toBe(EXIT.usage);
+    expect(a.stderr()).toContain("--advisories file rejected");
+    const b = capture();
+    expect(await main(["scan", fixturePath("lockfiles/direct-only.package-lock.json"), "--advisories", fixturePath("lockfiles/v1.package-lock.json")], b.io)).toBe(EXIT.usage);
+    expect(b.stderr()).toMatch(/rejected/);
+  });
+});
+
 describe("gateseeker scan <directory> (CLI)", () => {
   const VIBE = fixturePath("projects/vibe-next-supabase");
   const CLEAN = fixturePath("projects/clean-vite");

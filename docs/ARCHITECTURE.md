@@ -1,4 +1,4 @@
-# Architecture (after Sprint 1)
+# Architecture (after Sprint 2a)
 
 ## Data flow
 
@@ -10,6 +10,8 @@ project directory ──▶ src/patterns/walker.ts ──▶ ProjectSnapshot ─
                   │
                   ▼
         src/parser/lockfile.ts ──▶ Dependency[] ──▶ src/intel/osv.ts ──▶ src/rules/{cvss,severity,findings}.ts ──▶ Finding[] (dependency-vulnerability)
+                                      │
+                                      └──▶ src/intel/advisories.ts (approved records, local match) ──▶ Finding[] (supply-chain-anomaly)
                                                                                              │
                                              both ──▶ src/rules/priority.ts (one table) ◀────┘
                                                               │
@@ -32,6 +34,11 @@ The only runtime dependency is Zod. HTTP uses Node's global `fetch`; argument pa
 | `parser/lockfile.ts` | Parse and validate `package-lock.json` v2/v3; classify each entry's version status and exposure; collapse to unique `name@version`; compare semver. | Read the file system, resolve ranges, verify integrity hashes, run npm. |
 | `intel/osv-schema.ts` | Zod schema for the subset of the OSV record Gateseeker reads. Unknown fields pass through. | Reject records for unknown fields. |
 | `intel/osv.ts` | Query OSV with timeout, concurrency limit, per-run memoisation, pagination cap, and explicit failure outcomes. | Interpret results, retry. |
+| `intel/advisory-schema.ts` | Zod schema for curated advisory records: status rules, two-publisher requirement for `approved`, semver checks for npm, text limits, credential-pattern rejection. | Fetch anything. |
+| `intel/advisories.ts` | Load the advisory set (explicit path, bundled `dist/advisories.json`, or checkout directory), keep `approved` only, match npm dependencies by exact version or range, build `supply-chain-anomaly` findings. | Download at runtime, match non-npm ecosystems (until the Composer parser exists). |
+| `intel/feed/rss.ts` | Minimal RSS/Atom parser: refuses DOCTYPE/ENTITY, bounded regexes, keeps title/link/date only. | General XML. |
+| `intel/feed/collect.ts` | Fetch configured feeds through an injected `fetch` (https only, size and time limits, no cross-host redirects), filter by keywords, extract package candidates lexically, deduplicate against committed state, write `proposed` records. | Decide anything; call a model. |
+| `intel-cli.ts` | `gateseeker-intel collect / validate / build` for maintainers and the scheduled workflow. | Run during a user's scan. |
 | `rules/cvss.ts` | CVSS 3.0/3.1 base score from a vector string. | Score CVSS 2 or 4. |
 | `rules/severity.ts` | Severity tier: max CVSS 3.x score → tier; else declared rating; else UNKNOWN. | Guess from free text. |
 | `rules/priority.ts` | The priority table and modifiers, shared by both finding kinds. Returns priority plus rule ids applied. | Anything beyond the table. |
@@ -46,12 +53,25 @@ The only runtime dependency is Zod. HTTP uses Node's global `fetch`; argument pa
 | `report/text.ts` | Human-readable output; strips control characters from every untrusted string. | Colour, interactivity. |
 | `cli.ts` | Arguments, path type detection, report writing, exit code. | Business logic. |
 
+## Curated advisory flow
+
+```
+public feeds ──(Intel feed workflow, every 6 h)──▶ advisories/proposed/*.json ──(human review in PR)──▶ advisories/approved/*.json
+                                                                                                              │
+                                                                             pnpm build: gateseeker-intel build ▼
+                                                                                                   dist/advisories.json ──▶ gateseeker scan
+```
+
+The workflow is the only one with write permissions and uses the repository's own token. CI validates every record on every push. The scanner never reads `proposed` or `rejected` records.
+
 ## Trust boundaries
 
 1. **Project files → walker and rules.** Everything in the directory is attacker-controlled. Controls: symlinks skipped; containment check on every path; fixed directory exclusions; file-count, file-size and depth limits that abort with a typed error (exit 3); binary detection by extension and NUL probe; lines over 5000 characters skipped by rules; regexes reviewed and timed against adversarial 1 MB inputs; snippets sanitized and secrets redacted; rule exceptions caught and reported as a `GSK-ENGINE-000` finding instead of crashing.
 2. **Lockfile → parser.** Byte limit before parsing, dependency-count limit, strict schema, no code execution.
 3. **OSV → client.** Schema validation (malformed response is a failed query), timeout, pagination cap, summaries and references treated as untrusted text.
-4. **Report → terminal / file.** `sanitize()` removes control characters and newlines, truncates long values. Secrets never appear in full in any output; tests assert this for the JSON report and the terminal text.
+4. **Public feeds → collector.** Feed bodies are attacker-influenceable text. Controls: allow-listed `https` sources only, 2 MB and 10 s limits, no cross-host redirects, parser refuses DOCTYPE/ENTITY, only title/link/date retained, titles sanitized, output is a `proposed` record that a human must act on.
+5. **Advisory records → scanner.** Records are data in the repository, reviewed in PRs and validated by schema in CI and at load time; credential-looking tokens are rejected; only `approved` records match.
+6. **Report → terminal / file.** `sanitize()` removes control characters and newlines, truncates long values. Secrets never appear in full in any output; tests assert this for the JSON report and the terminal text.
 
 ## Query states and the verdict
 
@@ -93,7 +113,7 @@ Dependencies:
 - Only `package-lock.json` with `lockfileVersion` 2 or 3. Only the `packages` section is read.
 - A dependency is "direct" when declared in the root entry **and** installed at top level; nested copies of direct packages are treated as transitive.
 - Workspace packages and `link: true` entries are skipped with a warning. Missing, non-semver or non-registry versions are `not-queried`, which makes the run `incomplete`.
-- OSV is the only intelligence source. A compromised package that kept its version number is not detected (planned: curated feed, Sprint 2a; supply-chain heuristics, Sprint 2b).
+- Intelligence comes from OSV plus the curated advisory set; an incident absent from both is not detected. The curated set covers what a reviewer approved; Packagist records do not match until the Composer parser exists (Sprint 2b); structural supply-chain heuristics are also Sprint 2b.
 - CVSS 2 and 4 vectors are preserved but not scored. OSV's version matching is performed server-side. No reachability analysis. No cross-run cache. Integrity hashes are not verified.
 
 Code patterns:

@@ -1,0 +1,33 @@
+{
+  "id": "GSK-ADV-2026-9001",
+  "status": "approved",
+  "type": "malicious-version",
+  "severity": "CRITICAL",
+  "ecosystem": "npm",
+  "packages": [
+    {
+      "name": "gsk-fixture-malicious-pkg",
+      "affected": {
+        "versions": ["1.2.3"],
+        "ranges": [{ "introduced": "2.0.0", "fixed": "2.0.4" }],
+        "fixed_in": "2.0.4"
+      }
+    }
+  ],
+  "window": { "start": "2026-01-10T00:00:00Z", "end": "2026-01-12T00:00:00Z" },
+  "indicators": ["Synthetic record used only by Gateseeker tests; the package does not exist."],
+  "summary": "SYNTHETIC TEST RECORD: versions 1.2.3 and 2.0.0 to 2.0.3 of a fictitious package carry a payload.",
+  "remediation": "Upgrade to 2.0.4 or later and rotate credentials present where the affected versions were installed.",
+  "sources": [
+    { "url": "https://example.com/report-a", "publisher": "Example Publisher A", "title": "Fictitious report A", "published_at": "2026-01-11" },
+    { "url": "https://example.org/report-b", "publisher": "Example Publisher B", "title": "Fictitious report B", "published_at": "2026-01-11" }
+  ],
+  "review": {
+    "proposed_by": "collector",
+    "proposed_at": "2026-01-11T06:00:00Z",
+    "reviewed_by": "test-reviewer",
+    "reviewed_at": "2026-01-11T09:00:00Z",
+    "notes": "Fixture."
+  },
+  "upstream": { "osv": null, "ghsa": null }
+}

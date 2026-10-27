@@ -1,0 +1,9 @@
+The advisory records in this directory (advisories/**) are data, licensed under
+the Creative Commons Attribution 4.0 International License (CC-BY-4.0).
+https://creativecommons.org/licenses/by/4.0/
+
+Attribution: "Gateseeker advisories, https://github.com/fernandocapone-stack/gateseeker".
+
+Each record cites its public sources; the records contain only structured facts
+and links, never the text of those sources. The Gateseeker source code remains
+under the MIT license in the repository root.

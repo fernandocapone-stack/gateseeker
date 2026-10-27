@@ -1,6 +1,8 @@
 # Gateseeker — Sprint 2a: feed de inteligência curado
 
-> Status: **proposta, aguardando aprovação do PO**. Depende da Sprint 1 concluída e validada (2026-10-27).
+> Status: **aprovada pelo PO em 2026-10-27** com todas as recomendações da seção 8: Action com `GITHUB_TOKEN` abrindo PRs, lista de fontes proposta, dados sob CC-BY-4.0, coleta a cada 6 horas, PO como revisor. Implementação em andamento.
+>
+> Desvio registrado: os registros usam **JSON** em vez de YAML, para manter zero dependências de runtime novas (um parser YAML seria a primeira). A revisão em PR funciona igual.
 > Última atualização: 2026-10-27
 
 Você é o Software Engineer responsável pelo Gateseeker. O stakeholder, Product Owner, Product Designer e auditor é o usuário humano. As regras de trabalho, a stack e os controles de segurança das Sprints 0 e 1 continuam valendo integralmente e não são repetidos aqui.
@@ -27,7 +29,7 @@ A sprint entrega um **feed de inteligência curado**: um robô coleta fontes que
 
 ### 3.1. Formato de advisory
 
-Um arquivo por registro em `advisories/`, em YAML (legível na revisão por PR), validado por esquema Zod em `src/intel/advisory-schema.ts`.
+Um arquivo por registro em `advisories/`, em JSON (sem dependência nova; legível na revisão por PR), validado por esquema Zod em `src/intel/advisory-schema.ts`. O exemplo abaixo está em YAML apenas por legibilidade; o arquivo real é o JSON equivalente.
 
 ```yaml
 id: GSK-ADV-2026-0001                 # estável, sequencial por ano
