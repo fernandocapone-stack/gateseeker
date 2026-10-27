@@ -1,4 +1,4 @@
-# Architecture (after Sprint 2a-UI)
+# Architecture (after Sprint 2b)
 
 ## Data flow
 
@@ -9,9 +9,11 @@ project directory ──▶ src/patterns/walker.ts ──▶ ProjectSnapshot ─
         └── package-lock.json (if present at root)
                   │
                   ▼
-        src/parser/lockfile.ts ──▶ Dependency[] ──▶ src/intel/osv.ts ──▶ src/rules/{cvss,severity,findings}.ts ──▶ Finding[] (dependency-vulnerability)
+        src/parser/lockfile.ts (npm) or src/parser/composer.ts ──▶ Dependency[] ──▶ src/intel/osv.ts ──▶ src/rules/{cvss,severity,findings}.ts ──▶ Finding[] (dependency-vulnerability)
                                       │
-                                      └──▶ src/intel/advisories.ts (approved records, local match) ──▶ Finding[] (supply-chain-anomaly)
+                                      ├──▶ src/intel/advisories.ts (approved records; versions/ranges locally, tag rewrites via src/intel/packagist.ts) ──▶ Finding[] (supply-chain-anomaly, origin advisory)
+                                      │
+                                      └──▶ src/supplychain/{snapshot,rules}.ts (current lock vs optional --baseline) ──▶ Finding[] (supply-chain-anomaly, origin structural)
                                                                                              │
                                              both ──▶ src/rules/priority.ts (one table) ◀────┘
                                                               │
@@ -34,6 +36,10 @@ The only runtime dependency is Zod. HTTP uses Node's global `fetch`; argument pa
 | `parser/lockfile.ts` | Parse and validate `package-lock.json` v2/v3; classify each entry's version status and exposure; collapse to unique `name@version`; compare semver. | Read the file system, resolve ranges, verify integrity hashes, run npm. |
 | `intel/osv-schema.ts` | Zod schema for the subset of the OSV record Gateseeker reads. Unknown fields pass through. | Reject records for unknown fields. |
 | `intel/osv.ts` | Query OSV with timeout, concurrency limit, per-run memoisation, pagination cap, and explicit failure outcomes. | Interpret results, retry. |
+| `parser/composer.ts` | Parse and validate Composer 2 `composer.lock` (+ optional `composer.json` for directness); normalize `vX.Y.Z`; classify `dev-*`, aliases and path/non-registry sources; keep commit, source URL, release time, autoload files and scripts per entry. | Run composer, resolve constraints. |
+| `intel/packagist.ts` | Read-only Packagist p2 metadata client (https, no token, timeout, memoised): expands the delta-encoded version list and answers which commit a version currently points at. | Write anything, query other hosts. |
+| `supplychain/snapshot.ts` | Ecosystem-neutral view of a lockfile (reference, host, install scripts, autoload files, release time, dev/direct). | Interpret. |
+| `supplychain/rules.ts` | GSK-SC-001..005 over one snapshot and an optional baseline; baseline diff summary. | Network. |
 | `intel/advisory-schema.ts` | Zod schema for curated advisory records: status rules, two-publisher requirement for `approved`, semver checks for npm, text limits, credential-pattern rejection. | Fetch anything. |
 | `intel/advisories.ts` | Load the advisory set (explicit path, bundled `dist/advisories.json`, or checkout directory), keep `approved` only, match npm dependencies by exact version or range, build `supply-chain-anomaly` findings. | Download at runtime, match non-npm ecosystems (until the Composer parser exists). |
 | `intel/feed/rss.ts` | Minimal RSS/Atom parser: refuses DOCTYPE/ENTITY, bounded regexes, keeps title/link/date only. | General XML. |
@@ -72,10 +78,12 @@ The workflow is the only one with write permissions and uses the repository's ow
 1. **Project files → walker and rules.** Everything in the directory is attacker-controlled. Controls: symlinks skipped; containment check on every path; fixed directory exclusions; file-count, file-size and depth limits that abort with a typed error (exit 3); binary detection by extension and NUL probe; lines over 5000 characters skipped by rules; regexes reviewed and timed against adversarial 1 MB inputs; snippets sanitized and secrets redacted; rule exceptions caught and reported as a `GSK-ENGINE-000` finding instead of crashing.
 2. **Lockfile → parser.** Byte limit before parsing, dependency-count limit, strict schema, no code execution.
 3. **OSV → client.** Schema validation (malformed response is a failed query), timeout, pagination cap, summaries and references treated as untrusted text.
-4. **Public feeds → collector.** Feed bodies are attacker-influenceable text. Controls: allow-listed `https` sources only, 2 MB and 10 s limits, no cross-host redirects, parser refuses DOCTYPE/ENTITY, only title/link/date retained, titles sanitized, output is a `proposed` record that a human must act on.
-5. **Advisory records → scanner.** Records are data in the repository, reviewed in PRs and validated by schema in CI and at load time; credential-looking tokens are rejected; only `approved` records match.
-6. **Browser → triage server.** Only 127.0.0.1; every API call needs the session token printed by the CLI (the page strips it from the address bar); CSP and nosniff headers; static files are confined to `ui/dist`; request bodies capped at 512 KB; the record id in a decision is taken from the server-side pending record, not from the client; approve/reject refuse to run when git has no `user.name`.
-7. **Report → terminal / file.** `sanitize()` removes control characters and newlines, truncates long values. Secrets never appear in full in any output; tests assert this for the JSON report and the terminal text.
+4. **Registry metadata → scanner.** Packagist p2 responses are validated by schema; a failed or missing lookup never clears a dependency: the tag match falls back to the time check, is marked unverified, and the Packagist query is recorded as failed, which makes the verdict `incomplete`.
+5. **Baseline lockfile → structural rules.** The baseline is user-supplied and could itself be tampered with; the report prints both lockfile hashes and the diff summary so the comparison is auditable. Rules only compare fields; nothing is fetched or executed.
+6. **Public feeds → collector.** Feed bodies are attacker-influenceable text. Controls: allow-listed `https` sources only, 2 MB and 10 s limits, no cross-host redirects, parser refuses DOCTYPE/ENTITY, only title/link/date retained, titles sanitized, output is a `proposed` record that a human must act on.
+7. **Advisory records → scanner.** Records are data in the repository, reviewed in PRs and validated by schema in CI and at load time; credential-looking tokens are rejected; only `approved` records match.
+8. **Browser → triage server.** Only 127.0.0.1; every API call needs the session token printed by the CLI (the page strips it from the address bar); CSP and nosniff headers; static files are confined to `ui/dist`; request bodies capped at 512 KB; the record id in a decision is taken from the server-side pending record, not from the client; approve/reject refuse to run when git has no `user.name`.
+9. **Report → terminal / file.** `sanitize()` removes control characters and newlines, truncates long values. Secrets never appear in full in any output; tests assert this for the JSON report and the terminal text.
 
 ## Query states and the verdict
 
@@ -117,7 +125,9 @@ Dependencies:
 - Only `package-lock.json` with `lockfileVersion` 2 or 3. Only the `packages` section is read.
 - A dependency is "direct" when declared in the root entry **and** installed at top level; nested copies of direct packages are treated as transitive.
 - Workspace packages and `link: true` entries are skipped with a warning. Missing, non-semver or non-registry versions are `not-queried`, which makes the run `incomplete`.
-- Intelligence comes from OSV plus the curated advisory set; an incident absent from both is not detected. The curated set covers what a reviewer approved; Packagist records do not match until the Composer parser exists (Sprint 2b); structural supply-chain heuristics are also Sprint 2b.
+- Intelligence comes from OSV plus the curated advisory set; an incident absent from both is not detected. Tag-rewrite matching needs the lock's `source.reference` and `time`; locks without them (or `--no-packagist`) yield unverified results.
+- Structural rules compare only what two lockfiles say; without `--baseline` only GSK-SC-001 and GSK-SC-004 run. A package appearing with several versions (npm nested copies) is skipped by the pairwise rules. Composer `composer.json` is optional; without it no dependency is "direct" and priorities are one step lower.
+- Composer versions with four components or `dev-*` branches are not queried against OSV.
 - CVSS 2 and 4 vectors are preserved but not scored. OSV's version matching is performed server-side. No reachability analysis. No cross-run cache. Integrity hashes are not verified.
 
 Code patterns:

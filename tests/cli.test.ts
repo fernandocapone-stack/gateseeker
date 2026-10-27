@@ -74,7 +74,7 @@ describe("gateseeker scan (CLI)", () => {
     expect(text).toContain("Command Injection in lodash");
     expect(text).toContain("severity: HIGH (CVSS 7.2)");
     expect(text).toContain("action:   Update lodash to 4.17.21 or later");
-    expect(text).toContain("GATE: FAIL (fail-on P2, patterns warn)");
+    expect(text).toContain("GATE: FAIL (fail-on P2, patterns warn, supply-chain rules warn)");
     expect(c.stderr()).toBe("");
   });
 
@@ -211,7 +211,7 @@ describe("gateseeker scan <directory> (CLI)", () => {
     expect(text).toContain("GSK-SECRET-001");
     expect(text).toContain("GSK-SUPABASE-001");
     expect(text).toContain("Suppressed (1):");
-    expect(text).toContain("GATE: PASS (fail-on P2, patterns warn)");
+    expect(text).toContain("GATE: PASS (fail-on P2, patterns warn, supply-chain rules warn)");
     for (const [name, value] of Object.entries(secrets)) {
       if (name !== "anon") expect(text, `secret ${name} leaked to terminal`).not.toContain(value);
     }
@@ -271,9 +271,10 @@ describe("text renderer hardening", () => {
       runId: "r",
       startedAt: "",
       finishedAt: "",
-      project: { rootPath: "/p", lockfilePath: "p", lockfileSha256: "", lockfileVersion: 3, name: null },
+      project: { rootPath: "/p", lockfilePath: "p", lockfileSha256: "", lockfileVersion: 3, name: null, lockfiles: [] },
       analyses: { dependencies: "analyzed", patterns: "not-analyzed" },
       patterns: null,
+      baseline: null,
       dependencies: [],
       queries: [],
       findings: [
@@ -293,7 +294,7 @@ describe("text renderer hardening", () => {
       ],
       summary: { dependencies: 1, queried: 1, byQueryState: { vulnerable: 1, "no-known-vulnerabilities": 0, "query-failed": 0, "not-queried": 0 }, byPriority: { P1: 0, P2: 1, P3: 0, P4: 0 }, byKind: { "dependency-vulnerability": 1, "insecure-pattern": 0, "supply-chain-anomaly": 0, "secret-exposure": 0 } },
       sources: [],
-      gate: { failOn: "P2", patternsMode: "warn", verdict: "fail", reason: "" },
+      gate: { failOn: "P2", patternsMode: "warn", supplyChainMode: "warn", verdict: "fail", reason: "" },
       errors: [],
       limitations: [],
     };

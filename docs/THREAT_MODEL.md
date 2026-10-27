@@ -1,4 +1,4 @@
-# Threat model (after Sprint 2a-UI)
+# Threat model (after Sprint 2b)
 
 Gateseeker processes attacker-controlled input (any project's files and lockfile), data from an external service (OSV), and prints results into a terminal and a file. This document lists what we protect, who might attack, where, how we mitigate, and which test proves each mitigation.
 
@@ -63,7 +63,17 @@ Gateseeker processes attacker-controlled input (any project's files and lockfile
 
 Residual: Gateseeker trusts TLS and OSV itself.
 
-### 5. Public feeds and the curated advisory set
+### 5. Registry lookups and baseline comparison (Sprint 2b)
+
+| Threat | Mitigation | Test |
+|---|---|---|
+| Packagist unavailable or tampered makes a rewritten tag look clean | Lookups are https-only to a fixed host with timeout and schema validation; a failed or missing lookup keeps the time-based match, marks it unverified and records a failed query (verdict `incomplete`). | `supplychain.test.ts` "matches by time inside the window and marks it unverified…", "with --no-packagist…" |
+| Registry still serves the poisoned tag (not yet restored) | The registry's own commit date is checked against the incident window, not just the reference equality. | `supplychain.test.ts` "matches (verified) when the registry still serves a commit dated inside the rewrite window" |
+| Attacker-controlled baseline lockfile hides a change | Both lockfiles' SHA-256 and the diff summary are printed; the baseline must be of the same kind as the scanned lock. | `supplychain.test.ts` "rejects a baseline of another lockfile kind"; `cli.test`/`supplychain.test` baseline output |
+| composer.lock crafted to crash or hang the parser | Same limits as npm (5 MB, 5000 packages), Zod schema, no execution; `composer.json` optional and tolerated when broken. | `composer.test.ts` |
+| Structural rules block builds on noise before precision is known | GSK-SC-* run in warn mode by default; `--supply-chain gate` is explicit. | `supplychain.test.ts` scan test (verdict with warn mode) |
+
+### 6. Public feeds and the curated advisory set
 
 | Threat | Mitigation | Test |
 |---|---|---|
@@ -75,7 +85,7 @@ Residual: Gateseeker trusts TLS and OSV itself.
 | Third-party text or credentials pasted into a record | Text limits on `summary`/`notes`, credential-pattern rejection over the whole record, review guidance in `advisories/README.md`. | `intel.test.ts` "credential-looking token in notes", "summary over 300 chars" |
 | The workflow token is abused | Write permissions only in the `Intel feed` workflow, scoped to contents and pull requests; the main CI stays read-only; nothing merges automatically. | By construction (`.github/workflows/intel.yml`) |
 
-### 6. Local triage interface
+### 7. Local triage interface
 
 | Threat | Mitigation | Test |
 |---|---|---|
@@ -86,14 +96,14 @@ Residual: Gateseeker trusts TLS and OSV itself.
 | Decisions without an accountable reviewer | Reviewer is read from git `user.name`; approve/reject are refused when it is missing. | `ui-server.test.ts` "refuses to approve when git has no user.name" |
 | Embedded source page attacks the interface | The source is shown in a sandboxed iframe (`allow-scripts allow-same-origin` on the remote origin only), with `referrerpolicy=no-referrer`; the app itself never reads from it. | By construction (`ReviewForm.tsx`) |
 
-### 7. Output
+### 8. Output
 
 | Threat | Mitigation | Test |
 |---|---|---|
 | Package name, advisory summary or code snippet containing ANSI escapes or newlines spoofs a `GATE: PASS` line | `sanitize()` strips C0/C1 controls, DEL, U+2028/2029 and collapses newlines before any untrusted string is printed; values are truncated. | `cli.test.ts` "strips control characters", "renders an untrusted summary without letting it break lines" |
 | Attacker-controlled URL in `ref:` or in an advisory source is auto-opened | Nothing is opened; URLs are printed as text only. | By construction |
 
-### 8. Language and interpretation
+### 9. Language and interpretation
 
 | Threat | Mitigation | Test |
 |---|---|---|

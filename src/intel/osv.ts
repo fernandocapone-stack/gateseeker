@@ -35,7 +35,7 @@ export type OsvQueryOutcome =
 export interface OsvQuery {
   name: string;
   version: string;
-  ecosystem: "npm";
+  ecosystem: "npm" | "Packagist";
 }
 
 interface ResolvedOptions {

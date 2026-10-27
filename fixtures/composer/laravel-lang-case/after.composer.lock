@@ -1,0 +1,38 @@
+{
+  "_readme": "Gateseeker fixture: lock regenerated INSIDE the Laravel-Lang attack window. Same versions as before.composer.lock, different commits dated 2026-05-22T23:00Z, and a new autoload.files entry. Synthetic: references are fake, no attacker code.",
+  "content-hash": "afterafterafterafterafterafterafter",
+  "packages": [
+    {
+      "name": "laravel-lang/attributes",
+      "version": "2.13.5",
+      "source": { "type": "git", "url": "https://github.com/Laravel-Lang/attributes.git", "reference": "aaaa00000000000000000000000000000000bad1" },
+      "dist": { "type": "zip", "url": "https://api.github.com/repos/Laravel-Lang/attributes/zipball/aaaa00000000000000000000000000000000bad1", "reference": "aaaa00000000000000000000000000000000bad1", "shasum": "" },
+      "autoload": { "psr-4": { "LaravelLang\\Attributes\\": "src/" }, "files": ["src/helpers.php"] },
+      "time": "2026-05-22T23:01:00+00:00"
+    },
+    {
+      "name": "laravel-lang/lang",
+      "version": "15.22.7",
+      "source": { "type": "git", "url": "https://github.com/Laravel-Lang/lang.git", "reference": "bbbb00000000000000000000000000000000bad1" },
+      "dist": { "type": "zip", "url": "https://api.github.com/repos/Laravel-Lang/lang/zipball/bbbb00000000000000000000000000000000bad1", "reference": "bbbb00000000000000000000000000000000bad1", "shasum": "" },
+      "autoload": { "psr-4": { "LaravelLang\\Lang\\": "src/" }, "files": ["src/helpers.php"] },
+      "time": "2026-05-22T22:40:00+00:00"
+    },
+    {
+      "name": "monolog/monolog",
+      "version": "3.9.0",
+      "source": { "type": "git", "url": "https://github.com/Seldaek/monolog.git", "reference": "3333333333333333333333333333333333333333" },
+      "dist": { "type": "zip", "url": "https://api.github.com/repos/Seldaek/monolog/zipball/3333333333333333333333333333333333333333", "reference": "3333333333333333333333333333333333333333", "shasum": "" },
+      "time": "2026-02-01T00:00:00+00:00"
+    }
+  ],
+  "packages-dev": [],
+  "aliases": [],
+  "minimum-stability": "stable",
+  "stability-flags": {},
+  "prefer-stable": true,
+  "prefer-lowest": false,
+  "platform": { "php": "^8.3" },
+  "platform-dev": {},
+  "plugin-api-version": "2.6.0"
+}

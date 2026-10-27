@@ -1,0 +1,170 @@
+{
+  "packages": {
+    "laravel-lang/lang": [
+      {
+        "name": "laravel-lang/lang",
+        "description": "List of 126 languages for Laravel Framework, Laravel Jetstream, Laravel Fortify, Laravel Breeze, Laravel Cashier, Laravel Nova, Laravel Spark and Laravel UI",
+        "keywords": [
+          "laravel",
+          "languages",
+          "lang",
+          "lpm"
+        ],
+        "homepage": "",
+        "version": "15.37.4",
+        "version_normalized": "15.37.4.0",
+        "license": [
+          "MIT"
+        ],
+        "authors": [
+          {
+            "name": "Laravel-Lang Team",
+            "homepage": "https://github.com/Laravel-Lang"
+          }
+        ],
+        "source": {
+          "url": "https://github.com/Laravel-Lang/lang.git",
+          "type": "git",
+          "reference": "a3a9ef9b039d10db442bfb3bed0a97c9b50f30a7"
+        },
+        "dist": {
+          "url": "https://api.github.com/repos/Laravel-Lang/lang/zipball/a3a9ef9b039d10db442bfb3bed0a97c9b50f30a7",
+          "type": "zip",
+          "shasum": "",
+          "reference": "a3a9ef9b039d10db442bfb3bed0a97c9b50f30a7"
+        },
+        "type": "library",
+        "support": {
+          "issues": "https://github.com/Laravel-Lang/lang/issues",
+          "source": "https://github.com/Laravel-Lang/lang"
+        },
+        "funding": [
+          {
+            "url": "https://boosty.to/dragon-code",
+            "type": "boosty"
+          },
+          {
+            "url": "https://yoomoney.ru/to/410012608840929",
+            "type": "yoomoney"
+          }
+        ],
+        "time": "2026-10-09T09:55:05+00:00",
+        "published-time": "2026-10-09T09:55:30+00:00",
+        "autoload": {
+          "psr-4": {
+            "LaravelLang\\Lang\\": "src/"
+          }
+        },
+        "extra": {
+          "laravel": {
+            "providers": [
+              "LaravelLang\\Lang\\ServiceProvider"
+            ]
+          }
+        },
+        "require": {
+          "php": "^8.2",
+          "ext-json": "*",
+          "laravel-lang/publisher": "^16.0"
+        },
+        "require-dev": {
+          "dragon-code/codestyler": "^6.0",
+          "laravel-lang/status-generator": "^2.11",
+          "phpunit/phpunit": "^11.0 || ^12.0",
+          "symfony/var-dumper": "^7.0"
+        },
+        "conflict": {
+          "laravel/framework": "<11.0.7"
+        }
+      },
+      {
+        "version": "15.37.3",
+        "version_normalized": "15.37.3.0",
+        "source": {
+          "url": "https://github.com/Laravel-Lang/lang.git",
+          "type": "git",
+          "reference": "a3504212776c77984273beb9b7ef9ecbacc2e4e4"
+        },
+        "dist": {
+          "url": "https://api.github.com/repos/Laravel-Lang/lang/zipball/a3504212776c77984273beb9b7ef9ecbacc2e4e4",
+          "type": "zip",
+          "shasum": "",
+          "reference": "a3504212776c77984273beb9b7ef9ecbacc2e4e4"
+        },
+        "time": "2026-10-01T08:03:34+00:00",
+        "published-time": "2026-10-01T08:04:10+00:00"
+      },
+      {
+        "version": "15.37.2",
+        "version_normalized": "15.37.2.0",
+        "source": {
+          "url": "https://github.com/Laravel-Lang/lang.git",
+          "type": "git",
+          "reference": "40c4749c96709e1d2da12860d4f6c249b2d52e43"
+        },
+        "dist": {
+          "url": "https://api.github.com/repos/Laravel-Lang/lang/zipball/40c4749c96709e1d2da12860d4f6c249b2d52e43",
+          "type": "zip",
+          "shasum": "",
+          "reference": "40c4749c96709e1d2da12860d4f6c249b2d52e43"
+        },
+        "time": "2026-09-30T11:01:30+00:00",
+        "published-time": "2026-09-30T11:02:14+00:00"
+      },
+      {
+        "version": "15.37.1",
+        "version_normalized": "15.37.1.0",
+        "source": {
+          "url": "https://github.com/Laravel-Lang/lang.git",
+          "type": "git",
+          "reference": "34e84328dc5d7e9008a065548f1e845115b86742"
+        },
+        "dist": {
+          "url": "https://api.github.com/repos/Laravel-Lang/lang/zipball/34e84328dc5d7e9008a065548f1e845115b86742",
+          "type": "zip",
+          "shasum": "",
+          "reference": "34e84328dc5d7e9008a065548f1e845115b86742"
+        },
+        "time": "2026-09-25T08:56:05+00:00",
+        "published-time": "2026-09-25T08:57:34+00:00"
+      },
+      {
+        "version": "15.37.0",
+        "version_normalized": "15.37.0.0",
+        "source": {
+          "url": "https://github.com/Laravel-Lang/lang.git",
+          "type": "git",
+          "reference": "fd56e2851201df06d33b10bba5f0b0017b39b0ad"
+        },
+        "dist": {
+          "url": "https://api.github.com/repos/Laravel-Lang/lang/zipball/fd56e2851201df06d33b10bba5f0b0017b39b0ad",
+          "type": "zip",
+          "shasum": "",
+          "reference": "fd56e2851201df06d33b10bba5f0b0017b39b0ad"
+        },
+        "time": "2026-09-25T08:30:22+00:00",
+        "published-time": "2026-09-25T08:31:43+00:00"
+      },
+      {
+        "version": "15.36.1",
+        "version_normalized": "15.36.1.0",
+        "source": {
+          "url": "https://github.com/Laravel-Lang/lang.git",
+          "type": "git",
+          "reference": "1a2c2ec36aa1928ba022a5c0955fa2bb17e16d89"
+        },
+        "dist": {
+          "url": "https://api.github.com/repos/Laravel-Lang/lang/zipball/1a2c2ec36aa1928ba022a5c0955fa2bb17e16d89",
+          "type": "zip",
+          "shasum": "",
+          "reference": "1a2c2ec36aa1928ba022a5c0955fa2bb17e16d89"
+        },
+        "time": "2026-09-24T11:38:30+00:00",
+        "published-time": "2026-09-24T11:39:49+00:00"
+      }
+    ]
+  },
+  "minified": "composer/2.0",
+  "recordedAt": "2026-10-27",
+  "note": "Real Packagist p2 metadata, trimmed to the 6 newest versions; delta-encoded (minified) exactly as served."
+}

@@ -1,0 +1,38 @@
+{
+  "_readme": "Gateseeker fixture: lock regenerated BEFORE the Laravel-Lang tag rewrite of 2026-05-22T22:32Z. Synthetic: references are fake, shapes real.",
+  "content-hash": "beforebeforebeforebeforebeforebefore",
+  "packages": [
+    {
+      "name": "laravel-lang/attributes",
+      "version": "2.13.5",
+      "source": { "type": "git", "url": "https://github.com/Laravel-Lang/attributes.git", "reference": "aaaa000000000000000000000000000000000001" },
+      "dist": { "type": "zip", "url": "https://api.github.com/repos/Laravel-Lang/attributes/zipball/aaaa000000000000000000000000000000000001", "reference": "aaaa000000000000000000000000000000000001", "shasum": "" },
+      "autoload": { "psr-4": { "LaravelLang\\Attributes\\": "src/" } },
+      "time": "2025-06-23T09:39:20+00:00"
+    },
+    {
+      "name": "laravel-lang/lang",
+      "version": "15.22.7",
+      "source": { "type": "git", "url": "https://github.com/Laravel-Lang/lang.git", "reference": "bbbb000000000000000000000000000000000001" },
+      "dist": { "type": "zip", "url": "https://api.github.com/repos/Laravel-Lang/lang/zipball/bbbb000000000000000000000000000000000001", "reference": "bbbb000000000000000000000000000000000001", "shasum": "" },
+      "autoload": { "psr-4": { "LaravelLang\\Lang\\": "src/" } },
+      "time": "2025-08-08T00:17:56+00:00"
+    },
+    {
+      "name": "monolog/monolog",
+      "version": "3.9.0",
+      "source": { "type": "git", "url": "https://github.com/Seldaek/monolog.git", "reference": "3333333333333333333333333333333333333333" },
+      "dist": { "type": "zip", "url": "https://api.github.com/repos/Seldaek/monolog/zipball/3333333333333333333333333333333333333333", "reference": "3333333333333333333333333333333333333333", "shasum": "" },
+      "time": "2026-02-01T00:00:00+00:00"
+    }
+  ],
+  "packages-dev": [],
+  "aliases": [],
+  "minimum-stability": "stable",
+  "stability-flags": {},
+  "prefer-stable": true,
+  "prefer-lowest": false,
+  "platform": { "php": "^8.3" },
+  "platform-dev": {},
+  "plugin-api-version": "2.6.0"
+}

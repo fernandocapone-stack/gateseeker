@@ -47,6 +47,9 @@ export interface LockfileEntry {
   dev: boolean;
   optional: boolean;
   peer: boolean;
+  resolved: string | null;
+  integrity: string | null;
+  hasInstallScript: boolean;
 }
 
 export interface ParsedLockfile {
@@ -73,6 +76,8 @@ const packageEntrySchema = z.looseObject({
   devOptional: z.boolean().optional(),
   peer: z.boolean().optional(),
   inBundle: z.boolean().optional(),
+  hasInstallScript: z.boolean().optional(),
+  integrity: z.string().optional(),
   name: z.string().optional(),
   dependencies: dependencyMap,
   devDependencies: dependencyMap,
@@ -279,6 +284,9 @@ export function parseLockfile(
       dev,
       optional: pkg.optional === true || pkg.devOptional === true,
       peer: pkg.peer === true,
+      resolved: pkg.resolved ?? null,
+      integrity: pkg.integrity ?? null,
+      hasInstallScript: pkg.hasInstallScript === true,
     });
   }
 

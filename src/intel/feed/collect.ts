@@ -41,6 +41,8 @@ export interface CollectOptions {
   config: SourcesConfig;
   state: CollectorState;
   fetch?: typeof fetch;
+  /** OSV query endpoint used to mark candidates already covered upstream; null disables the check. */
+  osvEndpoint?: string | null;
   now?: () => Date;
   timeoutMs?: number;
   maxBytes?: number;
@@ -62,7 +64,7 @@ export interface Proposal {
 export interface CollectResult {
   proposals: Proposal[];
   state: CollectorState;
-  stats: { sources: number; fetched: number; failed: number; entries: number; relevant: number; duplicates: number; tooOld: number; deferred: number; proposed: number };
+  stats: { sources: number; fetched: number; failed: number; entries: number; relevant: number; duplicates: number; tooOld: number; deferred: number; proposed: number; coveredUpstream: number };
   errors: string[];
 }
 
@@ -128,6 +130,41 @@ function guessEcosystem(title: string, candidates: string[]): (typeof ADVISORY_E
   return "other";
 }
 
+const OSV_ECOSYSTEMS: Record<string, string> = { npm: "npm", Packagist: "Packagist", PyPI: "PyPI", RubyGems: "RubyGems", "crates.io": "crates.io", Go: "Go" };
+
+/** Asks OSV whether any candidate package already has records; failures never block a proposal. */
+export async function osvCoverage(candidates: string[], ecosystem: string, fetchFn: typeof fetch, endpoint: string, timeoutMs: number): Promise<{ ids: string[]; packages: string[] }> {
+  const eco = OSV_ECOSYSTEMS[ecosystem];
+  const ids = new Set<string>();
+  const packages: string[] = [];
+  if (!eco) return { ids: [], packages };
+  for (const raw of candidates.slice(0, 5)) {
+    const name = raw.replace(/@\d+\.\d+\.\d+$/, "");
+    if (name.includes("/") && eco === "npm" && !name.startsWith("@")) continue;
+    const controller = new AbortController();
+    const timer = setTimeout(() => {
+      controller.abort();
+    }, timeoutMs);
+    try {
+      const res = await fetchFn(endpoint, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ package: { name, ecosystem: eco } }), signal: controller.signal });
+      if (!res.ok) continue;
+      const json = (await res.json()) as { vulns?: { id?: unknown; aliases?: unknown }[] };
+      const found = (json.vulns ?? []).filter((v) => typeof v.id === "string");
+      if (found.length === 0) continue;
+      packages.push(name);
+      for (const v of found) {
+        ids.add(v.id as string);
+        for (const a of Array.isArray(v.aliases) ? v.aliases : []) if (typeof a === "string") ids.add(a);
+      }
+    } catch {
+      /* unreachable OSV must not block the proposal */
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+  return { ids: [...ids].sort(), packages };
+}
+
 export function slugify(text: string): string {
   return text.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 60) || "entry";
 }
@@ -180,7 +217,8 @@ export async function collect(options: CollectOptions): Promise<CollectResult> {
   const timeoutMs = options.timeoutMs ?? 10_000;
   const maxBytes = options.maxBytes ?? 2 * 1024 * 1024;
   const state: CollectorState = { seen: { ...options.state.seen }, titles: { ...options.state.titles } };
-  const stats = { sources: 0, fetched: 0, failed: 0, entries: 0, relevant: 0, duplicates: 0, tooOld: 0, deferred: 0, proposed: 0 };
+  const stats = { sources: 0, fetched: 0, failed: 0, entries: 0, relevant: 0, duplicates: 0, tooOld: 0, deferred: 0, proposed: 0, coveredUpstream: 0 };
+  const osvEndpoint = options.osvEndpoint === undefined ? "https://api.osv.dev/v1/query" : options.osvEndpoint;
   const maxAgeMs = (options.maxAgeDays ?? 30) * 24 * 60 * 60 * 1000;
   const maxProposals = options.maxProposals ?? 25;
   const errors: string[] = [];
@@ -232,12 +270,15 @@ export async function collect(options: CollectOptions): Promise<CollectResult> {
 
       const candidates = extractCandidates(entry.title);
       const id = `GSK-ADV-${year}-${String(seq++).padStart(4, "0")}`;
+      const ecosystem = guessEcosystem(entry.title, candidates);
+      const coverage = osvEndpoint === null ? null : await osvCoverage(candidates, ecosystem, fetchFn, osvEndpoint, timeoutMs);
+      if (coverage !== null && coverage.ids.length > 0) stats.coveredUpstream++;
       const advisory: Advisory = {
         id,
         status: "proposed",
         type: "other",
         severity: "HIGH",
-        ecosystem: guessEcosystem(entry.title, candidates),
+        ecosystem,
         packages: (candidates.length > 0 ? candidates : ["UNKNOWN/fill-in"]).map((name) => ({ name: name.replace(/@\d+\.\d+\.\d+$/, ""), affected: {} })),
         window: { start: entry.publishedAt, end: null },
         indicators: [],
@@ -246,6 +287,14 @@ export async function collect(options: CollectOptions): Promise<CollectResult> {
         sources: [{ url: entry.link, publisher: source.publisher, title: entry.title, published_at: (entry.publishedAt ?? nowIso).slice(0, 10) }],
         review: { proposed_by: "collector", proposed_at: nowIso, reviewed_by: null, reviewed_at: null, notes: null },
         upstream: { osv: null, ghsa: null },
+        ...(coverage !== null && coverage.ids.length > 0
+          ? {
+              draft: {
+                upstream: { osv: coverage.ids.find((i) => !i.startsWith("GHSA-")) ?? null, ghsa: coverage.ids.find((i) => i.startsWith("GHSA-")) ?? null },
+                notes: `Already covered by OSV (${coverage.ids.slice(0, 4).join(", ")}) for ${coverage.packages.join(", ")}; the scanner reports it through OSV. Reject as duplicate unless this record adds something OSV lacks.`,
+              },
+            }
+          : {}),
       };
       proposals.push({
         fileName: `${(entry.publishedAt ?? nowIso).slice(0, 10)}-${slugify(entry.title)}.json`,
@@ -261,7 +310,7 @@ export async function collect(options: CollectOptions): Promise<CollectResult> {
 }
 
 /** Reads config and state from a checkout, runs the collector, writes proposals and state. */
-export async function runCollect(root: string, options: { fetch?: typeof fetch; now?: () => Date; dryRun?: boolean; maxAgeDays?: number; maxProposals?: number } = {}): Promise<CollectResult & { written: string[] }> {
+export async function runCollect(root: string, options: { fetch?: typeof fetch; now?: () => Date; dryRun?: boolean; maxAgeDays?: number; maxProposals?: number; osvEndpoint?: string | null } = {}): Promise<CollectResult & { written: string[] }> {
   const advisoriesDir = join(root, "advisories");
   const config = sourcesSchema.parse(JSON.parse(await readFile(join(advisoriesDir, "sources.json"), "utf8")));
   let state: CollectorState = { seen: {}, titles: {} };
@@ -280,6 +329,7 @@ export async function runCollect(root: string, options: { fetch?: typeof fetch; 
     ...(options.now ? { now: options.now } : {}),
     ...(options.maxAgeDays !== undefined ? { maxAgeDays: options.maxAgeDays } : {}),
     ...(options.maxProposals !== undefined ? { maxProposals: options.maxProposals } : {}),
+    ...(options.osvEndpoint !== undefined ? { osvEndpoint: options.osvEndpoint } : {}),
   });
 
   const written: string[] = [];
@@ -323,12 +373,14 @@ async function nextSequenceNumber(advisoriesDir: string, year: number): Promise<
 export function summarize(result: CollectResult): string {
   const lines = [
     `sources ${result.stats.sources}, fetched ${result.stats.fetched}, failed ${result.stats.failed}`,
-    `entries ${result.stats.entries}, relevant ${result.stats.relevant}, duplicates ${result.stats.duplicates}, too old ${result.stats.tooOld}, deferred to next run ${result.stats.deferred}, proposed ${result.stats.proposed}`,
+    `entries ${result.stats.entries}, relevant ${result.stats.relevant}, duplicates ${result.stats.duplicates}, too old ${result.stats.tooOld}, deferred to next run ${result.stats.deferred}, proposed ${result.stats.proposed} (already covered by OSV: ${result.stats.coveredUpstream})`,
   ];
   for (const p of result.proposals) {
     lines.push(`- [${p.advisory.id}] ${p.entry.publisher}: ${p.entry.title}`);
     lines.push(`  ${p.entry.link}`);
     lines.push(`  candidates: ${p.candidates.length > 0 ? p.candidates.join(", ") : "(none; fill in)"}`);
+    const draft = p.advisory.draft as { upstream?: { osv?: string | null; ghsa?: string | null } } | undefined;
+    if (draft?.upstream?.osv || draft?.upstream?.ghsa) lines.push(`  already covered by OSV: ${[draft.upstream.osv, draft.upstream.ghsa].filter(Boolean).join(", ")}`);
   }
   if (result.errors.length > 0) {
     lines.push("errors:");

@@ -4,7 +4,7 @@ Security gate for AI-generated code. *(working description; branding and tagline
 
 Gateseeker points at a project directory, checks the code for the security mistakes most common in AI-generated apps, asks [OSV](https://osv.dev) which installed npm versions have known vulnerabilities, ranks every finding with deterministic and auditable rules, and returns a gate verdict with an exit code you can wire into CI.
 
-**Status after Sprint 2a:** npm lockfiles (v2/v3) checked against OSV **and** a curated, human-approved advisory feed for supply-chain incidents the databases miss; eight code-pattern rules for JavaScript/TypeScript projects (Next.js, Vite, Supabase, Firebase). CLI only. See [docs/PRODUCT.md](docs/PRODUCT.md) for direction and `docs/SPRINT_*.md` for the scope this code implements.
+**Status after Sprint 2b:** npm (`package-lock.json` v2/v3) and Composer (`composer.lock`) dependencies checked against OSV **and** a curated, human-approved advisory feed, with tag-rewrite verification against Packagist; structural supply-chain rules that compare a lockfile with a baseline; eight code-pattern rules for JavaScript/TypeScript projects. CLI only. See [docs/PRODUCT.md](docs/PRODUCT.md) for direction and `docs/SPRINT_*.md` for the scope this code implements.
 
 ## Requirements
 
@@ -34,10 +34,11 @@ pnpm dev scan fixtures/projects/vibe-next-supabase
 ## Usage
 
 ```
-gateseeker scan <project-dir | package-lock.json> [options]
+gateseeker scan <project-dir | package-lock.json | composer.lock> [options]
 
-  A directory runs the code-pattern rules and, when package-lock.json exists at
-  its root, the dependency analysis. A lockfile path runs dependencies only.
+  A directory runs the code-pattern rules and, for every package-lock.json or
+  composer.lock at its root, the dependency analysis. A lockfile path runs
+  dependencies only.
 
   --format <text|json>      Output format (default: text)
   --output <file>           Also write the JSON report to <file>
@@ -45,6 +46,13 @@ gateseeker scan <project-dir | package-lock.json> [options]
   --only <deps|patterns>    Run a single analysis (directory scans only)
   --patterns <warn|gate>    warn: pattern findings are reported but do not
                             affect the verdict (default). gate: they do.
+  --supply-chain <warn|gate>
+                            Same switch for the structural supply-chain rules
+                            (GSK-SC-*). Curated advisory matches are always gated.
+  --baseline <lockfile>     A previous lockfile of the same kind to compare with
+  --max-release-age-days <n>
+                            Flag releases newer than n days (default: 3; 0 disables)
+  --no-packagist            Skip Packagist lookups; tag-rewrite matches become unverified
   --max-size <bytes>        Reject lockfiles larger than this (default: 5242880)
   --max-deps <n>            Reject lockfiles with more packages than this (default: 5000)
   --max-files <n>           Abort directory scans with more files (default: 5000)
@@ -92,13 +100,43 @@ GATE: PASS (fail-on P2, patterns warn)
 
 Secrets are never printed: a matched credential is shown as its first four characters and its length.
 
+## Supply-chain signals (Composer and npm)
+
+Besides known vulnerabilities, `gateseeker scan` looks for the shape of a supply-chain compromise:
+
+- **Curated advisories with tag rewrites.** For a Composer package named in an approved record with `affected.tags` and `commits_after`, the scanner compares the commit pinned in `composer.lock` with the commit Packagist serves today for the same version. A different commit, or a commit dated inside the incident window, is a `supply-chain-anomaly` finding. Without network (`--no-packagist`, or Packagist down) the time check alone decides and the finding is marked **unverified**; the run is `incomplete`, never `pass`.
+- **Structural rules**, no network, warn mode by default (`--supply-chain gate` to block):
+
+| Id | Signal | Needs baseline | Severity |
+|---|---|---|---|
+| `GSK-SC-001` | Production dependency pinned to a branch/commit or a git/tarball URL instead of a published version | no | MODERATE |
+| `GSK-SC-002` | An existing dependency gained `autoload.files` or install scripts | yes | HIGH |
+| `GSK-SC-003` | Same version now resolves to a different commit (Composer) or integrity hash (npm): the signature of a rewritten tag or replaced artifact | yes | CRITICAL |
+| `GSK-SC-004` | A dependency was released in the last 3 days (configurable) | no | LOW |
+| `GSK-SC-005` | A dependency's source moved to another host | yes | HIGH |
+
+The baseline is a previous lockfile of the same kind. In CI, before calling Gateseeker:
+
+```bash
+git show origin/main:composer.lock > /tmp/base.lock
+```
+
+```bash
+node dist/cli.js scan . --baseline /tmp/base.lock
+```
+
+Gateseeker never runs git itself. The report prints the hashes of both lockfiles.
+
+A dependency pinned to a branch (`dev-main`) cannot be looked up in any registry, so it is reported as not queried and the run ends `incomplete` until it is pinned to a release; the same rule that keeps a failed query from counting as clean applies here.
+
 ## Curated advisory feed
 
 Official vulnerability databases miss a class of incident: a package whose existing tags or versions are rewritten with malicious code, with no new version number and no CVE. Five months after the Laravel-Lang Composer compromise of May 2026, OSV still had no record of it. Gateseeker keeps its own curated set of such incidents under [advisories/](advisories/README.md):
 
 - A scheduled workflow (`Intel feed`, every 6 hours) reads public security feeds, keeps entries that look like supply-chain incidents, and opens a pull request with proposed records. It stores only titles, links and dates, never the text of a source.
 - A named reviewer completes each record and marks it `approved` or `rejected`. Nothing is merged or consumed automatically.
-- `pnpm build` compiles `advisories/approved/` into `dist/advisories.json`; `gateseeker scan` matches every npm dependency against it and reports hits as `supply-chain-anomaly` findings with the record's severity, sources and reviewer. Packagist records are stored and validated; they will match once the `composer.lock` parser lands (Sprint 2b).
+- `pnpm build` compiles `advisories/approved/` into `dist/advisories.json`; `gateseeker scan` matches npm and Composer dependencies against it (versions, ranges, and tag rewrites verified against Packagist) and reports hits as `supply-chain-anomaly` findings with the record's severity, sources and reviewer.
+- The collector asks OSV about every package candidate it extracts and pre-fills a draft with the official ids when the incident is already covered, so the reviewer can reject duplicates in one click.
 - Approved records are offered upstream to OSV/GHSA following [docs/UPSTREAM.md](docs/UPSTREAM.md). Advisory data is CC-BY-4.0.
 
 Maintainer commands: `gateseeker-intel collect | validate | build | ui`.

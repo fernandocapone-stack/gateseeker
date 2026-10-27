@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import { compareSemver } from "../parser/lockfile.js";
 import type { Dependency, Finding } from "../types.js";
 import { validateAdvisory, type Advisory } from "./advisory-schema.js";
+import type { PackagistClient } from "./packagist.js";
 import { decidePriority } from "../rules/priority.js";
 
 /**
@@ -110,6 +111,7 @@ export async function loadAdvisories(options: { path?: string } = {}): Promise<A
   return finish([], "none", ["no advisory set found (not built and no advisories/approved directory)"]);
 }
 
+/** Version-based match (npm and Composer): exact versions and semver ranges. Synchronous, no network. */
 export function advisoryMatches(advisory: Advisory, dep: Dependency): boolean {
   if (advisory.status !== "approved") return false;
   if (advisory.ecosystem !== dep.ecosystem) return false;
@@ -126,7 +128,70 @@ export function advisoryMatches(advisory: Advisory, dep: Dependency): boolean {
   return false;
 }
 
-export function buildAdvisoryFinding(dep: Dependency, advisory: Advisory, queriedAt: string): Finding {
+export interface TagMatchResult {
+  matched: boolean;
+  verification: "verified" | "unverified" | "not-applicable";
+  /** Present when the registry lookup failed; the scan records a failed query for it. */
+  lookupError: string | null;
+  details: Record<string, string | number | boolean | null>;
+}
+
+/**
+ * Tag-rewrite match for Composer: the advisory lists affected tags ("*" or
+ * specific ones) and the instant after which commits are suspicious. The
+ * dependency is affected when the lock's commit differs from the commit the
+ * registry reports for that version today (the tag was rewritten and later
+ * restored), or when the lock's release time falls inside the window (the
+ * rewritten tag is what the registry still serves). Without the registry the
+ * time check alone decides, marked unverified.
+ */
+export async function advisoryTagMatch(advisory: Advisory, dep: Dependency, packagist: PackagistClient | null): Promise<TagMatchResult> {
+  const none: TagMatchResult = { matched: false, verification: "not-applicable", lookupError: null, details: {} };
+  if (advisory.status !== "approved" || advisory.ecosystem !== "Packagist" || dep.ecosystem !== "Packagist") return none;
+  const pkg = advisory.packages.find((p) => p.name === dep.name);
+  if (!pkg?.affected.tags?.length || !pkg.affected.commits_after) return none;
+  const version = dep.version ?? "";
+  const tagListed = pkg.affected.tags.includes("*") || pkg.affected.tags.some((t) => t.replace(/^v/, "") === version.replace(/^v/, ""));
+  if (!tagListed) return none;
+
+  const after = Date.parse(pkg.affected.commits_after);
+  const end = advisory.window.end ? Date.parse(advisory.window.end) : Number.POSITIVE_INFINITY;
+  const within = (iso: string | null | undefined): boolean => {
+    const t = iso ? Date.parse(iso) : Number.NaN;
+    return Number.isFinite(t) && t >= after && t <= end;
+  };
+  // The commits that rewrote the tags are dated inside the window; a lock (or a registry) that
+  // reports such a date for this version pinned one of them.
+  const lockInWindow = within(dep.releasedAt);
+  const details: Record<string, string | number | boolean | null> = {
+    lockReference: dep.sourceReference ?? null,
+    lockReleasedAt: dep.releasedAt ?? null,
+    commitsAfter: pkg.affected.commits_after,
+    windowEnd: advisory.window.end,
+    lockInWindow,
+  };
+
+  if (packagist === null || !dep.sourceReference) {
+    return { matched: lockInWindow, verification: "unverified", lookupError: packagist === null ? "registry lookup disabled" : "lock has no source reference", details };
+  }
+  const current = await packagist.currentReference(dep.name, version);
+  if (current.status === "failed") {
+    return { matched: lockInWindow, verification: "unverified", lookupError: current.error, details };
+  }
+  if (current.status === "not-found") {
+    return { matched: lockInWindow, verification: "unverified", lookupError: `version ${version} not found on Packagist`, details };
+  }
+  const mismatch = current.reference !== null && current.reference !== dep.sourceReference;
+  const registryInWindow = within(current.time);
+  return {
+    matched: mismatch || registryInWindow,
+    verification: "verified",
+    lookupError: null,
+    details: { ...details, registryReference: current.reference, registryReleasedAt: current.time, referenceMismatch: mismatch, registryInWindow },
+  };
+}
+
+export function buildAdvisoryFinding(dep: Dependency, advisory: Advisory, queriedAt: string, tag?: TagMatchResult): Finding {
   const pkg = advisory.packages.find((p) => p.name === dep.name);
   const fixedIn = pkg?.affected.fixed_in ?? null;
   const fixedVersions = [...new Set([...(fixedIn ? [fixedIn] : []), ...(pkg?.affected.ranges ?? []).map((r) => r.fixed).filter((f): f is string => f !== undefined)])];
@@ -139,19 +204,23 @@ export function buildAdvisoryFinding(dep: Dependency, advisory: Advisory, querie
     subject,
     evidence: {
       kind: "supply-chain-anomaly",
+      origin: "advisory",
       advisoryId: advisory.id,
+      ruleId: null,
       type: advisory.type,
       summary: advisory.summary,
       indicators: advisory.indicators,
       window: advisory.window,
       reviewedBy: advisory.review.reviewed_by,
       reviewedAt: advisory.review.reviewed_at,
+      verification: tag?.verification ?? "not-applicable",
+      details: tag ? tag.details : null,
     },
     source: { name: ADVISORY_SOURCE_NAME, queriedAt },
     severity: { tier: advisory.severity, declared: advisory.severity, cvss: [] },
     priority: decision.priority,
     rationale: decision.rationale,
-    remediation: { fixedVersions, action: advisory.remediation },
+    remediation: { fixedVersions, action: tag?.verification === "unverified" ? `${advisory.remediation} (Registry check unavailable: verify the pinned commit manually against the package's repository.)` : advisory.remediation },
     references: advisory.sources.map((s) => ({ type: s.primary ? "PRIMARY" : "REPORT", url: s.url })),
     aiExplanation: null,
   };

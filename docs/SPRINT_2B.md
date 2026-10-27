@@ -1,6 +1,8 @@
 # Gateseeker — Sprint 2b: Composer e sinais estruturais de supply chain
 
-> Status: **proposta, aguardando aprovação do PO**. Depende da Sprint 2a (feed curado) e da 2a-UI (triagem), ambas concluídas em 2026-10-27.
+> Status: **aprovada pelo PO em 2026-10-27** (escopo, consultas de leitura ao GitHub e Packagist). Implementação concluída e **validada em 5 projetos PHP reais em 2026-10-27** (`docs/VALIDATION_SPRINT_2B.md`): 2 falsos positivos de `GSK-SC-003` eliminados por construção, demais regras corretas; Laravel-Lang verificado ao vivo no Packagist sem falso positivo.
+>
+> Desvios registrados: a verificação de tag usa só a API p2 do Packagist (um pedido por pacote, sem limite de taxa do GitHub); a API do GitHub ficou sem uso. A regra de correspondência compara também a data do commit que o registro serve hoje com a janela, para pegar o caso em que a tag ainda não foi restaurada. O registro Laravel-Lang ganhou `window.end` = 2026-05-23T00:00Z (fim da fase de reescrita, segundo a StepSecurity) para que versões publicadas depois do incidente não casem.
 > Última atualização: 2026-10-27
 
 Você é o Software Engineer responsável pelo Gateseeker. O stakeholder, Product Owner, Product Designer e auditor é o usuário humano, que não é desenvolvedor: apresente decisões em linguagem simples. As regras de trabalho, a stack e os controles de segurança das sprints anteriores continuam valendo.
