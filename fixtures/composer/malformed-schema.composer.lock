@@ -1,0 +1,5 @@
+{
+  "_readme": "Gateseeker fixture: packages is an object instead of an array",
+  "packages": { "laravel/framework": { "version": "v12.3.0" } },
+  "plugin-api-version": "2.6.0"
+}

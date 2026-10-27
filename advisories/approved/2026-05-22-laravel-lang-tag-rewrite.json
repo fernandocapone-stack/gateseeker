@@ -48,12 +48,13 @@
   ],
   "window": {
     "start": "2026-05-22T22:32:00Z",
-    "end": null
+    "end": "2026-05-23T00:00:00Z"
   },
   "indicators": [
     "Existing git tags force-pushed to new commits instead of new versions being published",
     "composer.json autoload.files gains src/helpers.php, executed on require vendor/autoload.php",
-    "Second-stage PHP credential stealer targeting CI and developer machines"
+    "Second-stage PHP credential stealer targeting CI and developer machines",
+    "Rewritten commits are dated between 2026-05-22T22:32Z and 2026-05-23T00:00Z; a lock whose pinned commit carries such a date installed one of them"
   ],
   "summary": "Existing tags of four laravel-lang Composer packages were rewritten with a credential stealer that runs during Composer bootstrap; no new version number and no CVE were issued.",
   "remediation": "Pin each laravel-lang package to a commit SHA verified to predate 2026-05-22T22:32Z, reinstall vendor from scratch, and rotate every credential present on machines or CI runners that installed these packages after that time.",
@@ -76,7 +77,7 @@
     "proposed_at": "2026-10-27T18:00:00Z",
     "reviewed_by": "fernandocapone-stack",
     "reviewed_at": "2026-10-27T21:30:00Z",
-    "notes": "Approved by the PO on 2026-10-27 after checking both sources. Repository state today: tags point to normal October commits, composer.json autoload has no helpers.php, no advisory published by the org, OSV still empty. Matching rule for Sprint 2b: lock reference committed after 2026-05-22T22:32Z and not equal to the tag's current commit."
+    "notes": "Approved by the PO on 2026-10-27 after checking both sources. Today the tags point to normal October commits, composer.json has no autoload.files, the org published no advisory and OSV is still empty. Sprint 2b: window end set to 2026-05-23T00:00Z (end of the rewrite phase per StepSecurity); matching = lock commit differs from the registry commit for the same version, or a commit dated inside the window."
   },
   "upstream": {
     "osv": null,

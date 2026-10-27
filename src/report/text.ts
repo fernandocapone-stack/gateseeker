@@ -56,12 +56,14 @@ function renderPatternFinding(f: Finding): string[] {
 function renderAdvisoryFinding(f: Finding): string[] {
   if (f.evidence.kind !== "supply-chain-anomaly") return [];
   const e = f.evidence;
+  const label = e.origin === "advisory" ? sanitize(e.advisoryId ?? "", 40) : sanitize(e.ruleId ?? "", 40);
   const out = [
-    `  [${f.priority}] ${sanitize(f.subject, 120)}  ${sanitize(e.advisoryId, 40)}  supply-chain: ${sanitize(e.type, 40)}`,
-    `       ${sanitize(e.summary, 300)}`,
-    `       severity: ${f.severity.tier}   why: ${f.rationale.join(", ")}`,
+    `  [${f.priority}] ${sanitize(f.subject, 120)}  ${label}  supply-chain: ${sanitize(e.type, 80)}`,
+    `       ${sanitize(e.summary, 400)}`,
+    `       severity: ${f.severity.tier}   why: ${f.rationale.join(", ")}${e.verification === "unverified" ? "   (unverified: registry check unavailable)" : ""}`,
     `       action:   ${sanitize(f.remediation.action, 500)}`,
   ];
+  if (e.indicators.length > 0) out.push(`       evidence: ${sanitize(e.indicators.join("; "), 300)}`);
   const ref = f.references[0];
   if (ref) out.push(`       ref:      ${sanitize(ref.url, 200)}`);
   if (e.reviewedBy) out.push(`       reviewed: ${sanitize(e.reviewedBy, 60)} on ${sanitize(e.reviewedAt ?? "?", 30)}`);
@@ -85,7 +87,13 @@ export function renderText(report: Report): string {
   out.push(`gateseeker ${report.gateseekerVersion}  run ${report.runId}`);
   out.push(line("project", sanitize(report.project.rootPath)));
   if (report.analyses.dependencies === "analyzed") {
-    out.push(line("lockfile", `${sanitize(report.project.lockfilePath ?? "")} (v${report.project.lockfileVersion ?? "?"})`));
+    for (const lf of report.project.lockfiles) {
+      out.push(line("lockfile", `${sanitize(lf.path)}${lf.lockfileVersion !== null ? ` (v${lf.lockfileVersion})` : ""}`));
+    }
+    if (report.baseline) {
+      const b = report.baseline;
+      out.push(line("baseline", `${sanitize(b.path)}  compared ${b.packagesCompared}, added ${b.added.length}, removed ${b.removed.length}, changed ${b.changed.length}`));
+    }
     out.push(
       line(
         "dependencies",
@@ -128,7 +136,7 @@ export function renderText(report: Report): string {
     out.push("");
   }
 
-  out.push(`GATE: ${report.gate.verdict.toUpperCase()} (fail-on ${report.gate.failOn}, patterns ${report.gate.patternsMode})`);
+  out.push(`GATE: ${report.gate.verdict.toUpperCase()} (fail-on ${report.gate.failOn}, patterns ${report.gate.patternsMode}, supply-chain rules ${report.gate.supplyChainMode})`);
   out.push(`  ${report.gate.reason}`);
   return out.join("\n");
 }

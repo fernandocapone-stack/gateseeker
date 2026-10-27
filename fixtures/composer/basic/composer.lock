@@ -1,0 +1,60 @@
+{
+  "_readme": ["This file locks the dependencies of your project to a known state", "Gateseeker fixture: synthetic, shapes copied from real Composer 2 lockfiles, hashes and references are fake"],
+  "content-hash": "0000000000000000000000000000fixture",
+  "packages": [
+    {
+      "name": "laravel/framework",
+      "version": "v12.3.0",
+      "source": { "type": "git", "url": "https://github.com/laravel/framework.git", "reference": "1111111111111111111111111111111111111111" },
+      "dist": { "type": "zip", "url": "https://api.github.com/repos/laravel/framework/zipball/1111111111111111111111111111111111111111", "reference": "1111111111111111111111111111111111111111", "shasum": "" },
+      "require": { "monolog/monolog": "^3.0" },
+      "time": "2026-03-01T10:00:00+00:00"
+    },
+    {
+      "name": "laravel-lang/lang",
+      "version": "15.37.2",
+      "source": { "type": "git", "url": "https://github.com/Laravel-Lang/lang.git", "reference": "2222222222222222222222222222222222222222" },
+      "dist": { "type": "zip", "url": "https://api.github.com/repos/Laravel-Lang/lang/zipball/2222222222222222222222222222222222222222", "reference": "2222222222222222222222222222222222222222", "shasum": "" },
+      "autoload": { "psr-4": { "LaravelLang\\Lang\\": "src/" } },
+      "time": "2026-04-10T08:00:00+00:00"
+    },
+    {
+      "name": "monolog/monolog",
+      "version": "3.9.0",
+      "source": { "type": "git", "url": "https://github.com/Seldaek/monolog.git", "reference": "3333333333333333333333333333333333333333" },
+      "dist": { "type": "zip", "url": "https://api.github.com/repos/Seldaek/monolog/zipball/3333333333333333333333333333333333333333", "reference": "3333333333333333333333333333333333333333", "shasum": "" },
+      "time": "2026-02-01T00:00:00+00:00"
+    },
+    {
+      "name": "acme/bleeding-edge",
+      "version": "dev-main",
+      "source": { "type": "git", "url": "https://github.com/acme/bleeding-edge.git", "reference": "4444444444444444444444444444444444444444" },
+      "dist": { "type": "zip", "url": "https://api.github.com/repos/acme/bleeding-edge/zipball/4444444444444444444444444444444444444444", "reference": "4444444444444444444444444444444444444444", "shasum": "" },
+      "time": "2026-10-01T00:00:00+00:00"
+    },
+    {
+      "name": "acme/local-helper",
+      "version": "1.0.0",
+      "dist": { "type": "path", "url": "../packages/local-helper", "reference": "5555555555555555555555555555555555555555" },
+      "scripts": { "post-install-cmd": ["Acme\\Installer::run"] },
+      "autoload": { "files": ["src/helpers.php"] }
+    }
+  ],
+  "packages-dev": [
+    {
+      "name": "phpunit/phpunit",
+      "version": "11.5.3",
+      "source": { "type": "git", "url": "https://github.com/sebastianbergmann/phpunit.git", "reference": "6666666666666666666666666666666666666666" },
+      "dist": { "type": "zip", "url": "https://api.github.com/repos/sebastianbergmann/phpunit/zipball/6666666666666666666666666666666666666666", "reference": "6666666666666666666666666666666666666666", "shasum": "" },
+      "time": "2026-01-15T12:00:00+00:00"
+    }
+  ],
+  "aliases": [],
+  "minimum-stability": "stable",
+  "stability-flags": {},
+  "prefer-stable": true,
+  "prefer-lowest": false,
+  "platform": { "php": "^8.3" },
+  "platform-dev": {},
+  "plugin-api-version": "2.6.0"
+}

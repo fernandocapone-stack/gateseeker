@@ -7,7 +7,7 @@
  *   3. explanations produced by AI (reserved field, not implemented, never decisive).
  */
 
-export type Ecosystem = "npm";
+export type Ecosystem = "npm" | "Packagist";
 
 /** How trustworthy the version string of a lockfile entry is. */
 export type VersionStatus =
@@ -32,6 +32,10 @@ export interface Dependency {
   exposure: Exposure;
   /** Lockfile paths where this name@version appears. */
   paths: string[];
+  /** Composer only: commit fixed in the lock, its VCS url and release time, used by supply-chain rules. */
+  sourceReference?: string | null;
+  sourceUrl?: string | null;
+  releasedAt?: string | null;
 }
 
 export type QueryState =
@@ -103,19 +107,27 @@ export interface PatternEvidence {
   details: Record<string, string | number | boolean | null> | null;
 }
 
-/** Facts from a curated Gateseeker advisory (see advisories/). */
-export interface AdvisoryEvidence {
+/** Facts behind a supply-chain finding: a curated advisory (advisories/) or a structural rule on the lockfile. */
+export interface SupplyChainEvidence {
   kind: "supply-chain-anomaly";
-  advisoryId: string;
+  origin: "advisory" | "structural";
+  advisoryId: string | null;
+  ruleId: string | null;
   type: string;
   summary: string;
   indicators: string[];
-  window: { start: string | null; end: string | null };
+  window: { start: string | null; end: string | null } | null;
   reviewedBy: string | null;
   reviewedAt: string | null;
+  /** "verified": checked against the registry/baseline; "unverified": the check could not run; "not-applicable": no external check involved. */
+  verification: "verified" | "unverified" | "not-applicable";
+  details: Record<string, string | number | boolean | null> | null;
 }
 
-export type Evidence = DependencyEvidence | PatternEvidence | AdvisoryEvidence;
+/** @deprecated name kept for readers of older code; use SupplyChainEvidence. */
+export type AdvisoryEvidence = SupplyChainEvidence;
+
+export type Evidence = DependencyEvidence | PatternEvidence | SupplyChainEvidence;
 
 export interface Finding {
   id: string;
@@ -163,7 +175,19 @@ export interface Report {
     lockfileSha256: string | null;
     lockfileVersion: number | null;
     name: string | null;
+    /** Every lockfile analyzed (npm and/or Composer). */
+    lockfiles: { path: string; kind: string; sha256: string; lockfileVersion: number | null }[];
   };
+  /** Comparison with a previous lockfile, when --baseline was given. */
+  baseline: {
+    path: string;
+    sha256: string;
+    ecosystem: Ecosystem;
+    packagesCompared: number;
+    added: string[];
+    removed: string[];
+    changed: string[];
+  } | null;
   /** Which analyses ran. Absent analyses are declared, not silently skipped. */
   analyses: {
     dependencies: "analyzed" | "not-analyzed";
@@ -186,6 +210,8 @@ export interface Report {
     failOn: Priority;
     /** "warn": pattern findings are reported but do not affect the verdict. */
     patternsMode: PatternsMode;
+    /** Same switch for the structural supply-chain rules (GSK-SC-*). Curated advisory matches are always gated. */
+    supplyChainMode: PatternsMode;
     verdict: Verdict;
     reason: string;
   };

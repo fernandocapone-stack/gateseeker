@@ -1,0 +1,21 @@
+{
+  "_readme": "Gateseeker fixture: ordinary update baseline. Synthetic references.",
+  "packages": [
+    {
+      "name": "monolog/monolog",
+      "version": "3.8.0",
+      "source": { "type": "git", "url": "https://github.com/Seldaek/monolog.git", "reference": "3380000000000000000000000000000000000000" },
+      "dist": { "type": "zip", "url": "https://api.github.com/repos/Seldaek/monolog/zipball/3380000000000000000000000000000000000000", "reference": "3380000000000000000000000000000000000000", "shasum": "" },
+      "time": "2025-12-01T00:00:00+00:00"
+    },
+    {
+      "name": "acme/removed-later",
+      "version": "1.0.0",
+      "source": { "type": "git", "url": "https://github.com/acme/removed-later.git", "reference": "7777777777777777777777777777777777777777" },
+      "dist": { "type": "zip", "url": "https://api.github.com/repos/acme/removed-later/zipball/7777777777777777777777777777777777777777", "reference": "7777777777777777777777777777777777777777", "shasum": "" },
+      "time": "2025-01-01T00:00:00+00:00"
+    }
+  ],
+  "packages-dev": [],
+  "plugin-api-version": "2.6.0"
+}

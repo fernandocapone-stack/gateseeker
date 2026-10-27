@@ -21,10 +21,11 @@ export const EXIT = { pass: 0, fail: 1, incomplete: 2, usage: 3 } as const;
 
 const USAGE = `gateseeker ${GATESEEKER_VERSION}
 
-Usage: gateseeker scan <project-dir | package-lock.json> [options]
+Usage: gateseeker scan <project-dir | package-lock.json | composer.lock> [options]
 
-  A directory runs the code-pattern rules and, when package-lock.json exists at
-  its root, the dependency analysis. A lockfile path runs dependencies only.
+  A directory runs the code-pattern rules and, for every package-lock.json or
+  composer.lock at its root, the dependency analysis. A lockfile path runs
+  dependencies only.
 
 Options:
   --format <text|json>      Output format (default: text)
@@ -33,6 +34,14 @@ Options:
   --only <deps|patterns>    Run a single analysis (directory scans only)
   --patterns <warn|gate>    warn: pattern findings are reported but do not
                             affect the verdict (default). gate: they do.
+  --supply-chain <warn|gate>
+                            Same switch for the structural supply-chain rules
+                            (GSK-SC-*). Curated advisory matches are always gated.
+  --baseline <lockfile>     A previous lockfile of the same kind to compare with
+                            (in CI: git show origin/main:composer.lock > base.lock)
+  --max-release-age-days <n>
+                            Flag releases newer than n days (default: 3; 0 disables)
+  --no-packagist            Skip Packagist lookups; tag-rewrite matches become unverified
   --max-size <bytes>        Reject lockfiles larger than this (default: ${DEFAULT_PARSER_LIMITS.maxBytes})
   --max-deps <n>            Reject lockfiles with more packages than this (default: ${DEFAULT_PARSER_LIMITS.maxDependencies})
   --max-files <n>           Abort directory scans with more files (default: ${DEFAULT_WALK_LIMITS.maxFiles})
@@ -72,6 +81,12 @@ const optionSpec = {
   "fail-on": { type: "string" },
   only: { type: "string" },
   patterns: { type: "string" },
+  "supply-chain": { type: "string" },
+  baseline: { type: "string" },
+  "max-release-age-days": { type: "string" },
+  "no-packagist": { type: "boolean" },
+  // Undocumented: lets tests point the Packagist client at a local server.
+  "packagist-base": { type: "string" },
   "max-size": { type: "string" },
   "max-deps": { type: "string" },
   "max-files": { type: "string" },
@@ -115,6 +130,20 @@ export async function main(argv: string[], io: Io): Promise<number> {
     const failOn = oneOf(values["fail-on"]?.toUpperCase(), PRIORITIES, "fail-on", "P2");
     const only = values.only === undefined ? undefined : oneOf(values.only, ["deps", "patterns"] as const, "only", "deps");
     const patternsMode = oneOf(values.patterns, ["warn", "gate"] as const, "patterns", "warn");
+    const supplyChainMode = oneOf(values["supply-chain"], ["warn", "gate"] as const, "supply-chain", "warn");
+    const maxReleaseAgeDays = values["max-release-age-days"] !== undefined ? Number(values["max-release-age-days"]) : undefined;
+    if (maxReleaseAgeDays !== undefined && !(Number.isInteger(maxReleaseAgeDays) && maxReleaseAgeDays >= 0)) {
+      throw new UsageError(`--max-release-age-days must be a non-negative integer, got "${values["max-release-age-days"] ?? ""}".`);
+    }
+    let baseline: { path: string; content: string } | undefined;
+    if (values.baseline !== undefined) {
+      const baselinePath = resolve(values.baseline);
+      try {
+        baseline = { path: baselinePath, content: await readFile(baselinePath, "utf8") };
+      } catch (err) {
+        throw new UsageError(`Cannot read --baseline ${baselinePath}: ${err instanceof Error ? err.message : String(err)}`);
+      }
+    }
     const maxBytes = positiveInt(values["max-size"], "max-size");
     const maxDependencies = positiveInt(values["max-deps"], "max-deps");
     const maxFiles = positiveInt(values["max-files"], "max-files");
@@ -141,6 +170,10 @@ export async function main(argv: string[], io: Io): Promise<number> {
     const common = {
       failOn,
       patternsMode,
+      supplyChainMode,
+      ...(maxReleaseAgeDays !== undefined ? { maxReleaseAgeDays } : {}),
+      ...(baseline !== undefined ? { baseline } : {}),
+      ...(values["no-packagist"] === true ? { packagist: false as const } : values["packagist-base"] !== undefined ? { packagist: { base: values["packagist-base"] } } : {}),
       ...(advisories !== undefined ? { advisories } : {}),
       limits: {
         ...(maxBytes !== undefined ? { maxBytes } : {}),
@@ -163,7 +196,15 @@ export async function main(argv: string[], io: Io): Promise<number> {
     } else {
       if (only !== undefined) throw new UsageError("--only applies to directory scans; a lockfile path always runs the dependency analysis only.");
       const content = await readFile(targetPath, "utf8");
-      result = await scan({ lockfilePath: targetPath, lockfileContent: content, ...common });
+      let manifestContent: string | null = null;
+      if (targetPath.toLowerCase().endsWith("composer.lock")) {
+        try {
+          manifestContent = await readFile(resolve(targetPath, "..", "composer.json"), "utf8");
+        } catch {
+          manifestContent = null;
+        }
+      }
+      result = await scan({ lockfilePath: targetPath, lockfileContent: content, manifestContent, ...common });
     }
 
     if (!result.ok) {

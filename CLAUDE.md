@@ -26,11 +26,12 @@ Read `docs/SPRINT_0.md` (current scope) and `docs/PRODUCT.md` (direction) before
 ## Layout
 
 ```
-src/parser/    package-lock.json parsing and limits
+src/parser/    package-lock.json (lockfile.ts) and composer.lock (composer.ts) parsing and limits
+src/supplychain/ lockfile snapshot + structural rules GSK-SC-001..005 (baseline comparison)
 src/intel/     OSV client and schema
 src/rules/     CVSS scoring, severity tier, priority table, finding builder
 src/patterns/  directory walker, file classifier, gitignore matcher, rule engine, rules/ (one file per GSK rule)
-src/intel/     OSV client, advisory schema + loader/matcher, feed/ (RSS parser, collector), ui/ (local triage server, git allowlist)
+src/intel/     OSV client, Packagist p2 client, advisory schema + loader/matcher (incl. tag-rewrite verification), feed/ (RSS parser, collector with OSV coverage check), ui/ (local triage server, git allowlist)
 ui/            separate Vite + React + Tailwind package (shadcn-style components) served by `gateseeker-intel ui`; built into ui/dist
 e2e/           Playwright tests for the triage interface (webServer: e2e/start.mjs builds a throwaway repo)
 src/report/    text renderer

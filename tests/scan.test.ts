@@ -41,6 +41,7 @@ describe("scan", () => {
     expect(report.gate).toEqual({
       failOn: "P2",
       patternsMode: "warn",
+      supplyChainMode: "warn",
       verdict: "fail",
       reason: "5 finding(s) at priority P2 or higher.",
     });
@@ -81,7 +82,7 @@ describe("scan", () => {
     const report = await run("direct-only.package-lock.json", { lodash: EMPTY, zod: EMPTY });
     expect(report.findings).toEqual([]);
     expect(report.gate.verdict).toBe("pass");
-    expect(report.gate.reason).toMatch(/^All 2 dependencies were queried; no finding at priority P2 or higher\. No known vulnerabilities at that level were found in the sources consulted\.$/);
+    expect(report.gate.reason).toMatch(/^All 2 dependency queries completed; no finding at priority P2 or higher\. No known vulnerabilities at that level were found in the sources consulted\.$/);
   });
 
   it("respects --fail-on: P1 threshold still fails, P1-only threshold with P2 findings passes", async () => {
@@ -136,7 +137,7 @@ describe("scan", () => {
   it("rejects an invalid lockfile before any network call", async () => {
     let calls = 0;
     const result = await scan({
-      lockfilePath: "x",
+      lockfilePath: "x", // unknown name: the kind is probed from the content, then the parser rejects v1
       lockfileContent: readFixture("lockfiles/v1.package-lock.json"),
       osv: {
         fetch: () => {

@@ -1,0 +1,22 @@
+{
+  "_readme": "Gateseeker fixture: ordinary update. monolog moves 3.8.0 -> 3.9.0 with a new commit, one package removed, one added. Synthetic references.",
+  "packages": [
+    {
+      "name": "monolog/monolog",
+      "version": "3.9.0",
+      "source": { "type": "git", "url": "https://github.com/Seldaek/monolog.git", "reference": "3333333333333333333333333333333333333333" },
+      "dist": { "type": "zip", "url": "https://api.github.com/repos/Seldaek/monolog/zipball/3333333333333333333333333333333333333333", "reference": "3333333333333333333333333333333333333333", "shasum": "" },
+      "time": "2026-02-01T00:00:00+00:00"
+    },
+    {
+      "name": "acme/added-now",
+      "version": "2.0.0",
+      "source": { "type": "git", "url": "https://github.com/acme/added-now.git", "reference": "8888888888888888888888888888888888888888" },
+      "dist": { "type": "zip", "url": "https://api.github.com/repos/acme/added-now/zipball/8888888888888888888888888888888888888888", "reference": "8888888888888888888888888888888888888888", "shasum": "" },
+      "autoload": { "files": ["src/bootstrap.php"] },
+      "time": "2026-03-01T00:00:00+00:00"
+    }
+  ],
+  "packages-dev": [],
+  "plugin-api-version": "2.6.0"
+}
