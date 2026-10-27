@@ -74,7 +74,7 @@ describe("gateseeker scan (CLI)", () => {
     expect(text).toContain("Command Injection in lodash");
     expect(text).toContain("severity: HIGH (CVSS 7.2)");
     expect(text).toContain("action:   Update lodash to 4.17.21 or later");
-    expect(text).toContain("GATE: FAIL (fail-on P2)");
+    expect(text).toContain("GATE: FAIL (fail-on P2, patterns warn)");
     expect(c.stderr()).toBe("");
   });
 
@@ -86,9 +86,9 @@ describe("gateseeker scan (CLI)", () => {
     const code = await main(["scan", fixturePath("lockfiles/direct-only.package-lock.json"), "--osv-endpoint", endpoint], c.io);
 
     expect(code).toBe(EXIT.pass);
-    expect(c.stdout()).toContain("No known vulnerabilities were found in the sources consulted.");
+    expect(c.stdout()).toContain("No known vulnerabilities or insecure patterns were found in the sources consulted.");
     expect(c.stdout()).toContain("GATE: PASS");
-    expect(c.stdout()).not.toMatch(/secure|safe|free of/i);
+    expect(c.stdout()).not.toMatch(/\b(secure|safe|free of)\b/i);
   });
 
   it("exits 2 when the source fails, even with no findings", async () => {
@@ -171,6 +171,69 @@ describe("gateseeker scan (CLI)", () => {
   });
 });
 
+describe("gateseeker scan <directory> (CLI)", () => {
+  const VIBE = fixturePath("projects/vibe-next-supabase");
+  const CLEAN = fixturePath("projects/clean-vite");
+  const secrets = JSON.parse(readFixture("projects/secrets.json")) as Record<string, string>;
+
+  it("warn mode: pattern findings are printed but the exit code follows dependencies", async () => {
+    responses["lodash"] = { status: 200, body: "{}" };
+    responses["zod"] = { status: 200, body: "{}" };
+    const c = capture();
+    const code = await main(["scan", VIBE, "--osv-endpoint", endpoint], c.io);
+    expect(code).toBe(EXIT.pass);
+    const text = c.stdout();
+    expect(text).toContain("GSK-SECRET-001");
+    expect(text).toContain("GSK-SUPABASE-001");
+    expect(text).toContain("Suppressed (1):");
+    expect(text).toContain("GATE: PASS (fail-on P2, patterns warn)");
+    for (const [name, value] of Object.entries(secrets)) {
+      if (name !== "anon") expect(text, `secret ${name} leaked to terminal`).not.toContain(value);
+    }
+  });
+
+  it("gate mode: pattern findings fail the gate (exit 1)", async () => {
+    responses["lodash"] = { status: 200, body: "{}" };
+    responses["zod"] = { status: 200, body: "{}" };
+    const c = capture();
+    const code = await main(["scan", VIBE, "--osv-endpoint", endpoint, "--patterns", "gate", "--format", "json"], c.io);
+    expect(code).toBe(EXIT.fail);
+    const report = JSON.parse(c.stdout()) as Report;
+    expect(report.gate.patternsMode).toBe("gate");
+    expect(report.analyses).toEqual({ dependencies: "analyzed", patterns: "analyzed" });
+    const json = c.stdout();
+    for (const [name, value] of Object.entries(secrets)) {
+      if (name !== "anon") expect(json, `secret ${name} leaked to JSON`).not.toContain(value);
+    }
+  });
+
+  it("--only patterns never contacts the OSV endpoint; a clean project passes with exit 0", async () => {
+    const c = capture();
+    const code = await main(["scan", CLEAN, "--osv-endpoint", "http://127.0.0.1:9/", "--only", "patterns", "--patterns", "gate"], c.io);
+    expect(code).toBe(EXIT.pass);
+    expect(c.stdout()).toContain("dependencies   not analyzed");
+    expect(c.stdout()).toContain("No known vulnerabilities or insecure patterns were found in the sources consulted.");
+  });
+
+  it("walker limits reject the input with exit 3", async () => {
+    const c = capture();
+    expect(await main(["scan", VIBE, "--only", "patterns", "--max-files", "2"], c.io)).toBe(EXIT.usage);
+    expect(c.stderr()).toContain("Input rejected (too-many-files)");
+    const d = capture();
+    expect(await main(["scan", VIBE, "--only", "patterns", "--max-file-size", "100"], d.io)).toBe(EXIT.usage);
+    expect(d.stderr()).toContain("Input rejected (file-too-large)");
+  });
+
+  it("rejects --only on a lockfile path and bad --patterns values", async () => {
+    const a = capture();
+    expect(await main(["scan", fixturePath("lockfiles/direct-only.package-lock.json"), "--only", "deps"], a.io)).toBe(EXIT.usage);
+    expect(a.stderr()).toContain("--only applies to directory scans");
+    const b = capture();
+    expect(await main(["scan", VIBE, "--patterns", "loud"], b.io)).toBe(EXIT.usage);
+    expect(b.stderr()).toContain("--patterns must be one of warn, gate");
+  });
+});
+
 describe("text renderer hardening", () => {
   it("strips control characters and newlines from untrusted strings", () => {
     expect(sanitize("evil\u001b[31m\nname\u0007")).toBe("evil[31m name");
@@ -183,7 +246,9 @@ describe("text renderer hardening", () => {
       runId: "r",
       startedAt: "",
       finishedAt: "",
-      project: { lockfilePath: "p", lockfileSha256: "", lockfileVersion: 3, name: null },
+      project: { rootPath: "/p", lockfilePath: "p", lockfileSha256: "", lockfileVersion: 3, name: null },
+      analyses: { dependencies: "analyzed", patterns: "not-analyzed" },
+      patterns: null,
       dependencies: [],
       queries: [],
       findings: [
@@ -191,7 +256,7 @@ describe("text renderer hardening", () => {
           id: "X::a@1",
           kind: "dependency-vulnerability",
           subject: "a@1",
-          evidence: { vulnerabilityId: "X", aliases: [], summary: "line1\nGATE: PASS\u001b[0m", details: null, published: null, modified: null, affectedRanges: null },
+          evidence: { kind: "dependency-vulnerability", vulnerabilityId: "X", aliases: [], summary: "line1\nGATE: PASS\u001b[0m", details: null, published: null, modified: null, affectedRanges: null },
           source: { name: "osv.dev", queriedAt: "" },
           severity: { tier: "UNKNOWN", declared: null, cvss: [] },
           priority: "P2",
@@ -201,9 +266,9 @@ describe("text renderer hardening", () => {
           aiExplanation: null,
         },
       ],
-      summary: { dependencies: 1, queried: 1, byQueryState: { vulnerable: 1, "no-known-vulnerabilities": 0, "query-failed": 0, "not-queried": 0 }, byPriority: { P1: 0, P2: 1, P3: 0, P4: 0 } },
+      summary: { dependencies: 1, queried: 1, byQueryState: { vulnerable: 1, "no-known-vulnerabilities": 0, "query-failed": 0, "not-queried": 0 }, byPriority: { P1: 0, P2: 1, P3: 0, P4: 0 }, byKind: { "dependency-vulnerability": 1, "insecure-pattern": 0, "supply-chain-anomaly": 0, "secret-exposure": 0 } },
       sources: [],
-      gate: { failOn: "P2", verdict: "fail", reason: "" },
+      gate: { failOn: "P2", patternsMode: "warn", verdict: "fail", reason: "" },
       errors: [],
       limitations: [],
     };

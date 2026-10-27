@@ -1,9 +1,9 @@
 import type { Finding, Report } from "../types.js";
 
 /**
- * Human-readable terminal output. All strings coming from the lockfile or
- * from OSV are untrusted: control characters are stripped so a crafted
- * package name or summary cannot drive the terminal.
+ * Human-readable terminal output. All strings coming from the lockfile, from
+ * project files or from OSV are untrusted: control characters are stripped so
+ * a crafted package name or summary cannot drive the terminal.
  */
 
 const cc = (code: number): string => String.fromCharCode(code);
@@ -22,14 +22,16 @@ function line(label: string, value: string): string {
   return `${label.padEnd(14)} ${value}`;
 }
 
-function renderFinding(f: Finding): string[] {
-  const alias = f.evidence.aliases[0];
-  const ids = alias ? `${f.evidence.vulnerabilityId} (${sanitize(alias, 40)})` : f.evidence.vulnerabilityId;
+function renderDependencyFinding(f: Finding): string[] {
+  if (f.evidence.kind !== "dependency-vulnerability") return [];
+  const e = f.evidence;
+  const alias = e.aliases[0];
+  const ids = alias ? `${e.vulnerabilityId} (${sanitize(alias, 40)})` : e.vulnerabilityId;
   const cvss = f.severity.cvss.find((c) => c.score !== null);
   const sev = cvss ? `${f.severity.tier} (CVSS ${cvss.score})` : f.severity.tier;
   const out = [
     `  [${f.priority}] ${sanitize(f.subject, 120)}  ${sanitize(ids, 120)}`,
-    `       ${sanitize(f.evidence.summary ?? "(no summary provided by source)")}`,
+    `       ${sanitize(e.summary ?? "(no summary provided by source)")}`,
     `       severity: ${sev}   why: ${f.rationale.join(", ")}`,
     `       action:   ${sanitize(f.remediation.action, 300)}`,
   ];
@@ -38,30 +40,60 @@ function renderFinding(f: Finding): string[] {
   return out;
 }
 
+function renderPatternFinding(f: Finding): string[] {
+  if (f.evidence.kind !== "insecure-pattern") return [];
+  const e = f.evidence;
+  const out = [
+    `  [${f.priority}] ${sanitize(f.subject, 160)}  ${sanitize(e.ruleId, 40)}  ${sanitize(e.title, 100)}`,
+    `       ${sanitize(e.message, 300)}`,
+  ];
+  if (e.snippet.length > 0) out.push(`       code:     ${sanitize(e.snippet, 160)}`);
+  out.push(`       severity: ${f.severity.tier} (${sanitize(e.fileClass, 20)} file)   why: ${f.rationale.join(", ")}`);
+  out.push(`       action:   ${sanitize(f.remediation.action, 300)}`);
+  return out;
+}
+
 export function renderText(report: Report): string {
   const s = report.summary;
   const out: string[] = [];
   out.push(`gateseeker ${report.gateseekerVersion}  run ${report.runId}`);
-  out.push(line("lockfile", `${sanitize(report.project.lockfilePath)} (v${report.project.lockfileVersion})`));
-  out.push(
-    line(
-      "dependencies",
-      `${s.dependencies} unique  (queried ${s.queried}, not queried ${s.byQueryState["not-queried"]}, failed ${s.byQueryState["query-failed"]})`,
-    ),
-  );
-  out.push(line("source", report.sources.map((x) => x.name).join(", ")));
+  out.push(line("project", sanitize(report.project.rootPath)));
+  if (report.analyses.dependencies === "analyzed") {
+    out.push(line("lockfile", `${sanitize(report.project.lockfilePath ?? "")} (v${report.project.lockfileVersion ?? "?"})`));
+    out.push(
+      line(
+        "dependencies",
+        `${s.dependencies} unique  (queried ${s.queried}, not queried ${s.byQueryState["not-queried"]}, failed ${s.byQueryState["query-failed"]})`,
+      ),
+    );
+  } else {
+    out.push(line("dependencies", "not analyzed (no package-lock.json at root, or --only patterns)"));
+  }
+  if (report.patterns) {
+    const p = report.patterns;
+    out.push(line("code", `${p.filesScanned} files scanned, ${p.filesSkippedIgnored} ignored, ${p.filesSkippedBinary} binary; ${p.rulesRun.length} rules; mode ${report.gate.patternsMode}`));
+  } else {
+    out.push(line("code", "not analyzed (lockfile-only scan, or --only deps)"));
+  }
+  out.push(line("sources", report.sources.map((x) => x.name).join(", ") || "none"));
   out.push("");
 
   if (report.findings.length === 0) {
-    out.push("No known vulnerabilities were found in the sources consulted.");
+    out.push("No known vulnerabilities or insecure patterns were found in the sources consulted.");
   } else {
     out.push(
-      `Findings: ${report.findings.length}  (P1 ${s.byPriority.P1}, P2 ${s.byPriority.P2}, P3 ${s.byPriority.P3}, P4 ${s.byPriority.P4})`,
+      `Findings: ${report.findings.length}  (P1 ${s.byPriority.P1}, P2 ${s.byPriority.P2}, P3 ${s.byPriority.P3}, P4 ${s.byPriority.P4})  dependencies ${s.byKind["dependency-vulnerability"]}, code patterns ${s.byKind["insecure-pattern"]}`,
     );
     for (const f of report.findings) {
-      out.push(...renderFinding(f));
+      out.push(...(f.kind === "insecure-pattern" ? renderPatternFinding(f) : renderDependencyFinding(f)));
       out.push("");
     }
+  }
+
+  if (report.patterns && report.patterns.suppressions.length > 0) {
+    out.push(`Suppressed (${report.patterns.suppressions.length}):`);
+    for (const sup of report.patterns.suppressions) out.push(`  - ${sanitize(`${sup.file}:${sup.line} ${sup.ruleId}: ${sup.reason}`, 200)}`);
+    out.push("");
   }
 
   if (report.errors.length > 0) {
@@ -70,7 +102,7 @@ export function renderText(report: Report): string {
     out.push("");
   }
 
-  out.push(`GATE: ${report.gate.verdict.toUpperCase()} (fail-on ${report.gate.failOn})`);
+  out.push(`GATE: ${report.gate.verdict.toUpperCase()} (fail-on ${report.gate.failOn}, patterns ${report.gate.patternsMode})`);
   out.push(`  ${report.gate.reason}`);
   return out.join("\n");
 }

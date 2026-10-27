@@ -5,3 +5,6 @@ coverage/
 .DS_Store
 # Reports produced by local scans. Fixtures live in fixtures/ and are versioned.
 gateseeker-report*.json
+
+# Fixture projects intentionally contain a fake node_modules directory and dotenv files.
+!fixtures/projects/*/node_modules/

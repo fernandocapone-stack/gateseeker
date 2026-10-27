@@ -56,6 +56,7 @@ export function buildFinding(
     kind: "dependency-vulnerability",
     subject,
     evidence: {
+      kind: "dependency-vulnerability",
       vulnerabilityId: vuln.id,
       aliases: vuln.aliases ?? [],
       summary: vuln.summary ?? null,

@@ -39,9 +39,13 @@ describe("scan", () => {
 
     expect(report.gate).toEqual({
       failOn: "P2",
+      patternsMode: "warn",
       verdict: "fail",
       reason: "5 finding(s) at priority P2 or higher.",
     });
+    expect(report.analyses).toEqual({ dependencies: "analyzed", patterns: "not-analyzed" });
+    expect(report.patterns).toBeNull();
+    expect(report.summary.byKind["dependency-vulnerability"]).toBe(5);
     expect(report.summary.byQueryState).toEqual({
       vulnerable: 1,
       "no-known-vulnerabilities": 1,
@@ -71,7 +75,7 @@ describe("scan", () => {
     const report = await run("direct-only.package-lock.json", { lodash: EMPTY, zod: EMPTY });
     expect(report.findings).toEqual([]);
     expect(report.gate.verdict).toBe("pass");
-    expect(report.gate.reason).toMatch(/No known vulnerabilities at that level were found in the sources consulted/);
+    expect(report.gate.reason).toMatch(/^All 2 dependencies were queried; no finding at priority P2 or higher\. No known vulnerabilities at that level were found in the sources consulted\.$/);
   });
 
   it("respects --fail-on: P1 threshold still fails, P1-only threshold with P2 findings passes", async () => {
@@ -118,7 +122,7 @@ describe("scan", () => {
     // injected to observe exposure-driven priorities on the same vulnerability data.
     const lodashAsMs = LODASH.replaceAll('"name": "lodash"', '"name": "ms"');
     const report = await run("transitive.package-lock.json", { ms: lodashAsMs, debug: EMPTY, "fake-test-runner": EMPTY });
-    const cmdInjection = report.findings.filter((f) => f.evidence.vulnerabilityId === "GHSA-35jh-r3h4-6jhm");
+    const cmdInjection = report.findings.filter((f) => f.evidence.kind === "dependency-vulnerability" && f.evidence.vulnerabilityId === "GHSA-35jh-r3h4-6jhm");
     const byDep = Object.fromEntries(cmdInjection.map((f) => [f.subject, f.priority]));
     expect(byDep).toEqual({ "ms@2.1.2": "P2", "ms@2.0.0": "P3" });
   });

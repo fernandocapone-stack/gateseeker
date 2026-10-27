@@ -1,6 +1,6 @@
 # Gateseeker — Sprint 1: padrões inseguros em código gerado por IA
 
-> Status: **proposta, aguardando aprovação do PO**. Depende da Sprint 0 concluída (CI verde em 2026-10-27).
+> Status: **aprovada pelo PO em 2026-10-27** (escopo, clonagem de repositórios públicos para validação, padrões de detecção públicos). Implementação em andamento; validação em projetos reais pendente da aprovação da lista de 5 repositórios.
 > Última atualização: 2026-10-27
 
 Você é o Software Engineer responsável pelo Gateseeker. O stakeholder, Product Owner, Product Designer e auditor é o usuário humano. As regras de trabalho, a stack e os controles de segurança da Sprint 0 (`docs/SPRINT_0.md`, seções 2, 3 e 5) continuam valendo integralmente e não são repetidos aqui.
@@ -126,7 +126,14 @@ Além da seção 5 da Sprint 0:
 - `README.md`, `docs/ARCHITECTURE.md` e `docs/THREAT_MODEL.md` atualizados e correspondendo ao código.
 - CI verde.
 
-## 7. Decisões que precisam do PO antes de começar
+## 7. Desvios registrados durante a implementação
+
+- `GSK-SECRET-001` não detecta chaves Google `AIza...`: chaves web do Firebase usam esse formato e são públicas por desenho; o padrão sozinho não distingue segredo de chave pública. Documentado no README.
+- O walker aborta (código 3) em arquivo de texto acima do limite, conforme a seção 3.1. Arquivos binários são pulados antes da checagem de tamanho.
+- Supressão cobre a própria linha e a seguinte; não há supressão por arquivo ou global.
+- Erro interno de regra vira achado `GSK-ENGINE-000` (P4) em vez de derrubar a varredura.
+
+## 8. Decisões tomadas pelo PO antes de começar
 
 1. Aprovação deste escopo.
 2. Aprovação para clonar repositórios públicos de terceiros para a validação (seção 3.6), e se o PO quer indicar os 5 projetos ou prefere que o engenheiro proponha uma lista.

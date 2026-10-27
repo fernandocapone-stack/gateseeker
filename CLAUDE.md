@@ -16,7 +16,8 @@ Read `docs/SPRINT_0.md` (current scope) and `docs/PRODUCT.md` (direction) before
 4. Priority is decided only by the tables in `src/rules/priority.ts`. Changing the table requires changing the explicit expectations in `tests/priority.test.ts` on purpose; the test does not read the table.
 5. Keep the three layers apart in `Finding`: source evidence, rule conclusions, AI explanation (reserved, always `null`).
 6. Validate all external data with Zod (`src/parser`, `src/intel/osv-schema.ts`). Unknown fields pass through; wrong shapes reject.
-7. Treat package names, summaries and URLs as untrusted. Terminal output goes through `sanitize()` in `src/report/text.ts`.
+7. Treat package names, summaries, URLs and project file contents as untrusted. Terminal output goes through `sanitize()` in `src/report/text.ts`; secrets go through `redactInLine`/`redactEnvLine` in `src/patterns/redact.ts` and never appear in full anywhere.
+11. Every pattern rule ships with positive, negative and suppression fixtures in `fixtures/projects/` and a ReDoS timing test. Pattern findings default to warn mode; do not flip the default to gate without measured precision (`docs/VALIDATION_SPRINT_1.md`).
 8. Do not add dependencies, paid services, GitHub integration or new ecosystems without the PO's approval. Current runtime dependency: `zod` only.
 9. Do not hide failures: no skipped tests, no weakened assertions, no `--no-verify`.
 10. Fixtures for real vulnerabilities must be recorded from the source and documented in `fixtures/*/README.md`. Never invent advisory ids or versions.
@@ -27,6 +28,7 @@ Read `docs/SPRINT_0.md` (current scope) and `docs/PRODUCT.md` (direction) before
 src/parser/    package-lock.json parsing and limits
 src/intel/     OSV client and schema
 src/rules/     CVSS scoring, severity tier, priority table, finding builder
+src/patterns/  directory walker, file classifier, gitignore matcher, rule engine, rules/ (one file per GSK rule)
 src/report/    text renderer
 src/scan.ts    orchestration and verdict
 src/cli.ts     argument parsing and exit codes

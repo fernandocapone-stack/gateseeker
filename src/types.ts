@@ -78,20 +78,38 @@ export interface Reference {
   url: string;
 }
 
+/** Raw facts from an intelligence source about a dependency, untouched. */
+export interface DependencyEvidence {
+  kind: "dependency-vulnerability";
+  vulnerabilityId: string;
+  aliases: string[];
+  summary: string | null;
+  details: string | null;
+  published: string | null;
+  modified: string | null;
+  affectedRanges: unknown; // preserved verbatim for auditing
+}
+
+/** Facts about a code pattern match. `snippet` is sanitized and redacted. */
+export interface PatternEvidence {
+  kind: "insecure-pattern";
+  ruleId: string;
+  title: string;
+  file: string;
+  line: number;
+  fileClass: string;
+  snippet: string;
+  message: string;
+  details: Record<string, string | number | boolean | null> | null;
+}
+
+export type Evidence = DependencyEvidence | PatternEvidence;
+
 export interface Finding {
   id: string;
   kind: FindingKind;
   subject: string;
-  /** Raw facts from the source, untouched. */
-  evidence: {
-    vulnerabilityId: string;
-    aliases: string[];
-    summary: string | null;
-    details: string | null;
-    published: string | null;
-    modified: string | null;
-    affectedRanges: unknown; // preserved verbatim for auditing
-  };
+  evidence: Evidence;
   source: { name: string; queriedAt: string };
   severity: Severity;
   priority: Priority;
@@ -108,17 +126,39 @@ export interface Finding {
 
 export type Verdict = "pass" | "fail" | "incomplete";
 
+export type PatternsMode = "warn" | "gate";
+
+export interface PatternsReport {
+  filesScanned: number;
+  filesSkippedIgnored: number;
+  filesSkippedBinary: number;
+  bytesScanned: number;
+  rulesRun: string[];
+  suppressions: { file: string; line: number; ruleId: string; reason: string }[];
+  invalidSuppressions: { file: string; line: number; text: string }[];
+}
+
 export interface Report {
   gateseekerVersion: string;
   runId: string;
   startedAt: string;
   finishedAt: string;
   project: {
-    lockfilePath: string;
-    lockfileSha256: string;
-    lockfileVersion: number;
+    /** Directory scanned, or the lockfile's directory when only a lockfile was given. */
+    rootPath: string;
+    /** null when no package-lock.json was analyzed. */
+    lockfilePath: string | null;
+    lockfileSha256: string | null;
+    lockfileVersion: number | null;
     name: string | null;
   };
+  /** Which analyses ran. Absent analyses are declared, not silently skipped. */
+  analyses: {
+    dependencies: "analyzed" | "not-analyzed";
+    patterns: "analyzed" | "not-analyzed";
+  };
+  /** null when the pattern analysis did not run. */
+  patterns: PatternsReport | null;
   dependencies: Dependency[];
   queries: QueryRecord[];
   findings: Finding[];
@@ -127,10 +167,13 @@ export interface Report {
     queried: number;
     byQueryState: Record<QueryState, number>;
     byPriority: Record<Priority, number>;
+    byKind: Record<FindingKind, number>;
   };
   sources: { name: string; endpoint: string }[];
   gate: {
     failOn: Priority;
+    /** "warn": pattern findings are reported but do not affect the verdict. */
+    patternsMode: PatternsMode;
     verdict: Verdict;
     reason: string;
   };

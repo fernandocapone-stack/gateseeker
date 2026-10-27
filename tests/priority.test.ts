@@ -145,6 +145,8 @@ describe("buildFinding with the real lodash record", () => {
       },
       aiExplanation: null,
     });
+    expect(f.evidence.kind).toBe("dependency-vulnerability");
+    if (f.evidence.kind !== "dependency-vulnerability") return;
     expect(f.evidence.aliases).toEqual(["CVE-2021-23337"]);
     expect(f.evidence.summary).toBe("Command Injection in lodash");
     expect(f.references).toContainEqual({
