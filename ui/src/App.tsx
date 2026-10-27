@@ -50,16 +50,9 @@ export function App() {
   return (
     <div className="mx-auto max-w-7xl px-4 py-6 md:px-8">
       <header className="mb-6 flex flex-wrap items-center justify-between gap-3 border-b pb-4">
-        <div className="flex items-start gap-3">
-          <span aria-hidden="true" className="mt-0.5 inline-block size-7 shrink-0 rounded-sm border border-primary-stroke bg-primary shadow-solid-sm [--shadow-color:var(--primary-stroke)]" />
-          <div>
+        <div className="flex items-center gap-3">
+          <span aria-hidden="true" className="inline-block size-7 shrink-0 rounded-sm border border-primary-stroke bg-primary shadow-solid-sm [--shadow-color:var(--primary-stroke)]" />
           <h1 className="text-xl font-semibold tracking-tight">Gateseeker · Triagem de advisories</h1>
-          <p className="text-sm text-muted-foreground">
-            Revisor: <strong>{state?.gitUser ?? "—"}</strong>
-            {state?.branch && <> · branch <code className="rounded bg-muted px-1">{state.branch}</code></>}
-            {state?.mergedIntelBranch && <> · lote <code className="rounded bg-muted px-1">{state.mergedIntelBranch.replace("origin/", "")}</code> incorporado</>}
-          </p>
-          </div>
         </div>
         <div className="flex items-center gap-2">
           {state && state.unpushed > 0 && <Badge variant="moderate">{state.unpushed} decisão(ões) ainda não enviada(s)</Badge>}

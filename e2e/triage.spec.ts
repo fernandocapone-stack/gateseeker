@@ -13,10 +13,8 @@ test("the page refuses to work without the session token", async ({ page }) => {
   await expect(page.getByText(/precisa do endereço completo/)).toBeVisible();
 });
 
-test("lists the pending records with reviewer and draft badge", async ({ page }) => {
+test("lists the pending records with the draft badge", async ({ page }) => {
   await page.goto(ENTRY);
-  await expect(page.getByText("Revisor:")).toBeVisible();
-  await expect(page.getByText("E2E Reviewer")).toBeVisible();
   await expect(page.getByTestId("pending-GSK-ADV-2026-9002")).toBeVisible();
   await expect(page.getByTestId("pending-GSK-ADV-2026-9003")).toBeVisible();
   await expect(page.getByTestId("pending-GSK-ADV-2026-9003").getByText("rascunho pré-preenchido")).toBeVisible();
