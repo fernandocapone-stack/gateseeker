@@ -8,28 +8,113 @@
     "typosquat",
     "credential stealer",
     "infostealer",
+    "stealer",
+    "hijack",
+    "worm",
+    "poisoned",
+    "tag rewrite",
+    "trojan"
+  ],
+  "contextKeywords": [
     "npm",
+    "pypi",
     "composer",
     "packagist",
-    "pypi",
     "rubygems",
-    "crates.io",
-    "tag rewrite",
-    "hijack",
-    "worm"
+    "crates",
+    "crate",
+    "maven",
+    "nuget",
+    "package",
+    "packages",
+    "library",
+    "dependency",
+    "dependencies",
+    "sdk",
+    "cli",
+    "plugin",
+    "extension",
+    "github action",
+    "workflow",
+    "release",
+    "docker",
+    "image",
+    "registry",
+    "open source",
+    "open-source"
   ],
   "sources": [
-    { "name": "stepsecurity-blog", "publisher": "StepSecurity", "url": "https://www.stepsecurity.io/blog/rss.xml", "enabled": true },
-    { "name": "aikido-blog", "publisher": "Aikido Security", "url": "https://www.aikido.dev/blog/rss.xml", "enabled": true },
-    { "name": "phoenix-security", "publisher": "Phoenix Security", "url": "https://phoenix.security/feed/", "enabled": false },
-    { "name": "snyk-blog", "publisher": "Snyk", "url": "https://snyk.io/blog/feed/", "enabled": true },
-    { "name": "wiz-blog", "publisher": "Wiz", "url": "https://www.wiz.io/feed/rss.xml", "enabled": true },
-    { "name": "the-hacker-news", "publisher": "The Hacker News", "url": "https://feeds.feedburner.com/TheHackersNews", "enabled": true },
-    { "name": "sonatype-blog", "publisher": "Sonatype", "url": "https://www.sonatype.com/blog/rss.xml", "enabled": true },
-    { "name": "reversinglabs-blog", "publisher": "ReversingLabs", "url": "https://www.reversinglabs.com/blog/rss.xml", "enabled": true },
-    { "name": "checkmarx-blog", "publisher": "Checkmarx", "url": "https://checkmarx.com/feed/", "enabled": true },
-    { "name": "ossf-malicious-packages", "publisher": "OpenSSF malicious-packages", "url": "https://github.com/ossf/malicious-packages/commits/main.atom", "enabled": false },
-    { "name": "friendsofphp-security-advisories", "publisher": "FriendsOfPHP security-advisories", "url": "https://github.com/FriendsOfPHP/security-advisories/commits/master.atom", "enabled": true },
-    { "name": "socket-blog", "publisher": "Socket", "url": "https://socket.dev/blog/rss", "enabled": false }
+    {
+      "name": "stepsecurity-blog",
+      "publisher": "StepSecurity",
+      "url": "https://www.stepsecurity.io/blog/rss.xml",
+      "enabled": true
+    },
+    {
+      "name": "aikido-blog",
+      "publisher": "Aikido Security",
+      "url": "https://www.aikido.dev/blog/rss.xml",
+      "enabled": true
+    },
+    {
+      "name": "phoenix-security",
+      "publisher": "Phoenix Security",
+      "url": "https://phoenix.security/feed/",
+      "enabled": false
+    },
+    {
+      "name": "snyk-blog",
+      "publisher": "Snyk",
+      "url": "https://snyk.io/blog/feed/",
+      "enabled": true
+    },
+    {
+      "name": "wiz-blog",
+      "publisher": "Wiz",
+      "url": "https://www.wiz.io/feed/rss.xml",
+      "enabled": true
+    },
+    {
+      "name": "the-hacker-news",
+      "publisher": "The Hacker News",
+      "url": "https://feeds.feedburner.com/TheHackersNews",
+      "enabled": true
+    },
+    {
+      "name": "sonatype-blog",
+      "publisher": "Sonatype",
+      "url": "https://www.sonatype.com/blog/rss.xml",
+      "enabled": true
+    },
+    {
+      "name": "reversinglabs-blog",
+      "publisher": "ReversingLabs",
+      "url": "https://www.reversinglabs.com/blog/rss.xml",
+      "enabled": true
+    },
+    {
+      "name": "checkmarx-blog",
+      "publisher": "Checkmarx",
+      "url": "https://checkmarx.com/feed/",
+      "enabled": true
+    },
+    {
+      "name": "ossf-malicious-packages",
+      "publisher": "OpenSSF malicious-packages",
+      "url": "https://github.com/ossf/malicious-packages/commits/main.atom",
+      "enabled": false
+    },
+    {
+      "name": "friendsofphp-security-advisories",
+      "publisher": "FriendsOfPHP security-advisories",
+      "url": "https://github.com/FriendsOfPHP/security-advisories/commits/master.atom",
+      "enabled": true
+    },
+    {
+      "name": "socket-blog",
+      "publisher": "Socket",
+      "url": "https://socket.dev/blog/rss",
+      "enabled": false
+    }
   ]
 }

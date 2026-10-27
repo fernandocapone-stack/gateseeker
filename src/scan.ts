@@ -100,7 +100,7 @@ async function analyzeDependencies(lockfilePath: string, content: string, opts: 
 
   const queries: QueryRecord[] = [];
   const findings: Finding[] = [];
-  const errors: string[] = [...lockfile.warnings, ...advisories.problems.map((p) => `Advisory set: ${p}`)];
+  const errors: string[] = [...lockfile.warnings, ...(advisories.origin === "none" ? [] : advisories.problems.map((p) => `Advisory set: ${p}`))];
 
 
   for (const dep of lockfile.dependencies) {
@@ -230,8 +230,14 @@ function assemble(args: { root: string; startedAt: string; deps: DepsOutcome | n
   }
 
   const limitations = [...COMMON_LIMITATIONS];
-  if (deps) limitations.push(...DEPENDENCY_LIMITATIONS);
-  else limitations.push("Dependencies were not analyzed: no package-lock.json at the project root (or --only patterns).");
+  if (deps) {
+    limitations.push(...DEPENDENCY_LIMITATIONS);
+    if (deps.advisories.origin === "none") {
+      limitations.push("No curated advisory set was available (not built and no advisories/approved directory); only OSV was consulted for dependencies.");
+    }
+  } else {
+    limitations.push("Dependencies were not analyzed: no package-lock.json at the project root (or --only patterns).");
+  }
   if (patterns) limitations.push(...PATTERN_LIMITATIONS);
   else limitations.push("Code patterns were not analyzed (lockfile-only scan or --only deps).");
 

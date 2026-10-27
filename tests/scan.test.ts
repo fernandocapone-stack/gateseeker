@@ -22,6 +22,7 @@ async function run(fixture: string, routes: Record<string, string | number>, fai
     lockfilePath: `fixtures/lockfiles/${fixture}`,
     lockfileContent: readFixture(`lockfiles/${fixture}`),
     osv: { fetch: fetchByName(routes) },
+    advisories: { advisories: [], origin: "test", digest: "0000000000000000", problems: [] },
     now: fixedNow,
     runId: "test-run",
     ...(failOn ? { failOn } : {}),
@@ -70,6 +71,8 @@ describe("scan", () => {
     expect(report.project.lockfileSha256).toMatch(/^[0-9a-f]{64}$/);
     expect(report.errors).toEqual([]);
     expect(report.limitations.length).toBeGreaterThan(0);
+    expect(report.limitations.join("\n")).not.toMatch(/Dependencies were not analyzed/);
+    expect(report.limitations.join("\n")).not.toMatch(/No curated advisory set/);
     expect(report.sources[0]).toEqual({ name: "osv.dev", endpoint: "https://api.osv.dev/v1/query" });
     expect(report.sources[1]?.name).toBe("gateseeker-advisories");
   });

@@ -14,7 +14,7 @@ Curated, human-approved records of software supply-chain incidents that the offi
 
 ## Lifecycle
 
-1. The `Intel feed` workflow runs every 6 hours (or manually), fetches the feeds, keeps entries whose title matches a keyword, extracts package-like tokens as candidates, and opens a pull request with one JSON file per new entry in `proposed/`.
+1. The `Intel feed` workflow runs every 6 hours (or manually), fetches the feeds, keeps entries whose title contains an incident word and an ecosystem word (`sources.json`), skips entries older than 30 days (remembered, not proposed), proposes at most 25 per run, extracts package-like tokens as candidates, and opens a pull request labelled `intel` with one JSON file per new entry in `proposed/`. While an `intel` pull request is open the workflow does nothing, so proposals are reviewed one batch at a time. The repository setting "Allow GitHub Actions to create and approve pull requests" must be on (enabled 2026-10-27).
 2. A reviewer reads the source, fills `packages[].affected`, `type`, `severity`, `summary`, `remediation`, `window`, sets `status`, fills `review`, and moves the file to `approved/` or `rejected/`.
 3. CI validates every record (`gateseeker-intel validate`): schema, status matching the directory, unique ids, `approved` needing two distinct publishers or one primary source, text limits, and no credential-looking tokens anywhere.
 4. `pnpm build` compiles `approved/` into `dist/advisories.json`. The scanner matches npm dependencies against it; Packagist records are stored and validated but only matched once the `composer.lock` parser exists (Sprint 2b).

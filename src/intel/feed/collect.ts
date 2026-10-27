@@ -13,7 +13,10 @@ import { parseFeed, type FeedEntry } from "./rss.js";
  */
 
 export const sourcesSchema = z.strictObject({
+  /** Incident words: at least one must appear in the title. */
   keywords: z.array(z.string().min(2)).min(1),
+  /** Ecosystem/context words: when present, at least one must also appear. */
+  contextKeywords: z.array(z.string().min(2)).default([]),
   sources: z
     .array(
       z.strictObject({
@@ -84,9 +87,12 @@ export function titleHash(title: string): string {
   return createHash("sha256").update(norm).digest("hex").slice(0, 16);
 }
 
-export function isRelevant(title: string, keywords: string[]): boolean {
+export function isRelevant(title: string, keywords: string[], contextKeywords: string[] = []): boolean {
   const t = title.toLowerCase();
-  return keywords.some((k) => t.includes(k.toLowerCase()));
+  const incident = keywords.some((k) => t.includes(k.toLowerCase()));
+  if (!incident) return false;
+  if (contextKeywords.length === 0) return true;
+  return contextKeywords.some((k) => t.includes(k.toLowerCase()));
 }
 
 const COMPOSER_RE = /\b([a-z0-9](?:[a-z0-9_.-]*[a-z0-9])?)\/([a-z0-9](?:[a-z0-9_.-]*[a-z0-9])?)\b/g;
@@ -201,7 +207,7 @@ export async function collect(options: CollectOptions): Promise<CollectResult> {
     }
     for (const entry of parsed.entries) {
       stats.entries++;
-      if (!isRelevant(entry.title, options.config.keywords)) continue;
+      if (!isRelevant(entry.title, options.config.keywords, options.config.contextKeywords)) continue;
       stats.relevant++;
       const url = canonicalUrl(entry.link);
       const th = titleHash(entry.title);

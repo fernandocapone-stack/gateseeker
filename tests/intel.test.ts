@@ -293,6 +293,9 @@ describe("collector", () => {
   it("filters irrelevant titles and treats tracking parameters as the same URL", () => {
     expect(isRelevant("Weekly product update", ["malicious"])).toBe(false);
     expect(isRelevant("Malicious npm package found", ["malicious"])).toBe(true);
+    // With context words, an incident word alone is not enough.
+    expect(isRelevant("Attackers hijack IP cameras", ["hijack"], ["npm", "package"])).toBe(false);
+    expect(isRelevant("Attackers hijack npm package", ["hijack"], ["npm", "package"])).toBe(true);
     expect(canonicalUrl("https://X.test/a/?utm_source=rss&utm_medium=feed&b=1#frag")).toBe(canonicalUrl("https://x.test/a?b=1"));
     expect(titleHash("Laravel-Lang: Supply Chain!")).toBe(titleHash("laravel lang supply chain"));
   });

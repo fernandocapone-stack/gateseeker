@@ -35,13 +35,25 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
 
+      - name: Skip while an intel pull request is open
+        id: gate
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          OPEN="$(gh pr list --state open --json headRefName --jq '[.[] | select(.headRefName | startswith("intel/"))] | length')"
+          echo "open=${OPEN}" >> "$GITHUB_OUTPUT"
+          if [ "${OPEN}" != "0" ]; then echo "An intel pull request is already open; review it first."; fi
+
       - name: Collect feeds
+        if: steps.gate.outputs.open == '0'
         run: node dist/intel-cli.js collect --summary-file /tmp/intel-summary.txt
 
       - name: Validate records
+        if: steps.gate.outputs.open == '0'
         run: node dist/intel-cli.js validate
 
       - name: Open pull request when there are proposals
+        if: steps.gate.outputs.open == '0'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -68,4 +80,5 @@ jobs:
             cat /tmp/intel-summary.txt
             echo '```'
           } > /tmp/pr-body.md
-          gh pr create --title "intel: ${COUNT} proposal(s) (${STAMP})" --body-file /tmp/pr-body.md --base main --head "$BRANCH" --label intel || gh pr create --title "intel: ${COUNT} proposal(s) (${STAMP})" --body-file /tmp/pr-body.md --base main --head "$BRANCH"
+          gh pr create --title "intel: ${COUNT} proposal(s) (${STAMP})" --body-file /tmp/pr-body.md --base main --head "$BRANCH" --label intel \
+            || gh pr create --title "intel: ${COUNT} proposal(s) (${STAMP})" --body-file /tmp/pr-body.md --base main --head "$BRANCH"
