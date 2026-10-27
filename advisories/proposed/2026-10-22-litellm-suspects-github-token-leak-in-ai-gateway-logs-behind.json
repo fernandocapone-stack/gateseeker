@@ -1,0 +1,39 @@
+{
+  "id": "GSK-ADV-2026-0010",
+  "status": "proposed",
+  "type": "other",
+  "severity": "HIGH",
+  "ecosystem": "other",
+  "packages": [
+    {
+      "name": "UNKNOWN/fill-in",
+      "affected": {}
+    }
+  ],
+  "window": {
+    "start": "2026-10-22T08:28:48.000Z",
+    "end": null
+  },
+  "indicators": [],
+  "summary": "TODO: one line written by the reviewer after reading the source.",
+  "remediation": "TODO: concrete action written by the reviewer.",
+  "sources": [
+    {
+      "url": "https://thehackernews.com/2026/10/litellm-suspects-github-token-leak-in.html",
+      "publisher": "The Hacker News",
+      "title": "LiteLLM Suspects GitHub Token Leak in AI Gateway Logs Behind Malicious Package Release",
+      "published_at": "2026-10-22"
+    }
+  ],
+  "review": {
+    "proposed_by": "collector",
+    "proposed_at": "2026-10-27T18:03:52.375Z",
+    "reviewed_by": null,
+    "reviewed_at": null,
+    "notes": null
+  },
+  "upstream": {
+    "osv": null,
+    "ghsa": null
+  }
+}

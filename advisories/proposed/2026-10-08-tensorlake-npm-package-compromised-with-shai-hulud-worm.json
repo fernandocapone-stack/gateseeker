@@ -1,0 +1,39 @@
+{
+  "id": "GSK-ADV-2026-0007",
+  "status": "proposed",
+  "type": "other",
+  "severity": "HIGH",
+  "ecosystem": "npm",
+  "packages": [
+    {
+      "name": "UNKNOWN/fill-in",
+      "affected": {}
+    }
+  ],
+  "window": {
+    "start": "2026-10-08T03:32:00.000Z",
+    "end": null
+  },
+  "indicators": [],
+  "summary": "TODO: one line written by the reviewer after reading the source.",
+  "remediation": "TODO: concrete action written by the reviewer.",
+  "sources": [
+    {
+      "url": "https://www.aikido.dev/blog/tensorlake-npm-package-compromised",
+      "publisher": "Aikido Security",
+      "title": "tensorlake NPM package compromised with Shai Hulud worm",
+      "published_at": "2026-10-08"
+    }
+  ],
+  "review": {
+    "proposed_by": "collector",
+    "proposed_at": "2026-10-27T18:03:52.375Z",
+    "reviewed_by": null,
+    "reviewed_at": null,
+    "notes": null
+  },
+  "upstream": {
+    "osv": null,
+    "ghsa": null
+  }
+}
