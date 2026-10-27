@@ -28,6 +28,7 @@
   --primary: oklch(0.62 0.2 292);
   --primary-foreground: oklch(0.99 0 0);
   --primary-hover: oklch(0.67 0.2 292);
+  --primary-stroke: oklch(0.42 0.17 292);
 
   /* Secondary / muted */
   --secondary: oklch(0.28 0.025 292);
@@ -40,8 +41,10 @@
   /* Status colours (severity badges and decision buttons) */
   --destructive: oklch(0.6 0.2 25);
   --destructive-foreground: oklch(0.99 0 0);
+  --destructive-stroke: oklch(0.4 0.16 25);
   --success: oklch(0.6 0.15 150);
   --success-foreground: oklch(0.99 0 0);
+  --success-stroke: oklch(0.4 0.12 150);
   --warning: oklch(0.82 0.16 85);
   --warning-foreground: oklch(0.2 0.03 85);
   --severity-high: oklch(0.68 0.19 45);
@@ -57,9 +60,14 @@
   /* Shape */
   --radius: 0.5rem;
 
-  /* Solid-offset shadows (no blur). Change the offset or the colour here. */
+  /*
+   * Solid shadows (no blur), Sentry style: a button's drop shadow sits
+   * straight below it, in the same colour as its stroke; pressing the button
+   * moves it down by --shadow-offset and the shadow disappears. Each button
+   * variant sets --shadow-color to its own stroke colour.
+   */
   --shadow-offset: 2px;
-  --shadow-color: oklch(0.07 0.015 292);
+  --shadow-color: var(--border-strong);
   --inset-shadow-color: oklch(0 0 0 / 45%);
 }
 
@@ -77,6 +85,7 @@
     --primary: oklch(0.52 0.2 292);
     --primary-foreground: oklch(0.99 0 0);
     --primary-hover: oklch(0.47 0.2 292);
+    --primary-stroke: oklch(0.38 0.17 292);
 
     --secondary: oklch(0.94 0.012 292);
     --secondary-foreground: oklch(0.25 0.03 292);
@@ -87,8 +96,10 @@
 
     --destructive: oklch(0.55 0.2 25);
     --destructive-foreground: oklch(0.99 0 0);
+    --destructive-stroke: oklch(0.4 0.16 25);
     --success: oklch(0.52 0.15 150);
     --success-foreground: oklch(0.99 0 0);
+    --success-stroke: oklch(0.38 0.12 150);
     --warning: oklch(0.85 0.16 85);
     --warning-foreground: oklch(0.25 0.04 85);
     --severity-high: oklch(0.65 0.19 45);
@@ -100,7 +111,6 @@
     --input-border: oklch(0.8 0.02 292);
     --ring: oklch(0.6 0.17 292);
 
-    --shadow-color: oklch(0.3 0.04 292);
     --inset-shadow-color: oklch(0 0 0 / 12%);
   }
 }
@@ -115,6 +125,7 @@
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);
   --color-primary-hover: var(--primary-hover);
+  --color-primary-stroke: var(--primary-stroke);
   --color-secondary: var(--secondary);
   --color-secondary-foreground: var(--secondary-foreground);
   --color-muted: var(--muted);
@@ -123,8 +134,10 @@
   --color-accent-foreground: var(--accent-foreground);
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
+  --color-destructive-stroke: var(--destructive-stroke);
   --color-success: var(--success);
   --color-success-foreground: var(--success-foreground);
+  --color-success-stroke: var(--success-stroke);
   --color-warning: var(--warning);
   --color-warning-foreground: var(--warning-foreground);
   --color-severity-high: var(--severity-high);
@@ -140,9 +153,9 @@
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
 
-  /* shadow-solid: offset drop shadow without blur, used on buttons and CTAs. */
-  --shadow-solid: var(--shadow-offset) var(--shadow-offset) 0 0 var(--shadow-color);
-  --shadow-solid-sm: 1px 1px 0 0 var(--shadow-color);
+  /* shadow-solid: drop shadow straight below the element, no blur, in --shadow-color. */
+  --shadow-solid: 0 var(--shadow-offset) 0 0 var(--shadow-color);
+  --shadow-solid-sm: 0 1px 0 0 var(--shadow-color);
   /* inset-shadow-solid: inner top shadow without blur, used on inputs. */
   --inset-shadow-solid: inset 0 2px 0 0 var(--inset-shadow-color);
 

@@ -51,7 +51,7 @@ export function App() {
     <div className="mx-auto max-w-7xl px-4 py-6 md:px-8">
       <header className="mb-6 flex flex-wrap items-center justify-between gap-3 border-b pb-4">
         <div className="flex items-start gap-3">
-          <span aria-hidden="true" className="mt-0.5 inline-block size-7 shrink-0 rounded-sm border border-primary bg-primary shadow-solid-sm" />
+          <span aria-hidden="true" className="mt-0.5 inline-block size-7 shrink-0 rounded-sm border border-primary-stroke bg-primary shadow-solid-sm [--shadow-color:var(--primary-stroke)]" />
           <div>
           <h1 className="text-xl font-semibold tracking-tight">Gateseeker · Triagem de advisories</h1>
           <p className="text-sm text-muted-foreground">
