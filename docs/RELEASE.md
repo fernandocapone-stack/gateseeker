@@ -10,7 +10,7 @@ Roteiro da primeira publicação pública e das seguintes. Os passos marcados **
    - `npm publish --access public --provenance false`: o npm pergunta o **código do autenticador** (seis dígitos); digite e confirme. Esta versão (`1.0.0-beta.1`) sai sem proveniência porque é construída fora do CI; é a única que ficará assim.
 3. **[PO] Publicação confiável no pacote.** Em https://www.npmjs.com/package/gateseeker/access (ou Settings do pacote, "Trusted publishing"), adicione um publicador GitHub Actions com: **Organization or user** `fernandocapone-stack`, **Repository** `gateseeker`, **Workflow filename** `release.yml`, ambiente em branco. Salve. A configuração precisa concluir a primeira publicação bem-sucedida em até 2 dias, então o passo 4 vem logo em seguida.
 4. Engenharia: publica `1.0.0-beta.2` pela tag `v1.0.0-beta.2`; o workflow `release.yml` publica com proveniência e cria a release no GitHub. A partir daí a tag `v1` e a Action apontam para uma versão com proveniência. Nenhum token fica guardado em lugar nenhum.
-5. **[PO] Repositório público.** Em https://github.com/fernandocapone-stack/gateseeker/settings, "Danger Zone", "Change visibility". Necessário para que a Action seja usada por outros repositórios. Antes: revisão final do histórico (eu confirmo a cada commit que não há segredo real; a palavra final é sua), descrição e tópicos do repositório. A tagline provisória continua provisória.
+5. **[PO] Repositório público.** Em https://github.com/fernandocapone-stack/gateseeker/settings, "Danger Zone", "Change visibility". Necessário para que a Action seja usada por outros repositórios **e para a proveniência**: o npm recusa (erro 422) qualquer publicação com proveniência vinda de repositório privado, como confirmado na tentativa `1.0.0-beta.5` em 2026-10-28. Portanto este passo vem antes do passo 4, não depois. Antes: revisão final do histórico (eu confirmo a cada commit que não há segredo real; a palavra final é sua), descrição e tópicos do repositório. A tagline provisória continua provisória.
 
 ## Publicação em etapas (o modo adotado)
 
@@ -23,7 +23,9 @@ O CI não publica diretamente: ele **prepara** a versão no npm (`npm stage publ
 3. **[PO] Aprovar no npm.** Abra https://www.npmjs.com/package/gateseeker, aba **Staged Packages**, confira a versão e clique em **Approve**; confirme com o autenticador. Só então a versão fica instalável. Alternativa pela linha de comando: `npm stage list gateseeker` e `npm stage approve <id>`.
 4. PO: confira que a versão apareceu com o selo "Provenance" na página do pacote e que a release existe em https://github.com/fernandocapone-stack/gateseeker/releases.
 
-Versões `1.0.0-beta.2` a `1.0.0-beta.4` existem como tags no git mas nunca chegaram ao npm (o publicador confiável ainda não estava salvo no npm); a primeira versão preparada por este fluxo é a `1.0.0-beta.5`.
+Versões `1.0.0-beta.2` a `1.0.0-beta.5` existem como tags no git mas nunca chegaram ao npm (beta.2 a beta.4: publicador confiável ainda não salvo no npm; beta.5: autenticação OK, mas proveniência exige repositório público); a primeira versão preparada por este fluxo é a `1.0.0-beta.6`.
+
+Revisão do histórico feita em 2026-10-28 antes de abrir o repositório: as únicas cadeias com formato de segredo em todos os 34 commits são as fixtures sintéticas da Sprint 1 (`fixtures/projects/`, `tests/patterns.test.ts`), documentadas em `fixtures/projects/README.md`. Os commits de main carregam o e-mail pessoal do autor (`fernando.capone@gmail.com`) em parte do histórico; isso passa a ser público com o repositório.
 
 ## Como alguém verifica a proveniência
 
