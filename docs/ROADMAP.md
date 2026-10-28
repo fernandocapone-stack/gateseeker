@@ -17,7 +17,7 @@ The product today answers one question well: **"what is wrong with this reposito
 | U3 | **History and notifications live in `localStorage`.** Another browser or a cleared cache starts empty; the service has no "my reports" list. | `web/src/history.ts`, `notifications.ts` | The Dashboard looks broken on a second device. Users can't trust a history that disappears. |
 | U4 | **No "what changed since last time".** Each scan is a fresh list; baseline exists in the CLI but not on the web. | Workspace | After fixing three things, the user can't see progress, and a new problem gets lost among the old ones. |
 | U5 | **No way to say "I know, accept this".** Suppression exists only as a code comment (`gateseeker-ignore`). | Report | Accepted risks come back every scan. That noise is how people stop reading reports. |
-| U6 | **The hosted scan may not consult the curated feed** (`src/web/service.ts` relies on the default load working inside the Vercel bundle; not verified). New approved records reach users only after a redeploy. | `src/web/` | The feed is our differentiator; if the page doesn't use it, the page undersells the product. |
+| U6 | **The hosted scan may not consult the curated feed** (`src/web/service.ts` relies on `dist/advisories.json` being traced into the Vercel function; not verified on the live page. The failure is not silent: the report then shows origin `none` and a limitation, so the check is in `docs/DEPLOY.md` §7). New approved records reach users only after a redeploy. | `src/web/` | The feed is our differentiator; if the page doesn't use it, the page undersells the product. |
 | U7 | **Lockfile coverage gap:** only `package-lock.json` and `composer.lock`. Projects using pnpm, Yarn or Bun get no dependency analysis. | `src/parser/` | Lovable, Bolt and many Next.js templates use Bun or pnpm. Today they get a partial report, possibly without realizing it. |
 | U8 | **Dense language for non-specialists.** P1–P4, CVSS, "GHSA", "advisory" are expert vocabulary. | Report, CLI | Our user isn't a security person. They need "Fix today / This week / When you can / FYI" and one plain sentence of impact. |
 
@@ -27,7 +27,7 @@ Each sprint keeps the format of `PRODUCT.md`: delivery, the hypothesis it tests,
 
 ### Sprint 4 (finish) — Ship the page honestly
 - Publish with Supabase + OAuth configured (`docs/DEPLOY.md`), round 2 validation through the live page.
-- **U6:** test that a hosted scan reports the approved Laravel-Lang record on a fixture repo; fix the bundle if it doesn't.
+- **U6:** in round 2, confirm the report's sources line shows `gateseeker-advisories: bundled (N approved …)`; if it shows `none`, add the file to the function bundle (`includeFiles` in `vercel.json`).
 - **U1 (decision for the PO):** let anonymous visitors scan without logging in, with a stricter limit (for example 3 per IP per day). Saved reports and history stay behind login. Alternative: keep login but show the example report on Home as the hero.
 - **U7, minimum:** when a repo has `pnpm-lock.yaml`, `yarn.lock` or `bun.lock` but no supported lockfile, the verdict says so explicitly ("dependencies not analyzed: pnpm lockfile not supported yet"). This is honesty, not a feature.
 

@@ -61,6 +61,7 @@ Enquanto a área autenticada não existir, Settings → Deployment Protection �
 
 - `https://gateseeker.vercel.app/api/config` responde `{"ok":true,"auth":{"mode":"supabase",...}}` (sem a service_role).
 - Entrar com GitHub em `/login`, analisar um repositório público em `/app`, abrir o relatório salvo pelo link `/r/<id>`.
+- No relatório, a linha de fontes mostra `gateseeker-advisories: bundled (N approved, digest …)`. Se aparecer `none` ou a limitação "No curated advisory set was available", o `dist/advisories.json` não entrou no pacote da função: a página está consultando só o OSV.
 - Supabase → Table Editor → `reports` mostra a linha; `scan_quota` mostra o contador.
 - Vercel → Settings → Cron Jobs lista `/api/cron/cleanup` às 03:00 UTC.
 
