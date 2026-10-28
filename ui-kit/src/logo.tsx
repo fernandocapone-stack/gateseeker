@@ -17,14 +17,18 @@ export function LogoSymbol({ className, ...props }: SVGAttributes<SVGSVGElement>
   );
 }
 
-/** Symbol plus wordmark, 110 x 22 as in the Figma header. Pass a label when it is the only name on screen. */
+/*
+ * Symbol plus wordmark in one 110 x 22 box, placed exactly as in the Figma
+ * component: symbol at the left edge, vertically centred 0.2px high
+ * (top 0.0045); wordmark at x 26.95 (24.5%), centred 1.2px high (top 3.8),
+ * so the bottom of the letters (y 15.8) meets the end of the symbol's
+ * diagonal. Pass a label when it is the only name on screen.
+ */
 export function Logo({ className, label = "GateSeeker" }: { className?: string; label?: string }) {
   return (
-    <span className={cn("inline-flex items-center gap-[6px] text-foreground", className)} role="img" aria-label={label}>
-      <LogoSymbol />
-      <svg viewBox="0 0 83.4521 12" width="83.4521" height="12" fill="none" aria-hidden="true" className="shrink-0">
-        <path d={WORDMARK} fill="currentColor" />
-      </svg>
-    </span>
+    <svg viewBox="0 0 110 22" width="110" height="22" fill="none" role="img" aria-label={label} className={cn("shrink-0 text-foreground", className)}>
+      <path d={SYMBOL} fill="var(--brand)" transform="translate(0 0.0045)" />
+      <path d={WORDMARK} fill="currentColor" transform="translate(26.95 3.8)" />
+    </svg>
   );
 }
