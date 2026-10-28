@@ -32,9 +32,11 @@ export function usePath(): string {
   return useContext(RouteContext);
 }
 
-export function navigate(to: string): void {
+/** `replace` swaps the current history entry, for redirects the back button must not return to. */
+export function navigate(to: string, { replace = false }: { replace?: boolean } = {}): void {
   if (normalize(window.location.pathname) === normalize(to)) return;
-  window.history.pushState({}, "", to);
+  if (replace) window.history.replaceState({}, "", to);
+  else window.history.pushState({}, "", to);
   window.dispatchEvent(new Event("gateseeker:navigate"));
   window.scrollTo({ top: 0 });
 }

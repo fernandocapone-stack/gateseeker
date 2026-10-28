@@ -1,18 +1,23 @@
-import { buttonVariants, cn } from "@gateseeker/ui-kit";
-import { LogOut, Menu, ShieldCheck, X } from "lucide-react";
+import { buttonVariants, cn, Logo } from "@gateseeker/ui-kit";
+import { LogOut, Menu, X } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { AuthProvider, useAuth } from "./auth-context";
+import { PageSkeleton, ReportSkeleton } from "./components/Skeletons";
 
 import { About } from "./pages/About";
 import { AppDemo } from "./pages/AppDemo";
+import { Dashboard } from "./pages/Dashboard";
+import { DesignSystem } from "./pages/DesignSystem";
 import { GetStarted } from "./pages/GetStarted";
 import { Home } from "./pages/Home";
 import { HowItWorks } from "./pages/HowItWorks";
 import { Login } from "./pages/Login";
-import { Resources } from "./pages/Resources";
+import { Resources, WorkspaceResources } from "./pages/Resources";
 import { SavedReport } from "./pages/SavedReport";
-import { Link, Router, usePath } from "./router";
+import { SettingsPage } from "./pages/Settings";
+import { Link, Router, navigate, usePath } from "./router";
+import { Workspace, type WorkspacePage } from "./Workspace";
 
 /**
  * Site shell: sticky header with the sections the PO asked for (Home, How it
@@ -36,7 +41,17 @@ const TITLES: Record<string, string> = {
   "/get-started": "Get started · Gateseeker",
   "/login": "Log in · Gateseeker",
   "/app": "Analyze a repository · Gateseeker",
+  "/app/design-system": "Design system · Gateseeker",
+  "/app/settings": "Settings · Gateseeker",
+  "/app/dashboard": "Dashboard · Gateseeker",
+  "/app/resources": "Resources · Gateseeker",
 };
+
+/* The public site exists only for signed-out visitors; a session sends these to the workspace. /login forwards on its own. */
+const PUBLIC_ROUTES = new Set(["/", "/how-it-works", "/about", "/get-started"]);
+/* Public pages with a workspace counterpart forward there instead of the Dashboard. */
+const WORKSPACE_COUNTERPART: Record<string, string> = { "/resources": "/app/resources" };
+const WORKSPACE_HOME = "/app/dashboard";
 
 const REPORT_ROUTE = /^\/r\/([A-Za-z0-9-]{1,64})$/;
 
@@ -52,11 +67,8 @@ export function App() {
 
 export function Brand({ className }: { className?: string }) {
   return (
-    <Link href="/" className={cn("flex items-center gap-2.5 text-base font-semibold tracking-tight", className)}>
-      <span className="flex size-7 items-center justify-center rounded-md border border-primary/40 bg-primary/15 text-primary">
-        <ShieldCheck className="size-4" aria-hidden="true" />
-      </span>
-      Gateseeker
+    <Link href="/" aria-label="GateSeeker home" className={cn("flex items-center", className)}>
+      <Logo label="GateSeeker" />
     </Link>
   );
 }
@@ -70,6 +82,12 @@ function Shell() {
     document.title = TITLES[path] ?? (reportId ? "Saved report · Gateseeker" : "Gateseeker");
     setOpen(false);
   }, [path, reportId]);
+  useEffect(() => {
+    if (auth.status === "signed-out" && path === "/app/resources") navigate("/resources", { replace: true });
+    if (auth.status !== "signed-in") return;
+    if (PUBLIC_ROUTES.has(path)) navigate(WORKSPACE_HOME, { replace: true });
+    else if (WORKSPACE_COUNTERPART[path]) navigate(WORKSPACE_COUNTERPART[path], { replace: true });
+  }, [auth.status, path]);
 
   let page = <NotFound />;
   if (path === "/") page = <Home />;
@@ -79,54 +97,77 @@ function Shell() {
   else if (path === "/get-started") page = <GetStarted />;
   else if (path === "/login") page = <Login />;
   else if (path === "/app") page = <AppDemo />;
+  else if (path === "/app/design-system") page = <DesignSystem />;
+  else if (path === "/app/settings") page = <SettingsPage />;
+  else if (path === "/app/dashboard") page = <Dashboard />;
+  else if (path === "/app/resources") page = <WorkspaceResources />;
   else if (reportId) page = <SavedReport id={reportId} />;
 
   const signedIn = auth.status === "signed-in" && auth.session !== null;
+  // Signed in, the workspace pages get the application frame instead of the site header and footer.
+  const workspacePage: WorkspacePage | null = path === "/app" ? "analyze" : path === "/app/design-system" ? "design-system" : path === "/app/settings" ? "settings" : path === "/app/dashboard" ? "dashboard" : path === "/app/resources" ? "resources" : reportId ? "issues" : null;
+  if (signedIn && workspacePage) return <Workspace page={workspacePage}>{page}</Workspace>;
+  // A public page must not flash for a signed-in visitor: render nothing until the session is known, then redirect (effect above).
+  if ((PUBLIC_ROUTES.has(path) || path in WORKSPACE_COUNTERPART) && (auth.status === "loading" || signedIn)) return <div className="min-h-dvh bg-background" />;
+  // While the session is read, workspace pages already show the frame with skeletons.
+  if (auth.status === "loading" && workspacePage) {
+    return (
+      <Workspace page={workspacePage} loading>
+        {workspacePage === "issues" ? <ReportSkeleton label="Loading the saved report" /> : <PageSkeleton label="Checking your session" />}
+      </Workspace>
+    );
+  }
   const login = auth.session?.user.login;
   const accountLabel = login ? `@${login}` : "Workspace";
 
+  // The active item is only blue: no pill behind it.
   const navLink = (href: string) =>
-    cn("rounded-md px-2.5 py-1.5 transition-colors hover:bg-accent/60 hover:text-foreground", path === href ? "bg-accent/60 text-foreground" : "text-muted-foreground");
+    cn("rounded-md px-2.5 py-1.5 transition-colors", path === href ? "text-primary" : "text-muted-foreground hover:text-foreground");
 
   return (
     <div className="flex min-h-screen flex-col">
-      <header className="sticky top-0 z-40 border-b bg-background/80 backdrop-blur-md">
-        <div className="mx-auto flex h-14 max-w-5xl items-center justify-between px-4 sm:px-6">
-          <Brand />
-          <nav aria-label="Main" className="hidden items-center gap-1 text-sm sm:flex">
+      <header className="sticky top-0 z-40 border-b bg-sidebar">
+        {/* Fluid: the full width of the window, logo left, sections centred, account and call to action right. */}
+        <div className="grid h-14 w-full grid-cols-[1fr_auto_1fr] items-center gap-4 px-4 sm:px-6">
+          <Brand className="justify-self-start" />
+          <nav aria-label="Main" className="hidden items-center gap-1 text-body sm:flex">
             {NAV.map((n) => (
               <Link key={n.href} href={n.href} aria-current={path === n.href ? "page" : undefined} className={navLink(n.href)}>
                 {n.label}
               </Link>
             ))}
-            {signedIn ? (
-              <>
-                <Link href="/app" aria-current={path === "/app" ? "page" : undefined} className={navLink("/app")}>
-                  {accountLabel}
-                </Link>
-                <button type="button" className={cn(navLink("/sign-out"), "inline-flex items-center gap-1.5")} onClick={() => void auth.signOut()}>
-                  <LogOut className="size-3.5" aria-hidden="true" /> Sign out
-                </button>
-              </>
-            ) : (
-              <Link href="/login" aria-current={path === "/login" ? "page" : undefined} className={navLink("/login")}>
-                Log in
-              </Link>
-            )}
-            <Link href="/get-started" className={cn(buttonVariants({ size: "sm" }), "ml-2")}>
-              Get started
-            </Link>
           </nav>
-          <button type="button" className="rounded-md p-1.5 hover:bg-accent/60 sm:hidden" aria-label={open ? "Close menu" : "Open menu"} aria-expanded={open} onClick={() => { setOpen((o) => !o); }}>
-            {open ? <X className="size-5" aria-hidden="true" /> : <Menu className="size-5" aria-hidden="true" />}
-          </button>
+          <div className="col-start-3 flex items-center justify-self-end gap-1 text-body">
+            <div className="hidden items-center gap-1 sm:flex">
+              {signedIn ? (
+                <>
+                  <Link href="/app" className={navLink("/app")}>
+                    {accountLabel}
+                  </Link>
+                  <button type="button" className={cn(navLink("/sign-out"), "inline-flex items-center gap-1.5")} onClick={() => void auth.signOut()}>
+                    <LogOut className="size-3.5" aria-hidden="true" /> Sign out
+                  </button>
+                </>
+              ) : (
+                <Link href="/login" aria-current={path === "/login" ? "page" : undefined} className={navLink("/login")}>
+                  Log in
+                </Link>
+              )}
+              <Link href="/get-started" className={cn(buttonVariants({ size: "sm" }), "ml-2")}>
+                Get started
+              </Link>
+            </div>
+            <button type="button" className="rounded-md p-1.5 hover:bg-accent/60 sm:hidden" aria-label={open ? "Close menu" : "Open menu"} aria-expanded={open} onClick={() => { setOpen((o) => !o); }}>
+              {open ? <X className="size-5" aria-hidden="true" /> : <Menu className="size-5" aria-hidden="true" />}
+            </button>
+          </div>
         </div>
         {open && (
           <nav aria-label="Main (mobile)" className="border-t bg-background px-4 py-3 sm:hidden">
             <ul className="grid gap-1 text-sm">
               {[...NAV, signedIn ? { href: "/app", label: accountLabel } : { href: "/login", label: "Log in" }].map((n) => (
                 <li key={n.href}>
-                  <Link href={n.href} className={cn("block rounded-md px-2.5 py-2", path === n.href ? "bg-accent/60 text-foreground" : "text-muted-foreground")}>
+                  <Link href={n.href} className={cn("block rounded-md px-2.5 py-2", path === n.href ? "text-primary" : "text-muted-foreground")}>
                     {n.label}
                   </Link>
                 </li>

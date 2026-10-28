@@ -17,7 +17,7 @@ async function signIn(page: Page): Promise<void> {
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Log in");
   await page.getByRole("button", { name: "Continue with GitHub" }).click();
   await expect(page).toHaveURL(/\/app$/);
-  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Analyze a repository");
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Find what to fix before you ship");
 }
 
 async function analyze(page: Page, url: string): Promise<void> {
@@ -31,10 +31,23 @@ test.describe("public page", () => {
     await expect(page.getByRole("heading", { level: 1 })).toContainText("Your app was built fast");
     await expect(page.getByLabel("Repository URL")).toHaveCount(0);
     await signIn(page);
-    const nav = page.getByRole("navigation", { name: "Main" });
-    await expect(nav.getByRole("link", { name: "@e2e-user" })).toBeVisible();
-    await nav.getByRole("button", { name: "Sign out" }).click();
-    await expect(nav.getByRole("link", { name: "Log in" })).toBeVisible();
+    // Signed in, the public site is gone: its pages forward to the Dashboard.
+    await page.getByRole("link", { name: "GateSeeker workspace" }).waitFor();
+    for (const path of ["/", "/about", "/get-started"]) {
+      await page.goto(path);
+      await expect(page).toHaveURL(/\/app\/dashboard$/);
+      await expect(page.getByRole("heading", { level: 1 })).toHaveText("How your repositories are doing");
+    }
+    // Resources has a workspace counterpart, linked from the sidebar.
+    await page.goto("/resources");
+    await expect(page).toHaveURL(/\/app\/resources$/);
+    await expect(page.getByRole("heading", { level: 1 })).toHaveText("Rules, limits and documentation");
+    await expect(page.getByRole("navigation", { name: "Workspace", exact: true }).getByRole("link", { name: "Resources" })).toHaveAttribute("aria-current", "page");
+    await expect(page.getByText("GSK-SUPABASE-001")).toBeVisible();
+    await page.getByRole("button", { name: "@e2e-user" }).click();
+    await page.getByRole("menuitem", { name: "Sign out" }).click();
+    await expect(page).toHaveURL(/\/$/);
+    await expect(page.getByRole("banner").getByRole("link", { name: "Log in" })).toBeVisible();
     await page.goto("/app");
     await expect(page.getByRole("heading", { level: 1 })).toHaveText("Log in");
   });
@@ -71,6 +84,67 @@ test.describe("public page", () => {
     await expect(page.getByTestId("saved-note")).not.toContainText("analyses used");
   });
 
+  test("exports the whole report for PDF: every finding expanded, workspace frame hidden", async ({ page }) => {
+    await signIn(page);
+    await analyze(page, "https://github.com/acme/vibe");
+    const report = page.getByRole("region", { name: "Report" });
+    await expect(report).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByRole("button", { name: "Export PDF" })).toBeVisible();
+    const details = page.locator("tr[id^=finding-]");
+    const total = await details.count();
+    expect(total).toBeGreaterThan(0);
+    // Collapsed on screen, and a filter with no match must not shorten the export.
+    await expect(details.filter({ visible: true })).toHaveCount(0);
+    await page.getByRole("radio", { name: "P4 (0)" }).click();
+    await expect(details).toHaveCount(0);
+    await page.evaluate("window.dispatchEvent(new Event('beforeprint'))");
+    await page.emulateMedia({ media: "print" });
+    await expect(details.filter({ visible: true })).toHaveCount(total);
+    await expect(page.getByRole("navigation", { name: "Workspace" })).toBeHidden();
+    await expect(report).toContainText("not that a project is secure");
+    await expect(report).not.toContainText("sk_live_HoHDwEcLksdRWvioeGponKHY");
+  });
+
+  test("records analyses as notifications and on the Dashboard, and honours the settings", async ({ page }) => {
+    await signIn(page);
+    const bell = page.getByRole("button", { name: /^Notifications/ });
+    await expect(bell).toHaveAccessibleName("Notifications");
+    await analyze(page, "https://github.com/acme/vibe");
+    await expect(page.getByRole("region", { name: "Report" })).toBeVisible({ timeout: 30_000 });
+    await analyze(page, "https://github.com/acme/private");
+    await expect(page.getByRole("alert")).toBeVisible();
+    // Typing errors are not worth a notification.
+    await analyze(page, "https://gitlab.com/acme/vibe");
+    await expect(bell).toHaveAccessibleName("Notifications, 2 unread");
+
+    await bell.click();
+    const panel = page.getByRole("dialog", { name: "Notifications" });
+    await expect(panel.getByRole("listitem")).toHaveCount(2);
+    await expect(panel.getByRole("listitem").first()).toContainText("Analysis refused");
+    await expect(panel.getByRole("listitem").nth(1)).toContainText("acme/vibe@0123456");
+    await page.getByRole("button", { name: "Close notifications" }).click();
+    await expect(bell).toHaveAccessibleName("Notifications");
+
+    // The Dashboard lists the repository with its latest verdict.
+    await page.getByRole("navigation", { name: "Workspace", exact: true }).getByRole("link", { name: "Dashboard" }).click();
+    const repos = page.getByRole("table", { name: "Repositories" });
+    await expect(repos.getByRole("row")).toHaveCount(2);
+    await expect(repos).toContainText("acme/vibe");
+    await expect(repos.getByRole("link", { name: "View issues" })).toHaveAttribute("href", /^\/r\/mem-/);
+
+    // Turned off in Settings (account menu): the next analysis leaves no notification.
+    await page.getByRole("button", { name: "@e2e-user" }).click();
+    await page.getByRole("menuitem", { name: "Settings" }).click();
+    await expect(page.getByRole("heading", { level: 1 })).toHaveText("Account and preferences");
+    await page.getByRole("switch", { name: /Notify me when an analysis ends/ }).uncheck({ force: true });
+    await page.getByRole("navigation", { name: "Workspace", exact: true }).getByRole("link", { name: "Analyze repository" }).click();
+    await analyze(page, "https://github.com/acme/private");
+    await expect(page.getByRole("alert")).toBeVisible();
+    await expect(bell).toHaveAccessibleName("Notifications");
+    await bell.click();
+    await expect(panel.getByRole("listitem")).toHaveCount(2);
+  });
+
   test("rejects an invalid URL without calling the service", async ({ page }) => {
     await signIn(page);
     await analyze(page, "https://gitlab.com/acme/vibe");
@@ -102,7 +176,7 @@ test.describe("public page", () => {
     await expect(page.getByRole("heading", { level: 1 })).toHaveText("About");
     await page.goto("/nothing-here");
     await expect(page.getByRole("heading", { level: 1 })).toHaveText("Page not found");
-    await page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "Log in" }).click();
+    await page.getByRole("banner").getByRole("link", { name: "Log in" }).click();
     await expect(page.getByRole("heading", { level: 1 })).toHaveText("Log in");
     await expect(page.getByRole("button", { name: "Continue with GitHub" })).toBeVisible();
     // A saved report needs a session too.

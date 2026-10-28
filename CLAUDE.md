@@ -33,7 +33,7 @@ src/rules/     CVSS scoring, severity tier, priority table, finding builder
 src/patterns/  directory walker, file classifier, gitignore matcher, rule engine, rules/ (one file per GSK rule)
 src/intel/     OSV client, Packagist p2 client, advisory schema + loader/matcher (incl. tag-rewrite verification), feed/ (RSS parser, collector with OSV coverage check), ui/ (local triage server, git allowlist)
 ui/            separate Vite + React package (triage interface) served by `gateseeker-intel ui`; built into ui/dist
-ui-kit/        shared theme (Sentry-style tokens) and shadcn-style components used by ui/ and web/
+ui-kit/        shared theme (tokens from the PO's Figma file "GateSeeker") and components used by ui/ and web/; live catalogue at /app/design-system
 web/           public site (Sprint 4): marketing pages, /login (Supabase Auth, GitHub), /app demo workspace, /r/<id>; Vite + React, Vercel functions in web/api
 supabase/      SQL migrations the PO applies in the Supabase SQL editor (RLS on, no policies; service_role only)
 src/web/       hosted service: strict GitHub URL parser, dependency-free tar.gz reader with limits, scan service (injected fetch), auth verifier, report store (memory/Supabase), HTTP handlers (auth -> cache -> quota -> scan -> save), env wiring, local dev server
