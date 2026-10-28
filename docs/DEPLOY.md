@@ -28,7 +28,7 @@ Estado: projeto Vercel `gateseeker` criado em 2026-10-28 (conta pessoal, plano H
 
 ## 4. Supabase: chaves
 
-Menu Project Settings → API Keys (as chaves novas, `sb_publishable_…` e `sb_secret_…`; não crie chaves extras, use as "default"). A URL do projeto está em Project Settings → General (Project URL, `https://<ref>.supabase.co`). Três valores, cada um vai para uma variável no Vercel:
+Menu Project Settings → API Keys (as chaves novas, `sb_publishable_…` e `sb_secret_…`; não crie chaves extras, use as "default"). A URL do projeto é montada a partir do Project ID mostrado em Project Settings → General: `https://<Project ID>.supabase.co`. Três valores, cada um vai para uma variável no Vercel:
 
 | No Supabase | Variável no Vercel | Pública? |
 |---|---|---|
