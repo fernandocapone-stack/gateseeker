@@ -10,7 +10,7 @@ import { expect, test } from "@playwright/test";
 test.describe("public page", () => {
   test("analyzes a public repository and shows prioritized findings", async ({ page }) => {
     await page.goto("/");
-    await expect(page.getByRole("heading", { level: 1 })).toContainText("Security gate for AI-generated code");
+    await expect(page.getByRole("heading", { level: 1 })).toContainText("Your app was built fast");
     await page.getByLabel("Repository URL").fill("https://github.com/acme/vibe");
     await page.getByRole("button", { name: "Analyze" }).click();
     await expect(page.getByRole("status")).toContainText("Analyzing");
@@ -43,6 +43,25 @@ test.describe("public page", () => {
     await page.getByLabel("Repository URL").fill("https://github.com/acme/huge");
     await page.getByRole("button", { name: "Analyze" }).click();
     await expect(page.getByRole("alert")).toContainText("Run the CLI locally");
+  });
+
+  test("navigates between the site sections without a full reload and serves deep links", async ({ page }) => {
+    await page.goto("/");
+    await page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "How it works" }).click();
+    await expect(page).toHaveURL(/\/how-it-works$/);
+    await expect(page.getByRole("heading", { level: 1 })).toHaveText("How it works");
+    await page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "Resources" }).click();
+    await expect(page.getByRole("heading", { level: 1 })).toHaveText("Resources");
+    await expect(page.getByText("GSK-SUPABASE-001")).toBeVisible();
+    await page.goto("/get-started");
+    await expect(page.getByRole("heading", { level: 1 })).toHaveText("Get started");
+    await expect(page.locator("#ci")).toContainText("uses: gateseeker-dev/gateseeker@v1");
+    await page.goto("/about");
+    await expect(page.getByRole("heading", { level: 1 })).toHaveText("About");
+    await page.goto("/nothing-here");
+    await expect(page.getByRole("heading", { level: 1 })).toHaveText("Page not found");
+    // No sign-in link until accounts exist.
+    await expect(page.getByRole("link", { name: /log ?in|sign in/i })).toHaveCount(0);
   });
 
   test("offers the GitHub Action workflow with the analyzed repository named", async ({ page }) => {

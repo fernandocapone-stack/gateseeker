@@ -35,7 +35,7 @@ Entregas:
 ### 3.1. Página (`web/`, pacote novo no workspace)
 
 - Vite + React + Tailwind + os componentes shadcn-style já existentes em `ui/` (extraídos para um pacote interno `@gateseeker/ui-kit` para as duas interfaces usarem o mesmo tema Sentry).
-- Rotas: `/` (campo de URL e relatório), `/r/<id>` (relatório salvo, compartilhável), `/ci` (como instalar a Action, com o trecho de três linhas), `/limits` (o que a análise cobre e não cobre).
+- Rotas (estrutura de site pedida pelo PO em 2026-10-28, design em conversa separada): `/` Home com a ferramenta de colar URL como demonstração viva e os três pilares; `/how-it-works`; `/about`; `/resources` (regras, limites, documentação); `/get-started` (navegador, CLI, Action); `/r/<id>` (relatório salvo, compartilhável, entra com a persistência). **Login fica para a Sprint 5**, quando houver contas: um botão de entrar sem destino não entra no site. Roteador próprio de poucas linhas, sem dependência; conteúdo em inglês, idioma do produto e do público.
 - Estados: digitando, analisando (com progresso textual: "baixando", "lendo 312 arquivos", "consultando OSV"), concluído, incompleto, recusado (URL inválida, repositório privado ou inexistente, limite estourado, fila cheia).
 - O relatório na tela é a mesma informação do `--format summary`, com os achados expandíveis para mostrar evidência, regra e referência, como no texto da CLI.
 - Botão "Usar no CI" que leva a `/ci` já com o nome do repositório preenchido no exemplo.
