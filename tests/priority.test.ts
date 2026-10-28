@@ -130,6 +130,14 @@ describe("buildFinding with the real lodash record", () => {
     expect(f.remediation.action).toBe("Update lodash to 4.17.21 or later in package.json and reinstall.");
   });
 
+  it("names composer.json and composer update for Packagist dependencies", () => {
+    const composerDirect: Dependency = { ...direct, name: "guzzlehttp/psr7", version: "1.8.0", ecosystem: "Packagist", paths: ["vendor/guzzlehttp/psr7"] };
+    const record = { id: "T", affected: [{ package: { name: "guzzlehttp/psr7", ecosystem: "Packagist" }, ranges: [{ type: "ECOSYSTEM", events: [{ introduced: "0" }, { fixed: "1.8.4" }] }] }] };
+    expect(buildFinding(composerDirect, record, source).remediation.action).toBe("Update guzzlehttp/psr7 to 1.8.4 or later in composer.json and run composer update.");
+    const transitive = { ...composerDirect, exposure: { direct: false, production: true } };
+    expect(buildFinding(transitive, record, source).remediation.action).toBe("Update the dependency that pulls in guzzlehttp/psr7 so it resolves to 1.8.4 or later (or require it directly at that version).");
+  });
+
   it("produces a P1 finding with evidence and references preserved", () => {
     const f = buildFinding(direct, vuln, source);
     expect(f).toMatchObject({

@@ -31,9 +31,13 @@ function remediationAction(dep: Dependency, fixedVersions: string[]): string {
   // Smallest fixed version above the installed one; otherwise the highest listed.
   const above = dep.version === null ? [] : fixedVersions.filter((v) => compareSemver(v, dep.version ?? "") > 0);
   const target = above[0] ?? fixedVersions[fixedVersions.length - 1] ?? "";
+  const composer = dep.ecosystem === "Packagist";
+  const manifest = composer ? "composer.json" : "package.json";
+  const reinstall = composer ? "run composer update" : "reinstall";
+  const pin = composer ? "or require it directly at that version" : "or add an npm override";
   const how = dep.exposure.direct
-    ? `Update ${dep.name} to ${target} or later in package.json and reinstall.`
-    : `Update the dependency that pulls in ${dep.name} so it resolves to ${target} or later (or add an npm override).`;
+    ? `Update ${dep.name} to ${target} or later in ${manifest} and ${reinstall}.`
+    : `Update the dependency that pulls in ${dep.name} so it resolves to ${target} or later (${pin}).`;
   return how;
 }
 
