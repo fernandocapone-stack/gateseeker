@@ -22,7 +22,7 @@ export function Logo({ className, label = "GateSeeker" }: { className?: string; 
   return (
     <span className={cn("inline-flex items-center gap-[6px] text-foreground", className)} role="img" aria-label={label}>
       <LogoSymbol />
-      <svg viewBox="0 0 83.4521 12" width="83.4521" height="12" fill="none" aria-hidden="true" className="shrink-0 -translate-y-px">
+      <svg viewBox="0 0 83.4521 12" width="83.4521" height="12" fill="none" aria-hidden="true" className="shrink-0">
         <path d={WORDMARK} fill="currentColor" />
       </svg>
     </span>

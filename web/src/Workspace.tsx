@@ -63,6 +63,9 @@ export function Workspace({ page, loading = false, children }: { page: Workspace
 
   const nav = (
     <>
+      <Link href="/app/dashboard" aria-current={page === "dashboard" ? "page" : undefined} className={navItemClass(page === "dashboard")}>
+        <LayoutDashboard aria-hidden="true" /> Dashboard
+      </Link>
       <Link href="/app" aria-current={page === "analyze" ? "page" : undefined} className={navItemClass(page === "analyze")}>
         <ScanSearch aria-hidden="true" /> Analyze repository
       </Link>
@@ -75,9 +78,6 @@ export function Workspace({ page, loading = false, children }: { page: Workspace
           <ListChecks aria-hidden="true" /> Issues
         </span>
       )}
-      <Link href="/app/dashboard" aria-current={page === "dashboard" ? "page" : undefined} className={navItemClass(page === "dashboard")}>
-        <LayoutDashboard aria-hidden="true" /> Dashboard
-      </Link>
     </>
   );
 
@@ -92,7 +92,7 @@ export function Workspace({ page, loading = false, children }: { page: Workspace
   );
 
   return (
-    <AppShell brand={<Link href="/app" aria-label="GateSeeker workspace"><Logo label="GateSeeker" /></Link>} title={TITLE[page]} actions={actions} nav={nav} account={account}>
+    <AppShell brand={<Link href="/app/dashboard" aria-label="GateSeeker workspace" className="flex items-center"><Logo label="GateSeeker" /></Link>} title={TITLE[page]} actions={actions} nav={nav} account={account}>
       {children}
       <NotificationsPanel open={panel} onClose={closePanel} items={notifications.items} onMarkAllRead={notifications.markAllRead} />
     </AppShell>
