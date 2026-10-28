@@ -125,7 +125,7 @@ function Shell() {
 
   return (
     <div className="flex min-h-screen flex-col">
-      <header className="sticky top-0 z-40 border-b bg-background/80 backdrop-blur-md">
+      <header className="sticky top-0 z-40 border-b bg-sidebar">
         <div className="mx-auto flex h-14 max-w-5xl items-center justify-between px-4 sm:px-6">
           <Brand />
           <nav aria-label="Main" className="hidden items-center gap-1 text-sm sm:flex">
