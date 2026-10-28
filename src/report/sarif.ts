@@ -11,7 +11,7 @@ import { sanitize } from "./text.js";
  */
 
 const SARIF_SCHEMA = "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/main/sarif-2.1/schema/sarif-schema-2.1.0.json";
-const README = "https://github.com/fernandocapone-stack/gateseeker#readme";
+const README = "https://github.com/gateseeker-dev/gateseeker#readme";
 
 export interface SarifRule {
   id: string;
@@ -75,7 +75,7 @@ function ruleFor(f: Finding, lockfileUri: string | null): { rule: SarifRule; uri
         name: id.replace(/-/g, ""),
         shortDescription: { text: sanitize(e.type, 120) },
         fullDescription: { text: sanitize(e.summary, 300) },
-        helpUri: e.origin === "advisory" ? `https://github.com/fernandocapone-stack/gateseeker/tree/main/advisories` : README,
+        helpUri: e.origin === "advisory" ? `https://github.com/gateseeker-dev/gateseeker/tree/main/advisories` : README,
         properties: { kind: "supply-chain-anomaly", tags: ["security", "supply-chain", "gateseeker"] },
       },
       uri: lockfileUri ?? "package-lock.json",

@@ -1,16 +1,16 @@
 # Validação externa da Sprint 3: a Action em repositórios de terceiros
 
-> Executada em 2026-10-28 com `gateseeker@1.0.0-beta.6` (npm, com proveniência) referenciada como `fernandocapone-stack/gateseeker@v1`. Critério de aceite da `docs/SPRINT_3.md`, seção 3.5: dois repositórios públicos de teste, um JavaScript e um PHP, cada um com um PR que troca uma dependência por uma versão vulnerável conhecida e um PR com atualização limpa; o primeiro deve ser bloqueado com comentário e SARIF corretos, o segundo deve passar.
+> Executada em 2026-10-28 com `gateseeker@1.0.0-beta.6` (npm, com proveniência) referenciada como `gateseeker-dev/gateseeker@v1`. Critério de aceite da `docs/SPRINT_3.md`, seção 3.5: dois repositórios públicos de teste, um JavaScript e um PHP, cada um com um PR que troca uma dependência por uma versão vulnerável conhecida e um PR com atualização limpa; o primeiro deve ser bloqueado com comentário e SARIF corretos, o segundo deve passar.
 
 ## Repositórios
 
 | | JavaScript | PHP |
 |---|---|---|
-| Repositório | https://github.com/fernandocapone-stack/gateseeker-test-js | https://github.com/fernandocapone-stack/gateseeker-test-php |
+| Repositório | https://github.com/gateseeker-dev/gateseeker-test-js | https://github.com/gateseeker-dev/gateseeker-test-php |
 | Projeto base (main) | `lodash@4.18.1`, `ms@2.1.2`; lockfile v3 gerado por `npm install --package-lock-only` | `guzzlehttp/psr7@3.1.1` e suas quatro dependências; `composer.lock` montado a partir dos metadados p2 do Packagist (referências de commit, URLs e datas reais) |
 | PR 1, deve bloquear | `lodash` rebaixado para `4.17.15` | `guzzlehttp/psr7` rebaixado para `1.8.0` |
 | PR 2, deve passar | `ms` atualizado para `2.1.3` | `guzzlehttp/psr7` atualizado para `3.2.0` |
-| Workflow | O trecho do README: `actions/checkout@v7` + `fernandocapone-stack/gateseeker@v1`, `fail-on: P2`, `patterns: warn`, `supply-chain: warn`, permissões `contents: read`, `pull-requests: write`, `security-events: write` | idem |
+| Workflow | O trecho do README: `actions/checkout@v7` + `gateseeker-dev/gateseeker@v1`, `fail-on: P2`, `patterns: warn`, `supply-chain: warn`, permissões `contents: read`, `pull-requests: write`, `security-events: write` | idem |
 
 Os projetos foram escolhidos de propósito pequenos: o que se testa é a Action (instalação pelo npm, baseline automática, comentário, SARIF, código de saída), não o motor, já validado nas Sprints 1 e 2b. Nenhum código dos projetos é executado em nenhum momento.
 
@@ -42,7 +42,7 @@ Ambos saem na próxima versão publicada; a `1.0.0-beta.6` em uso nos repositór
 
 - **Nível SARIF de achados em modo aviso.** O `GSK-SC-002`, que não conta para o portão, aparece no code scanning como `error` porque o nível segue a prioridade (P2). Alternativa: achados em modo aviso irem como `warning`, para a aba Security refletir o que bloqueia e o que não bloqueia. Não alterado; é escolha de produto.
 - **Alertas ficam no PR, não em main.** Os alertas do code scanning estão vinculados ao ref do PR; a lista padrão do repositório (ref `main`) fica vazia, como deve ser, porque main está limpa. Vale uma linha no README para quem procurar os alertas e não achar.
-- **Redirecionamento do nome.** Os workflows de teste referenciam `fernandocapone-stack/gateseeker@v1`. Se o repositório for transferido para uma organização, o GitHub redireciona a referência antiga; os dois repositórios de teste serão atualizados para o novo nome na ocasião.
+- **Redirecionamento do nome.** Os workflows de teste referenciam `gateseeker-dev/gateseeker@v1`. Se o repositório for transferido para uma organização, o GitHub redireciona a referência antiga; os dois repositórios de teste serão atualizados para o novo nome na ocasião.
 
 ## Reprodução
 

@@ -178,7 +178,7 @@ async function fetchText(url: string, fetchFn: typeof fetch, timeoutMs: number, 
     const res = await fetchFn(url, {
       signal: controller.signal,
       redirect: "manual",
-      headers: { "user-agent": "gateseeker-intel/0.1 (+https://github.com/fernandocapone-stack/gateseeker)", accept: "application/rss+xml, application/atom+xml, application/xml, text/xml" },
+      headers: { "user-agent": "gateseeker-intel/0.1 (+https://github.com/gateseeker-dev/gateseeker)", accept: "application/rss+xml, application/atom+xml, application/xml, text/xml" },
     });
     if (res.status >= 300 && res.status < 400) {
       const loc = res.headers.get("location") ?? "";

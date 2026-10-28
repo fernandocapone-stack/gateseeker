@@ -46,9 +46,9 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/fernandocapone-stack/gateseeker.git"
+    "url": "git+https://github.com/gateseeker-dev/gateseeker.git"
   },
-  "homepage": "https://github.com/fernandocapone-stack/gateseeker#readme",
+  "homepage": "https://github.com/gateseeker-dev/gateseeker#readme",
   "keywords": [
     "security",
     "supply-chain",

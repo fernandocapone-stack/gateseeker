@@ -9,7 +9,7 @@ Gateseeker points at a project directory, checks the code for the security mista
 ## Use in GitHub Actions
 
 ```yaml
-- uses: fernandocapone-stack/gateseeker@v1
+- uses: gateseeker-dev/gateseeker@v1
 ```
 
 That single step, after your checkout, runs the scanner on every pull request: known vulnerabilities for npm and Composer, curated supply-chain advisories, structural lockfile signals (compared with the base branch automatically), and code-pattern rules. It writes a job summary, keeps one sticky comment on the pull request up to date (needs `pull-requests: write`), uploads SARIF to code scanning (needs `security-events: write`), and fails the job when the gate fails. An incomplete analysis fails too, by design; set `allow-incomplete: true` to accept that risk.
@@ -22,7 +22,7 @@ permissions:
 
 steps:
   - uses: actions/checkout@v7
-  - uses: fernandocapone-stack/gateseeker@v1
+  - uses: gateseeker-dev/gateseeker@v1
     with:
       fail-on: P2          # P1 | P2 | P3 | P4
       patterns: warn       # warn | gate

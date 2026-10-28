@@ -11,7 +11,7 @@ Transformar o Gateseeker de uma ferramenta que a pessoa roda na própria máquin
 
 Entregas:
 
-1. **Action oficial** usável por qualquer repositório com `uses: fernandocapone-stack/gateseeker@v0`, com entradas para caminho, limiar, modos de aviso ou bloqueio, baseline automática e saídas para outros passos.
+1. **Action oficial** usável por qualquer repositório com `uses: gateseeker-dev/gateseeker@v0`, com entradas para caminho, limiar, modos de aviso ou bloqueio, baseline automática e saídas para outros passos.
 2. **Resumo legível no próprio pull request**: o resumo do job do GitHub e, opcionalmente, um comentário fixo no PR com os achados priorizados e a ação de cada um.
 3. **Saída SARIF** para o painel de segurança do GitHub (code scanning), para que os achados apareçam onde o desenvolvedor já olha.
 4. **Primeira publicação pública**: pacote `gateseeker` no npm com proveniência assinada pelo GitHub Actions, e repositório público. Sem isso a Action não pode ser usada por terceiros nem o produto ser open core de fato.
@@ -93,7 +93,7 @@ Passos da Action: `setup-node` fixado em Node 24; `npx --yes gateseeker@<versão
 
 ## 6. Critérios de aceite
 
-- A Action funciona a partir de outro repositório com `uses: fernandocapone-stack/gateseeker@v0` e as entradas documentadas.
+- A Action funciona a partir de outro repositório com `uses: gateseeker-dev/gateseeker@v0` e as entradas documentadas.
 - Pass, fail e incompleto mapeados corretamente, com `allow-incomplete` respeitado.
 - Baseline automática a partir da branch de base em PRs.
 - Resumo do job e comentário fixo no PR funcionando; SARIF aceito pelo code scanning.

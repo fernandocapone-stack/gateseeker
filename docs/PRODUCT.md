@@ -8,7 +8,7 @@
 **Gateseeker.** Mantido.
 
 - Verificado em 2026-10-27: `gateseeker`, `@gateseeker/cli` e `gate-seeker` livres no npm. Nenhum produto, startup ou projeto de software com esse nome encontrado em busca web.
-- O usuário `gateseeker` no GitHub existe (criado em 2026-01-08, sem repositórios) e **não pertence ao PO**. O repositório vive em `fernandocapone-stack/gateseeker`. Se uma organização for criada, precisará de outro handle (ex.: `gateseeker-dev`, `gateseeker-app`).
+- O usuário `gateseeker` no GitHub existe (criado em 2026-01-08, sem repositórios) e **não pertence ao PO**. Em 2026-10-28 o PO criou a organização `gateseeker-dev` e os repositórios foram transferidos para ela; a Action passa a ser `gateseeker-dev/gateseeker@v1` (o GitHub redireciona o nome antigo `fernandocapone-stack/gateseeker`).
 - Registrar antes do lançamento público: pacote npm `gateseeker`, domínio `.dev` ou `.io`. Marca no INPI só quando houver receita.
 
 **O que o nome não faz sozinho:** ele não explica o produto. "Seeker" soa passivo (quem procura), e o produto é ativo (quem barra). A tagline e o branding fazem esse trabalho e **serão trabalhados pelo PO em paralelo, sem bloquear as sprints** (decisão de 2026-10-27). Até lá, o repositório usa uma descrição funcional provisória:
