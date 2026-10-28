@@ -5,13 +5,15 @@ import { fetchReport, type ReportOutcome } from "../api";
 import { useAuth } from "../auth-context";
 import { CiSnippet } from "../components/CiSnippet";
 import { ReportSkeleton } from "../components/Skeletons";
-import { setLastReportId } from "../last-report";
 import { Link } from "../router";
 import { ReportView } from "../views/Report";
+import { useWorkspaceTitle } from "../Workspace";
 
 /**
  * /r/<id>: a report saved for the signed-in account. The id alone opens
  * nothing: the service returns a report only to the account that produced it.
+ * In the workspace it is a scan: the header shows "owner/repo" with a back
+ * button to the Scans list.
  */
 export function SavedReport({ id }: { id: string }) {
   const auth = useAuth();
@@ -24,10 +26,15 @@ export function SavedReport({ id }: { id: string }) {
     void fetchReport(id, auth.session.accessToken).then((o) => {
       if (cancelled) return;
       setOutcome(o);
-      if (o.ok) setLastReportId(o.id);
     });
     return () => { cancelled = true; };
   }, [auth.status, auth.session, id]);
+
+  const name = outcome?.ok ? `${outcome.saved.repository.owner}/${outcome.saved.repository.repo}` : null;
+  useWorkspaceTitle(name);
+  useEffect(() => {
+    if (name) document.title = `${name} · Gateseeker`;
+  }, [name]);
 
   if (auth.status === "loading" || (auth.status === "signed-in" && outcome === null)) {
     return <ReportSkeleton label="Loading the saved report" />;
@@ -62,7 +69,7 @@ export function SavedReport({ id }: { id: string }) {
   return (
     <>
       <div className="mb-4 print:hidden">
-        <h1 className="text-display font-medium break-all">{outcome.saved.repository.owner}/{outcome.saved.repository.repo}</h1>
+        <h1 className="sr-only">{name}</h1>
         <p className="text-label text-muted-foreground">
           Commit <span className="font-mono">{outcome.saved.repository.sha.slice(0, 7)}</span> · Saved report <code>{outcome.id}</code>, kept until {new Date(outcome.expiresAt).toLocaleDateString()}. <Link href="/app" className="text-primary hover:underline">Analyze another repository</Link>.
         </p>

@@ -130,7 +130,21 @@ test.describe("public page", () => {
     const repos = page.getByRole("table", { name: "Repositories" });
     await expect(repos.getByRole("row")).toHaveCount(2);
     await expect(repos).toContainText("acme/vibe");
-    await expect(repos.getByRole("link", { name: "View issues" })).toHaveAttribute("href", /^\/r\/mem-/);
+    await expect(repos.getByRole("link", { name: "View scan" })).toHaveAttribute("href", /^\/r\/mem-/);
+
+    // Scans lists every analysis; an opened scan is titled with the repository and leads back to the list.
+    await page.getByRole("navigation", { name: "Workspace", exact: true }).getByRole("link", { name: "Scans" }).click();
+    await expect(page.getByRole("heading", { level: 1 })).toHaveText("Your scans");
+    const scans = page.getByRole("table", { name: "Scans" });
+    await expect(scans.getByRole("row")).toHaveCount(2);
+    await scans.getByRole("link", { name: "View scan" }).click();
+    await expect(page.getByRole("region", { name: "Report" })).toBeVisible();
+    const header = page.getByRole("banner");
+    await expect(header).toContainText("acme/vibe");
+    await expect(page).toHaveTitle("acme/vibe · Gateseeker");
+    await expect(page.getByRole("navigation", { name: "Workspace", exact: true }).getByRole("link", { name: "Scans" })).toHaveClass(/border-primary/);
+    await header.getByRole("link", { name: "Back to scans" }).click();
+    await expect(page).toHaveURL(/\/app\/scans$/);
 
     // Turned off in Settings (account menu): the next analysis leaves no notification.
     await page.getByRole("button", { name: "@e2e-user" }).click();
