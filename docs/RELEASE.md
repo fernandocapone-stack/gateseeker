@@ -12,6 +12,10 @@ Roteiro da primeira publicação pública e das seguintes. Os passos marcados **
 4. Engenharia: publica `1.0.0-beta.2` pela tag `v1.0.0-beta.2`; o workflow `release.yml` publica com proveniência e cria a release no GitHub. A partir daí a tag `v1` e a Action apontam para uma versão com proveniência. Nenhum token fica guardado em lugar nenhum.
 5. **[PO] Repositório público.** Em https://github.com/fernandocapone-stack/gateseeker/settings, "Danger Zone", "Change visibility". Necessário para que a Action seja usada por outros repositórios. Antes: revisão final do histórico (eu confirmo a cada commit que não há segredo real; a palavra final é sua), descrição e tópicos do repositório. A tagline provisória continua provisória.
 
+## Opção para o futuro: publicação em etapas
+
+O npm oferece a "publicação em etapas" (staged publishing): o CI prepara a versão e um humano com 2FA a conclui no site. É uma camada a mais, alinhada com o princípio do produto de que um humano aprova, ao custo de um clique seu a cada versão. Hoje o publicador confiável está com "Allow npm publish" marcado (publicação direta pelo CI). Se quiser mudar, basta desmarcar essa opção no npm e eu adapto o workflow.
+
 ## A cada versão
 
 1. Engenharia: atualiza `version` em `package.json` e o `version` padrão em `action.yml` (iguais), atualiza o README se houver entradas novas, PR, CI verde, merge.
