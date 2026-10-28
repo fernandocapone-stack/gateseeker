@@ -89,6 +89,8 @@ stub.listen(4322, "127.0.0.1", () => {
       GATESEEKER_GITHUB_ARCHIVE: "http://127.0.0.1:4322",
       GATESEEKER_OSV_ENDPOINT: "http://127.0.0.1:4322/v1/query",
       GATESEEKER_PACKAGIST_BASE: "http://127.0.0.1:4322/p2",
+      GATESEEKER_AUTH_STUB: "1",
+      GATESEEKER_SCAN_LIMIT: "3",
     },
   });
   const stop = () => {

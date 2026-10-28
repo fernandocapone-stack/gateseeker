@@ -19,7 +19,7 @@ Read `docs/SPRINT_0.md` (current scope) and `docs/PRODUCT.md` (direction) before
 6. Validate all external data with Zod (`src/parser`, `src/intel/osv-schema.ts`). Unknown fields pass through; wrong shapes reject.
 7. Treat package names, summaries, URLs and project file contents as untrusted. Terminal output goes through `sanitize()` in `src/report/text.ts`; secrets go through `redactInLine`/`redactEnvLine` in `src/patterns/redact.ts` and never appear in full anywhere.
 11. Every pattern rule ships with positive, negative and suppression fixtures in `fixtures/projects/` and a ReDoS timing test. Pattern findings default to warn mode; do not flip the default to gate without measured precision (`docs/VALIDATION_SPRINT_1.md`).
-8. Do not add dependencies, paid services, GitHub integration or new ecosystems without the PO's approval. Current runtime dependency: `zod` only.
+8. Do not add dependencies, paid services, GitHub integration or new ecosystems without the PO's approval. Current runtime dependency of the published package: `zod` only (`web/` additionally uses `@supabase/supabase-js`, approved 2026-10-28; keys live only in Vercel environment variables).
 9. Do not hide failures: no skipped tests, no weakened assertions, no `--no-verify`.
 10. Fixtures for real vulnerabilities must be recorded from the source and documented in `fixtures/*/README.md`. Never invent advisory ids or versions.
 
@@ -34,8 +34,9 @@ src/patterns/  directory walker, file classifier, gitignore matcher, rule engine
 src/intel/     OSV client, Packagist p2 client, advisory schema + loader/matcher (incl. tag-rewrite verification), feed/ (RSS parser, collector with OSV coverage check), ui/ (local triage server, git allowlist)
 ui/            separate Vite + React package (triage interface) served by `gateseeker-intel ui`; built into ui/dist
 ui-kit/        shared theme (Sentry-style tokens) and shadcn-style components used by ui/ and web/
-web/           public page (Sprint 4): paste a GitHub URL, get the report; Vite + React, Vercel function in web/api
-src/web/       hosted service: strict GitHub URL parser, dependency-free tar.gz reader with limits, scan service (injected fetch), HTTP handler, local dev server
+web/           public site (Sprint 4): marketing pages, /login (Supabase Auth, GitHub), /app demo workspace, /r/<id>; Vite + React, Vercel functions in web/api
+supabase/      SQL migrations the PO applies in the Supabase SQL editor (RLS on, no policies; service_role only)
+src/web/       hosted service: strict GitHub URL parser, dependency-free tar.gz reader with limits, scan service (injected fetch), auth verifier, report store (memory/Supabase), HTTP handlers (auth -> cache -> quota -> scan -> save), env wiring, local dev server
 e2e/           Playwright tests for the triage interface (webServer: e2e/start.mjs builds a throwaway repo)
 src/report/    text renderer
 src/scan.ts    orchestration and verdict

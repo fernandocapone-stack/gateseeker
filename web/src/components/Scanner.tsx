@@ -3,6 +3,7 @@ import { ArrowRight, Loader2, ShieldAlert, ShieldQuestion } from "lucide-react";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 
 import { scanRepository, type ScanOutcome, type ScanResponseOk } from "../api";
+import { Link } from "../router";
 import { ReportView } from "../views/Report";
 
 /**
@@ -14,7 +15,7 @@ type Phase = { kind: "idle" } | { kind: "running"; url: string; startedAt: numbe
 
 const PROGRESS = ["Checking the repository on GitHub", "Downloading the archive", "Reading the project files", "Querying OSV and the curated advisories", "Applying the priority rules"];
 
-export function Scanner({ onResult }: { onResult?: (r: ScanResponseOk | null) => void }) {
+export function Scanner({ token, onResult }: { token: string | null; onResult?: (r: ScanResponseOk | null) => void }) {
   const [url, setUrl] = useState("");
   const [phase, setPhase] = useState<Phase>({ kind: "idle" });
   const abort = useRef<AbortController | null>(null);
@@ -29,7 +30,7 @@ export function Scanner({ onResult }: { onResult?: (r: ScanResponseOk | null) =>
     const startedAt = Date.now();
     setPhase({ kind: "running", url: trimmed, startedAt });
     onResult?.(null);
-    const outcome = await scanRepository(trimmed, controller.signal);
+    const outcome = await scanRepository(trimmed, token, controller.signal);
     if (controller.signal.aborted) return;
     setPhase({ kind: "done", url: trimmed, outcome, elapsedMs: Date.now() - startedAt });
     onResult?.(outcome.ok ? outcome : null);
@@ -63,14 +64,31 @@ export function Scanner({ onResult }: { onResult?: (r: ScanResponseOk | null) =>
           </Button>
         )}
       </form>
-      <p className="mt-2 text-xs text-muted-foreground">Public repositories only, up to 50 MB compressed. Nothing is installed or executed. Reports are not stored in this preview.</p>
+      <p className="mt-2 text-xs text-muted-foreground">Public repositories only, up to 50 MB compressed. Nothing is installed or executed. Reports stay in your account for 30 days.</p>
 
       <div className="mt-8">
         {phase.kind === "running" && <Progress startedAt={phase.startedAt} url={phase.url} />}
         {phase.kind === "done" && !phase.outcome.ok && <Refusal url={phase.url} code={phase.outcome.error.code} message={phase.outcome.error.message} />}
-        {phase.kind === "done" && phase.outcome.ok && <ReportView response={phase.outcome} elapsedMs={phase.elapsedMs} />}
+        {phase.kind === "done" && phase.outcome.ok && (
+          <>
+            <SavedNote response={phase.outcome} />
+            <ReportView response={phase.outcome} elapsedMs={phase.elapsedMs} />
+          </>
+        )}
       </div>
     </div>
+  );
+}
+
+function SavedNote({ response }: { response: ScanResponseOk }) {
+  if (response.id === null) return null;
+  const q = response.quota;
+  return (
+    <p className="mb-4 text-xs text-muted-foreground" data-testid="saved-note">
+      {response.cached ? "Reused a report of this commit from the last 24 hours. " : ""}
+      Saved as <Link href={`/r/${response.id}`} className="font-mono text-primary hover:underline">/r/{response.id}</Link> for 30 days.
+      {q ? ` ${String(q.used)} of ${String(q.limit)} analyses used this hour.` : ""}
+    </p>
   );
 }
 
@@ -98,13 +116,14 @@ function Progress({ startedAt, url }: { startedAt: number; url: string }) {
 }
 
 function Refusal({ url, code, message }: { url: string; code: string; message: string }) {
-  const incomplete = code === "timeout" || code === "upstream-error" || code === "download-failed";
+  const incomplete = code === "timeout" || code === "upstream-error" || code === "download-failed" || code === "store-unavailable";
+  const limited = code === "rate-limited" || code === "unauthorized";
   return (
-    <Card className={cn(incomplete ? "border-warning/60" : "border-destructive/60")} role="alert">
+    <Card className={cn(incomplete || limited ? "border-warning/60" : "border-destructive/60")} role="alert">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          {incomplete ? <ShieldQuestion className="size-5 text-warning" aria-hidden="true" /> : <ShieldAlert className="size-5 text-destructive" aria-hidden="true" />}
-          {incomplete ? "Analysis incomplete" : "Could not analyze this URL"}
+          {incomplete || limited ? <ShieldQuestion className="size-5 text-warning" aria-hidden="true" /> : <ShieldAlert className="size-5 text-destructive" aria-hidden="true" />}
+          {limited ? (code === "rate-limited" ? "Hourly limit reached" : "Sign in required") : incomplete ? "Analysis incomplete" : "Could not analyze this URL"}
         </CardTitle>
         <CardDescription className="break-all font-mono text-xs">{url}</CardDescription>
       </CardHeader>

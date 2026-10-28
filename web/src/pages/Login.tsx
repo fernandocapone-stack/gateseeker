@@ -1,11 +1,33 @@
 import { Button, Card, CardContent, CardDescription, CardHeader } from "@gateseeker/ui-kit";
-import { ShieldCheck } from "lucide-react";
+import { Loader2, ShieldCheck } from "lucide-react";
+import { useEffect, useState } from "react";
+
+import { safeNext, takeNext } from "../auth";
+import { useAuth } from "../auth-context";
+import { navigate } from "../router";
 
 /**
- * Sign-in shell. The button has no behaviour yet: GitHub sign-in (Supabase
- * Auth) is wired in a later sprint. Copy keeps the promise small on purpose.
+ * Sign-in page. "Continue with GitHub" starts Supabase Auth's OAuth flow
+ * (or the stub in local/test mode). After the round trip the page lands here
+ * again with a session and forwards to the remembered in-app path.
  */
 export function Login() {
+  const auth = useAuth();
+  const [busy, setBusy] = useState(false);
+  const next = safeNext(new URLSearchParams(window.location.search).get("next") ?? "/app");
+
+  useEffect(() => {
+    if (auth.status === "signed-in") navigate(takeNext() === "/app" ? next : takeNext());
+  }, [auth.status, next]);
+
+  async function start() {
+    setBusy(true);
+    await auth.signIn(next);
+    // On OAuth the browser navigates away; in stub mode the session appears at once and the effect above forwards.
+    setBusy(false);
+  }
+
+  const unavailable = auth.status !== "loading" && auth.mode === "none";
   return (
     <section className="relative mx-auto max-w-sm py-8 sm:py-12">
       <div className="hero-glow pointer-events-none absolute -inset-x-24 -top-24 h-80" aria-hidden="true" />
@@ -18,10 +40,14 @@ export function Login() {
           <CardDescription>Sign in to open the demo workspace and analyze a public GitHub repository.</CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4">
-          <Button size="lg" className="h-11 w-full" disabled aria-disabled="true">
-            <GitHubMark /> Continue with GitHub
+          <Button size="lg" className="h-11 w-full" disabled={busy || auth.status === "loading" || unavailable} onClick={() => void start()}>
+            {busy || auth.status === "loading" ? <Loader2 className="size-4 animate-spin" aria-hidden="true" /> : <GitHubMark />} Continue with GitHub
           </Button>
-          <p className="text-center text-xs text-muted-foreground">The demo workspace is free and rate limited. Public repositories only; nothing is installed or executed.</p>
+          {unavailable ? (
+            <p role="alert" className="text-center text-xs text-warning">Sign-in is not configured on this server. Run the CLI locally instead.</p>
+          ) : (
+            <p className="text-center text-xs text-muted-foreground">The demo workspace is free and rate limited. Public repositories only; nothing is installed or executed. We read your GitHub login and avatar, nothing else.</p>
+          )}
         </CardContent>
       </Card>
     </section>

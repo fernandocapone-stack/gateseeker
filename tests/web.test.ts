@@ -260,14 +260,23 @@ describe("extractTarGz", () => {
   });
 
   it("stays fast on adversarial headers (ReDoS budget)", () => {
-    const dest = freshDir();
-    const entries: Entry[] = [];
-    for (let i = 0; i < 500; i++) entries.push({ name: `repo/${"a.".repeat(40)}${i}`, data: "" });
-    const gz = targz(entries);
-    const start = performance.now();
-    const r = extractTarGz(gz, dest);
-    expect(r.ok).toBe(true);
-    expect(performance.now() - start).toBeLessThan(3000);
+    // Extraction time is dominated by writing 500 files, which varies a lot
+    // between machines (Windows under load took 3 s for the benign set). So
+    // the budget is relative: adversarial names must not cost more than a
+    // small multiple of plain names. An exponential regex would take minutes.
+    const plain: Entry[] = [];
+    const adversarial: Entry[] = [];
+    for (let i = 0; i < 500; i++) {
+      plain.push({ name: `repo/file-${i}`, data: "" });
+      adversarial.push({ name: `repo/${"a.".repeat(40)}${i}`, data: "" });
+    }
+    const t0 = performance.now();
+    expect(extractTarGz(targz(plain), freshDir()).ok).toBe(true);
+    const baseline = performance.now() - t0;
+    const t1 = performance.now();
+    expect(extractTarGz(targz(adversarial), freshDir()).ok).toBe(true);
+    const cost = performance.now() - t1;
+    expect(cost).toBeLessThan(baseline * 3 + 1000);
   });
 });
 

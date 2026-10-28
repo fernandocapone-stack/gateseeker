@@ -1,20 +1,47 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 
 /**
  * Browser tests for the public page, against the stub GitHub/OSV started by
- * e2e/start-web.mjs. The live scanner lives in the demo workspace (/app); the
- * Home is marketing only. Covers: a valid URL producing a report with the
- * fixture's findings, an invalid URL, a missing/private repository, a
- * repository over the size limit, and the "use in CI" section.
+ * e2e/start-web.mjs with the stub sign-in (GATESEEKER_AUTH_STUB=1) and a
+ * quota of 3 analyses per hour. The Home is marketing only; the live scanner
+ * lives in the demo workspace (/app) behind sign-in. Covers: the sign-in
+ * round trip, a valid URL producing a report with the fixture's findings and
+ * a saved /r/<id> link, the per-commit reuse, an invalid URL, a
+ * missing/private repository, a repository over the size limit, the "use in
+ * CI" section and sign-out.
  */
 
+async function signIn(page: Page): Promise<void> {
+  await page.goto("/app");
+  // Signed out: /app forwards to /login and comes back after the button.
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Log in");
+  await page.getByRole("button", { name: "Continue with GitHub" }).click();
+  await expect(page).toHaveURL(/\/app$/);
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Analyze a repository");
+}
+
+async function analyze(page: Page, url: string): Promise<void> {
+  await page.getByLabel("Repository URL").fill(url);
+  await page.getByRole("button", { name: "Analyze" }).click();
+}
+
 test.describe("public page", () => {
-  test("analyzes a public repository and shows prioritized findings", async ({ page }) => {
+  test("keeps the workspace behind sign-in and shows the account afterwards", async ({ page }) => {
     await page.goto("/");
     await expect(page.getByRole("heading", { level: 1 })).toContainText("Your app was built fast");
+    await expect(page.getByLabel("Repository URL")).toHaveCount(0);
+    await signIn(page);
+    const nav = page.getByRole("navigation", { name: "Main" });
+    await expect(nav.getByRole("link", { name: "@e2e-user" })).toBeVisible();
+    await nav.getByRole("button", { name: "Sign out" }).click();
+    await expect(nav.getByRole("link", { name: "Log in" })).toBeVisible();
     await page.goto("/app");
-    await page.getByLabel("Repository URL").fill("https://github.com/acme/vibe");
-    await page.getByRole("button", { name: "Analyze" }).click();
+    await expect(page.getByRole("heading", { level: 1 })).toHaveText("Log in");
+  });
+
+  test("analyzes a public repository, saves the report and reuses it for the same commit", async ({ page }) => {
+    await signIn(page);
+    await analyze(page, "https://github.com/acme/vibe");
     await expect(page.getByRole("status")).toContainText("Analyzing");
     const report = page.getByRole("region", { name: "Report" });
     await expect(report).toBeVisible({ timeout: 30_000 });
@@ -25,25 +52,38 @@ test.describe("public page", () => {
     // Snippets are redacted before they reach the page.
     await expect(report).not.toContainText("sk_live_HoHDwEcLksdRWvioeGponKHY");
     await expect(report.getByText("Limitations")).toBeVisible();
+
+    const note = page.getByTestId("saved-note");
+    await expect(note).toContainText("1 of 3 analyses used this hour");
+    const href = await note.getByRole("link").getAttribute("href");
+    expect(href).toMatch(/^\/r\/mem-/);
+
+    // The saved report opens by its id, for this account.
+    await page.goto(href ?? "/r/none");
+    await expect(page.getByRole("region", { name: "Report" })).toBeVisible();
+    await expect(page.getByText("Saved report")).toBeVisible();
+    await expect(page.locator("#ci")).toContainText("Add this workflow to acme/vibe");
+
+    // Same commit again: served from the cache, quota untouched.
+    await page.goto("/app");
+    await analyze(page, "https://github.com/acme/vibe/tree/main");
+    await expect(page.getByTestId("saved-note")).toContainText("Reused a report of this commit", { timeout: 30_000 });
+    await expect(page.getByTestId("saved-note")).not.toContainText("analyses used");
   });
 
   test("rejects an invalid URL without calling the service", async ({ page }) => {
-    await page.goto("/app");
-    await page.getByLabel("Repository URL").fill("https://gitlab.com/acme/vibe");
-    await page.getByRole("button", { name: "Analyze" }).click();
+    await signIn(page);
+    await analyze(page, "https://gitlab.com/acme/vibe");
     const alert = page.getByRole("alert");
     await expect(alert).toContainText("Could not analyze this URL");
     await expect(alert).toContainText("invalid-url");
   });
 
   test("explains a missing or private repository and an oversized one", async ({ page }) => {
-    await page.goto("/app");
-    await page.getByLabel("Repository URL").fill("https://github.com/acme/private");
-    await page.getByRole("button", { name: "Analyze" }).click();
+    await signIn(page);
+    await analyze(page, "https://github.com/acme/private");
     await expect(page.getByRole("alert")).toContainText("not found on GitHub, or it is private");
-
-    await page.getByLabel("Repository URL").fill("https://github.com/acme/huge");
-    await page.getByRole("button", { name: "Analyze" }).click();
+    await analyze(page, "https://github.com/acme/huge");
     await expect(page.getByRole("alert")).toContainText("Run the CLI locally");
   });
 
@@ -62,16 +102,17 @@ test.describe("public page", () => {
     await expect(page.getByRole("heading", { level: 1 })).toHaveText("About");
     await page.goto("/nothing-here");
     await expect(page.getByRole("heading", { level: 1 })).toHaveText("Page not found");
-    // The sign-in shell exists; the button is inert until accounts are wired.
     await page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "Log in" }).click();
     await expect(page.getByRole("heading", { level: 1 })).toHaveText("Log in");
     await expect(page.getByRole("button", { name: "Continue with GitHub" })).toBeVisible();
+    // A saved report needs a session too.
+    await page.goto("/r/mem-nothing");
+    await expect(page.getByText("Sign in to open this report")).toBeVisible();
   });
 
   test("offers the GitHub Action workflow with the analyzed repository named", async ({ page }) => {
-    await page.goto("/app");
-    await page.getByLabel("Repository URL").fill("https://github.com/acme/vibe");
-    await page.getByRole("button", { name: "Analyze" }).click();
+    await signIn(page);
+    await analyze(page, "https://github.com/acme/vibe");
     await expect(page.getByRole("region", { name: "Report" })).toBeVisible({ timeout: 30_000 });
     const ci = page.locator("#ci");
     await expect(ci).toContainText("Add this workflow to acme/vibe");

@@ -1,6 +1,8 @@
 import { buttonVariants, cn } from "@gateseeker/ui-kit";
-import { Menu, ShieldCheck, X } from "lucide-react";
+import { LogOut, Menu, ShieldCheck, X } from "lucide-react";
 import { useEffect, useState } from "react";
+
+import { AuthProvider, useAuth } from "./auth-context";
 
 import { About } from "./pages/About";
 import { AppDemo } from "./pages/AppDemo";
@@ -9,6 +11,7 @@ import { Home } from "./pages/Home";
 import { HowItWorks } from "./pages/HowItWorks";
 import { Login } from "./pages/Login";
 import { Resources } from "./pages/Resources";
+import { SavedReport } from "./pages/SavedReport";
 import { Link, Router, usePath } from "./router";
 
 /**
@@ -35,10 +38,14 @@ const TITLES: Record<string, string> = {
   "/app": "Analyze a repository · Gateseeker",
 };
 
+const REPORT_ROUTE = /^\/r\/([A-Za-z0-9-]{1,64})$/;
+
 export function App() {
   return (
     <Router>
-      <Shell />
+      <AuthProvider>
+        <Shell />
+      </AuthProvider>
     </Router>
   );
 }
@@ -56,11 +63,13 @@ export function Brand({ className }: { className?: string }) {
 
 function Shell() {
   const path = usePath();
+  const auth = useAuth();
   const [open, setOpen] = useState(false);
+  const reportId = REPORT_ROUTE.exec(path)?.[1] ?? null;
   useEffect(() => {
-    document.title = TITLES[path] ?? "Gateseeker";
+    document.title = TITLES[path] ?? (reportId ? "Saved report · Gateseeker" : "Gateseeker");
     setOpen(false);
-  }, [path]);
+  }, [path, reportId]);
 
   let page = <NotFound />;
   if (path === "/") page = <Home />;
@@ -70,6 +79,11 @@ function Shell() {
   else if (path === "/get-started") page = <GetStarted />;
   else if (path === "/login") page = <Login />;
   else if (path === "/app") page = <AppDemo />;
+  else if (reportId) page = <SavedReport id={reportId} />;
+
+  const signedIn = auth.status === "signed-in" && auth.session !== null;
+  const login = auth.session?.user.login;
+  const accountLabel = login ? `@${login}` : "Workspace";
 
   const navLink = (href: string) =>
     cn("rounded-md px-2.5 py-1.5 transition-colors hover:bg-accent/60 hover:text-foreground", path === href ? "bg-accent/60 text-foreground" : "text-muted-foreground");
@@ -85,9 +99,20 @@ function Shell() {
                 {n.label}
               </Link>
             ))}
-            <Link href="/login" aria-current={path === "/login" ? "page" : undefined} className={navLink("/login")}>
-              Log in
-            </Link>
+            {signedIn ? (
+              <>
+                <Link href="/app" aria-current={path === "/app" ? "page" : undefined} className={navLink("/app")}>
+                  {accountLabel}
+                </Link>
+                <button type="button" className={cn(navLink("/sign-out"), "inline-flex items-center gap-1.5")} onClick={() => void auth.signOut()}>
+                  <LogOut className="size-3.5" aria-hidden="true" /> Sign out
+                </button>
+              </>
+            ) : (
+              <Link href="/login" aria-current={path === "/login" ? "page" : undefined} className={navLink("/login")}>
+                Log in
+              </Link>
+            )}
             <Link href="/get-started" className={cn(buttonVariants({ size: "sm" }), "ml-2")}>
               Get started
             </Link>
@@ -99,13 +124,20 @@ function Shell() {
         {open && (
           <nav aria-label="Main (mobile)" className="border-t bg-background px-4 py-3 sm:hidden">
             <ul className="grid gap-1 text-sm">
-              {[...NAV, { href: "/login", label: "Log in" }].map((n) => (
+              {[...NAV, signedIn ? { href: "/app", label: accountLabel } : { href: "/login", label: "Log in" }].map((n) => (
                 <li key={n.href}>
                   <Link href={n.href} className={cn("block rounded-md px-2.5 py-2", path === n.href ? "bg-accent/60 text-foreground" : "text-muted-foreground")}>
                     {n.label}
                   </Link>
                 </li>
               ))}
+              {signedIn && (
+                <li>
+                  <button type="button" className="block w-full rounded-md px-2.5 py-2 text-left text-muted-foreground" onClick={() => void auth.signOut()}>
+                    Sign out
+                  </button>
+                </li>
+              )}
               <li className="pt-2">
                 <Link href="/get-started" className={cn(buttonVariants({ size: "default" }), "w-full")}>
                   Get started
