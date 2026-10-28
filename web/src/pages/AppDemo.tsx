@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import type { ScanResponseOk } from "../api";
 import { useAuth } from "../auth-context";
 import { CiSnippet } from "../components/CiSnippet";
-import { PageIntro } from "../components/PageIntro";
 import { Scanner } from "../components/Scanner";
 import { navigate } from "../router";
 
@@ -23,17 +22,25 @@ export function AppDemo() {
 
   if (auth.status !== "signed-in" || !auth.session) {
     return (
-      <p role="status" className="flex items-center gap-2 text-sm text-muted-foreground">
+      <p role="status" className="flex items-center gap-2 text-body text-muted-foreground">
         <Loader2 className="size-4 animate-spin" aria-hidden="true" /> Checking your session
       </p>
     );
   }
   return (
     <>
-      <PageIntro eyebrow="Demo workspace" title="Analyze a repository" lead="Paste the URL of a public GitHub repository. Gateseeker reads it, never runs it, and returns the prioritized report on this page." />
-      <Scanner token={auth.session.accessToken} onResult={setResult} />
+      <Scanner
+        token={auth.session.accessToken}
+        onResult={setResult}
+        heading={
+          <div>
+            <h1 className="text-display font-medium">Analyze a repository</h1>
+            <p className="text-label text-muted-foreground">Paste the URL of a public GitHub repository. Gateseeker reads it, never runs it, and returns the prioritized report on this page.</p>
+          </div>
+        }
+      />
       {result && (
-        <div className="mb-10">
+        <div className="mt-6 print:hidden">
           <CiSnippet repository={result.repository} />
         </div>
       )}

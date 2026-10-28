@@ -31,9 +31,15 @@ test.describe("public page", () => {
     await expect(page.getByRole("heading", { level: 1 })).toContainText("Your app was built fast");
     await expect(page.getByLabel("Repository URL")).toHaveCount(0);
     await signIn(page);
+    // Signed in, the site header names the account; the workspace has its own frame with the account menu.
+    await page.getByRole("link", { name: "GateSeeker workspace" }).waitFor();
+    await page.goto("/");
     const nav = page.getByRole("navigation", { name: "Main" });
     await expect(nav.getByRole("link", { name: "@e2e-user" })).toBeVisible();
-    await nav.getByRole("button", { name: "Sign out" }).click();
+    await nav.getByRole("link", { name: "@e2e-user" }).click();
+    await expect(page.getByRole("heading", { level: 1 })).toHaveText("Analyze a repository");
+    await page.getByRole("button", { name: "@e2e-user" }).click();
+    await page.getByRole("menuitem", { name: "Sign out" }).click();
     await expect(nav.getByRole("link", { name: "Log in" })).toBeVisible();
     await page.goto("/app");
     await expect(page.getByRole("heading", { level: 1 })).toHaveText("Log in");
@@ -69,6 +75,27 @@ test.describe("public page", () => {
     await analyze(page, "https://github.com/acme/vibe/tree/main");
     await expect(page.getByTestId("saved-note")).toContainText("Reused a report of this commit", { timeout: 30_000 });
     await expect(page.getByTestId("saved-note")).not.toContainText("analyses used");
+  });
+
+  test("exports the whole report for PDF: every finding expanded, workspace frame hidden", async ({ page }) => {
+    await signIn(page);
+    await analyze(page, "https://github.com/acme/vibe");
+    const report = page.getByRole("region", { name: "Report" });
+    await expect(report).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByRole("button", { name: "Export PDF" })).toBeVisible();
+    const details = page.locator("tr[id^=finding-]");
+    const total = await details.count();
+    expect(total).toBeGreaterThan(0);
+    // Collapsed on screen, and a filter with no match must not shorten the export.
+    await expect(details.filter({ visible: true })).toHaveCount(0);
+    await page.getByRole("radio", { name: "P4 (0)" }).click();
+    await expect(details).toHaveCount(0);
+    await page.evaluate("window.dispatchEvent(new Event('beforeprint'))");
+    await page.emulateMedia({ media: "print" });
+    await expect(details.filter({ visible: true })).toHaveCount(total);
+    await expect(page.getByRole("navigation", { name: "Workspace" })).toBeHidden();
+    await expect(report).toContainText("not that a project is secure");
+    await expect(report).not.toContainText("sk_live_HoHDwEcLksdRWvioeGponKHY");
   });
 
   test("rejects an invalid URL without calling the service", async ({ page }) => {

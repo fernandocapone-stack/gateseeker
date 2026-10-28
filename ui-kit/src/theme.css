@@ -23,130 +23,125 @@
 }
 
 /*
- * Design tokens for the triage interface.
+ * Design tokens, taken from the PO's Figma file "GateSeeker" (page Platform,
+ * screens Analyze Repository and Issues). The Figma variables are noted next
+ * to each value; tokens marked "proposal" have no counterpart in the file yet
+ * and are shown on /app/design-system for the PO to validate.
  *
- * Everything the PO may want to tune lives in :root below (dark theme, the
- * default) and in the prefers-color-scheme: light block (secondary theme).
+ * Dark only for now (the file has no light theme). Printing switches to the
+ * paper palette at the end of :root so exported PDFs are black on white.
  * The @theme inline block only maps these variables to Tailwind utilities;
  * it should not need edits when colours or radii change.
- *
- * Style reference chosen by the PO for now: Sentry. Near-black background with
- * a faint purple cast, surfaces one step lighter, purple accent on primary
- * CTAs and the active tab, controls with a solid (no blur) inner shadow,
- * buttons with a visible stroke and a solid offset drop shadow.
  */
 :root {
   color-scheme: dark;
 
-  /* Surfaces */
-  --background: oklch(0.16 0.018 292);
-  --foreground: oklch(0.95 0.01 292);
-  --card: oklch(0.26 0.024 292);
-  --card-foreground: oklch(0.95 0.01 292);
-  --popover: oklch(0.26 0.024 292);
-  --popover-foreground: oklch(0.95 0.01 292);
+  /* Raw palette (Figma variables) */
+  --gs-white: #ffffff; /* Color-white */
+  --gs-bg: #2e2936; /* Color-bg */
+  --gs-sidebar: #272433; /* Color-sidebar */
+  --gs-stroke: #1c1a27; /* Color-stroke */
+  --gs-light-blue: #a3a0af; /* Color-light-blue */
+  --gs-body: #7197e8; /* Color-body */
+  --gs-logo: #b478ff; /* Color-logo */
+  --gs-red: #de5c5c; /* Color-red */
+  --gs-orange: #e9bc07; /* Color-orange */
 
-  /* Brand accent (purple) */
-  --primary: oklch(0.62 0.2 292);
-  --primary-foreground: oklch(0.99 0 0);
-  --primary-hover: oklch(0.67 0.2 292);
-  --primary-stroke: oklch(0.32 0.14 292);
+  /* Surfaces */
+  --background: var(--gs-bg);
+  --foreground: var(--gs-white);
+  --card: var(--gs-sidebar);
+  --card-foreground: var(--gs-white);
+  --popover: var(--gs-sidebar);
+  --popover-foreground: var(--gs-white);
+  --sidebar: var(--gs-sidebar);
+  /* Recessed chips and pills (kind tag, KPI note, avatar) */
+  --chip: var(--gs-stroke);
+  --chip-foreground: var(--gs-light-blue);
+
+  /* Brand: the logo purple; the primary action is the Figma blue */
+  --brand: var(--gs-logo);
+  --primary: var(--gs-body);
+  --primary-foreground: var(--gs-stroke);
+  --primary-hover: #84a6ec; /* proposal: hover is 8% lighter */
+  --primary-stroke: var(--gs-stroke);
 
   /* Secondary / muted */
-  --secondary: oklch(0.32 0.027 292);
-  --secondary-foreground: oklch(0.93 0.01 292);
-  --muted: oklch(0.3 0.025 292);
-  --muted-foreground: oklch(0.74 0.02 292);
-  --accent: oklch(0.35 0.03 292);
-  --accent-foreground: oklch(0.97 0.01 292);
+  --secondary: var(--gs-sidebar);
+  --secondary-foreground: var(--gs-white);
+  --muted: var(--gs-sidebar);
+  --muted-foreground: var(--gs-light-blue);
+  --accent: #35303f; /* proposal: hover surface */
+  --accent-foreground: var(--gs-white);
 
-  /* Status colours (severity badges and decision buttons) */
-  --destructive: oklch(0.6 0.2 25);
-  --destructive-foreground: oklch(0.99 0 0);
-  --destructive-stroke: oklch(0.32 0.13 25);
-  --success: oklch(0.6 0.15 150);
-  --success-foreground: oklch(0.99 0 0);
-  --success-stroke: oklch(0.32 0.1 150);
-  --warning: oklch(0.82 0.16 85);
-  --warning-foreground: oklch(0.2 0.03 85);
-  --severity-high: oklch(0.68 0.19 45);
-  --severity-high-foreground: oklch(0.14 0.02 45);
+  /* Status colours */
+  --destructive: var(--gs-red);
+  --destructive-foreground: var(--gs-stroke);
+  --destructive-stroke: var(--gs-stroke);
+  --success: #5cbf8a; /* proposal: verdict pass */
+  --success-foreground: var(--gs-stroke);
+  --success-stroke: var(--gs-stroke);
+  --warning: var(--gs-orange);
+  --warning-foreground: var(--gs-stroke);
 
-  /* Neutral buttons share the card surface colour; stroke and shadow are darker than the page. */
-  --button: var(--card);
-  --button-hover: oklch(0.31 0.028 292);
-  --button-stroke: oklch(0.09 0.012 292);
+  /* Severity (badges): critical and high from the file, moderate and low are proposals */
+  --severity-critical: var(--gs-red);
+  --severity-high: var(--gs-orange);
+  --severity-high-foreground: var(--gs-stroke);
+  --severity-moderate: #6fb1d6;
+  --severity-low: var(--gs-light-blue);
+
+  /* Neutral buttons sit on the page colour with the dark stroke */
+  --button: var(--gs-bg);
+  --button-hover: var(--accent);
+  --button-stroke: var(--gs-stroke);
 
   /* Strokes */
-  --border: oklch(0.37 0.03 292);
-  --border-strong: oklch(0.52 0.05 292);
-  --input: oklch(0.15 0.018 292);
-  --input-border: oklch(0.42 0.035 292);
-  --ring: oklch(0.72 0.17 292);
+  --border: var(--gs-stroke);
+  --border-strong: #3d3848; /* proposal: focusable controls on hover */
+  --input: var(--gs-sidebar);
+  --input-border: var(--gs-stroke);
+  --ring: var(--gs-body);
 
-  /* Shape */
+  /* Shape: 8px cards, 6px buttons and inputs, 4px badges */
   --radius: 0.5rem;
 
   /*
-   * Solid shadows (no blur), Sentry style: a button's drop shadow sits
-   * straight below it, in the same colour as its stroke; pressing the button
-   * moves it down by --shadow-offset and the shadow disappears. Each button
-   * variant sets --shadow-color to its own stroke colour.
+   * Solid shadows (no blur): a button's drop shadow sits 2px straight below
+   * it in the stroke colour; pressing moves the button down and the shadow
+   * disappears. Each button variant sets --shadow-color to its own stroke.
    */
   --shadow-offset: 2px;
   --shadow-color: var(--button-stroke);
-  --inset-shadow-color: oklch(0 0 0 / 45%);
+  --inset-shadow-color: oklch(0 0 0 / 0%);
 
   /* Soft brand glow behind hero sections (the only blurred thing in the system). */
-  --glow: oklch(0.62 0.2 292 / 24%);
+  --glow: color-mix(in srgb, var(--gs-body) 18%, transparent);
 }
 
-@media (prefers-color-scheme: light) {
+/* Paper palette for printing and "Save as PDF". */
+@media print {
   :root {
     color-scheme: light;
-
-    --background: oklch(0.985 0.004 292);
-    --foreground: oklch(0.2 0.03 292);
-    --card: oklch(1 0 0);
-    --card-foreground: oklch(0.2 0.03 292);
-    --popover: oklch(1 0 0);
-    --popover-foreground: oklch(0.2 0.03 292);
-
-    --primary: oklch(0.52 0.2 292);
-    --primary-foreground: oklch(0.99 0 0);
-    --primary-hover: oklch(0.47 0.2 292);
-    --primary-stroke: oklch(0.3 0.14 292);
-
-    --secondary: oklch(0.94 0.012 292);
-    --secondary-foreground: oklch(0.25 0.03 292);
-    --muted: oklch(0.95 0.01 292);
-    --muted-foreground: oklch(0.5 0.02 292);
-    --accent: oklch(0.93 0.02 292);
-    --accent-foreground: oklch(0.2 0.03 292);
-
-    --destructive: oklch(0.55 0.2 25);
-    --destructive-foreground: oklch(0.99 0 0);
-    --destructive-stroke: oklch(0.32 0.13 25);
-    --success: oklch(0.52 0.15 150);
-    --success-foreground: oklch(0.99 0 0);
-    --success-stroke: oklch(0.32 0.1 150);
-    --warning: oklch(0.85 0.16 85);
-    --warning-foreground: oklch(0.25 0.04 85);
-    --severity-high: oklch(0.65 0.19 45);
-    --severity-high-foreground: oklch(0.99 0 0);
-
-    --button: var(--card);
-    --button-hover: oklch(0.96 0.01 292);
-    --button-stroke: oklch(0.45 0.03 292);
-
-    --border: oklch(0.88 0.015 292);
-    --border-strong: oklch(0.7 0.03 292);
-    --input: oklch(1 0 0);
-    --input-border: oklch(0.8 0.02 292);
-    --ring: oklch(0.6 0.17 292);
-
-    --inset-shadow-color: oklch(0 0 0 / 12%);
-    --glow: oklch(0.52 0.2 292 / 14%);
+    --background: #ffffff;
+    --foreground: #1c1a27;
+    --card: #ffffff;
+    --card-foreground: #1c1a27;
+    --sidebar: #ffffff;
+    --chip: #efeef3;
+    --chip-foreground: #4a4657;
+    --muted: #f6f5f9;
+    --muted-foreground: #5a5666;
+    --border: #d9d7e0;
+    --input: #f6f5f9;
+    --severity-critical: #c03b3b;
+    --severity-high: #9a7a00;
+    --severity-moderate: #2f7aa6;
+    --severity-low: #5a5666;
+    --destructive: #c03b3b;
+    --warning: #9a7a00;
+    --success: #2e8a59;
+    --primary: #3e66c4;
   }
 }
 
@@ -157,6 +152,10 @@
   --color-card-foreground: var(--card-foreground);
   --color-popover: var(--popover);
   --color-popover-foreground: var(--popover-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chip: var(--chip);
+  --color-chip-foreground: var(--chip-foreground);
+  --color-brand: var(--brand);
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);
   --color-primary-hover: var(--primary-hover);
@@ -175,8 +174,11 @@
   --color-success-stroke: var(--success-stroke);
   --color-warning: var(--warning);
   --color-warning-foreground: var(--warning-foreground);
+  --color-severity-critical: var(--severity-critical);
   --color-severity-high: var(--severity-high);
   --color-severity-high-foreground: var(--severity-high-foreground);
+  --color-severity-moderate: var(--severity-moderate);
+  --color-severity-low: var(--severity-low);
   --color-button: var(--button);
   --color-button-hover: var(--button-hover);
   --color-button-stroke: var(--button-stroke);
@@ -191,10 +193,38 @@
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
 
+  /*
+   * Type scale from the file: line height 1.4 and -2% tracking everywhere.
+   * micro = severity badge, caption = notes and pills, label = secondary text
+   * and small buttons, body = default app text, title = page title in the
+   * header, metric = KPI value, display = page heading.
+   */
+  --text-micro: 9px;
+  --text-micro--line-height: 1;
+  --text-micro--letter-spacing: -0.02em;
+  --text-caption: 11px;
+  --text-caption--line-height: 1.4;
+  --text-caption--letter-spacing: -0.02em;
+  --text-label: 12px;
+  --text-label--line-height: 1.4;
+  --text-label--letter-spacing: -0.02em;
+  --text-body: 13px;
+  --text-body--line-height: 1.4;
+  --text-body--letter-spacing: -0.02em;
+  --text-title: 15px;
+  --text-title--line-height: 1.4;
+  --text-title--letter-spacing: -0.02em;
+  --text-metric: 20px;
+  --text-metric--line-height: 1.4;
+  --text-metric--letter-spacing: -0.01em;
+  --text-display: 32px;
+  --text-display--line-height: 1.4;
+  --text-display--letter-spacing: -0.02em;
+
   /* shadow-solid: drop shadow straight below the element, no blur, in --shadow-color. */
   --shadow-solid: 0 var(--shadow-offset) 0 0 var(--shadow-color);
   --shadow-solid-sm: 0 1px 0 0 var(--shadow-color);
-  /* inset-shadow-solid: inner top shadow without blur, used on inputs. */
+  /* inset-shadow-solid: kept for compatibility; the file's inputs have no inner shadow. */
   --inset-shadow-solid: inset 0 2px 0 0 var(--inset-shadow-color);
 
   --font-sans: "Google Sans Flex", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
@@ -223,5 +253,12 @@
   }
   ::selection {
     @apply bg-primary/40;
+  }
+  @media print {
+    html, body {
+      @apply bg-white;
+      print-color-adjust: exact;
+      -webkit-print-color-adjust: exact;
+    }
   }
 }

@@ -1,11 +1,12 @@
-import { buttonVariants, cn } from "@gateseeker/ui-kit";
-import { LogOut, Menu, ShieldCheck, X } from "lucide-react";
+import { buttonVariants, cn, Logo } from "@gateseeker/ui-kit";
+import { LogOut, Menu, X } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { AuthProvider, useAuth } from "./auth-context";
 
 import { About } from "./pages/About";
 import { AppDemo } from "./pages/AppDemo";
+import { DesignSystem } from "./pages/DesignSystem";
 import { GetStarted } from "./pages/GetStarted";
 import { Home } from "./pages/Home";
 import { HowItWorks } from "./pages/HowItWorks";
@@ -13,6 +14,7 @@ import { Login } from "./pages/Login";
 import { Resources } from "./pages/Resources";
 import { SavedReport } from "./pages/SavedReport";
 import { Link, Router, usePath } from "./router";
+import { Workspace, type WorkspacePage } from "./Workspace";
 
 /**
  * Site shell: sticky header with the sections the PO asked for (Home, How it
@@ -36,6 +38,7 @@ const TITLES: Record<string, string> = {
   "/get-started": "Get started · Gateseeker",
   "/login": "Log in · Gateseeker",
   "/app": "Analyze a repository · Gateseeker",
+  "/app/design-system": "Design system · Gateseeker",
 };
 
 const REPORT_ROUTE = /^\/r\/([A-Za-z0-9-]{1,64})$/;
@@ -52,11 +55,8 @@ export function App() {
 
 export function Brand({ className }: { className?: string }) {
   return (
-    <Link href="/" className={cn("flex items-center gap-2.5 text-base font-semibold tracking-tight", className)}>
-      <span className="flex size-7 items-center justify-center rounded-md border border-primary/40 bg-primary/15 text-primary">
-        <ShieldCheck className="size-4" aria-hidden="true" />
-      </span>
-      Gateseeker
+    <Link href="/" aria-label="GateSeeker home" className={cn("flex items-center", className)}>
+      <Logo label="GateSeeker" />
     </Link>
   );
 }
@@ -79,9 +79,13 @@ function Shell() {
   else if (path === "/get-started") page = <GetStarted />;
   else if (path === "/login") page = <Login />;
   else if (path === "/app") page = <AppDemo />;
+  else if (path === "/app/design-system") page = <DesignSystem />;
   else if (reportId) page = <SavedReport id={reportId} />;
 
   const signedIn = auth.status === "signed-in" && auth.session !== null;
+  // Signed in, the workspace pages get the application frame instead of the site header and footer.
+  const workspacePage: WorkspacePage | null = path === "/app" ? "analyze" : path === "/app/design-system" ? "design-system" : reportId ? "issues" : null;
+  if (signedIn && workspacePage) return <Workspace page={workspacePage}>{page}</Workspace>;
   const login = auth.session?.user.login;
   const accountLabel = login ? `@${login}` : "Workspace";
 
