@@ -439,7 +439,7 @@ export function decideVerdict(
 ): { verdict: Verdict; reason: string } {
   const blocking = findings.filter((f) => priorityAtLeast(f.priority, failOn)).length;
   if (blocking > 0) {
-    return { verdict: "fail", reason: `${blocking} finding(s) at priority ${failOn} or higher.` };
+    return { verdict: "fail", reason: `${blocking} gated finding(s) at priority ${failOn} or higher.` };
   }
   const unresolved = byQueryState["query-failed"] + byQueryState["not-queried"];
   if (unresolved > 0) {

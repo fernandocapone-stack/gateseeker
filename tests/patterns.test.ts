@@ -309,7 +309,7 @@ describe("scanDirectory", () => {
     expect(rep.analyses).toEqual({ dependencies: "analyzed", patterns: "analyzed" });
     expect(rep.summary.byKind["dependency-vulnerability"]).toBe(5);
     expect(rep.summary.byKind["insecure-pattern"]).toBeGreaterThan(10);
-    expect(rep.gate).toMatchObject({ patternsMode: "warn", verdict: "fail", reason: "5 finding(s) at priority P2 or higher." });
+    expect(rep.gate).toMatchObject({ patternsMode: "warn", verdict: "fail", reason: "5 gated finding(s) at priority P2 or higher." });
     expect(rep.project.lockfileVersion).toBe(3);
     expect(rep.patterns?.rulesRun.length).toBe(RULES.length);
     expect(rep.sources.map((s) => s.name)).toEqual(["osv.dev", "gateseeker-advisories", "gateseeker-supply-chain-rules", "gateseeker-rules"]);

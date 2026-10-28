@@ -43,7 +43,7 @@ describe("scan", () => {
       patternsMode: "warn",
       supplyChainMode: "warn",
       verdict: "fail",
-      reason: "5 finding(s) at priority P2 or higher.",
+      reason: "5 gated finding(s) at priority P2 or higher.",
     });
     expect(report.analyses).toEqual({ dependencies: "analyzed", patterns: "not-analyzed" });
     expect(report.patterns).toBeNull();
@@ -88,7 +88,7 @@ describe("scan", () => {
   it("respects --fail-on: P1 threshold still fails, P1-only threshold with P2 findings passes", async () => {
     const strict = await run("direct-only.package-lock.json", { lodash: LODASH, zod: EMPTY }, "P1");
     expect(strict.gate.verdict).toBe("fail");
-    expect(strict.gate.reason).toBe("2 finding(s) at priority P1 or higher.");
+    expect(strict.gate.reason).toBe("2 gated finding(s) at priority P1 or higher.");
   });
 
   it("marks the run incomplete when a query fails, even with no findings", async () => {
