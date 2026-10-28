@@ -1,7 +1,7 @@
 # Gateseeker — Posicionamento de produto
 
 > Status: rascunho para aprovação do PO, orienta a Sprint 0. Revisar ao fim de cada sprint.
-> Última atualização: 2026-10-27 (roadmap: Sprint 2 dividida em 2a feed de inteligência e 2b PHP/supply chain)
+> Última atualização: 2026-10-28 (Sprint 3 entregue; Sprint 4 proposta: página web)
 
 ## 1. Nome
 
@@ -77,9 +77,10 @@ Camadas separadas e nunca misturadas: **dados da fonte** → **conclusões por r
 | **1** | Primeiro conjunto de `insecure-pattern` para stacks de vibe coding (segredos em código de cliente, Supabase RLS, variáveis `NEXT_PUBLIC_` sensíveis, CORS aberto). Saída em terminal legível por humano. | Devs de Lovable/Bolt/Cursor acham os achados úteis e acionáveis. Testar com 5 projetos reais. |
 | **2a** | **Feed de inteligência curado.** Formato próprio de advisory (ecossistema, pacote, versões/tags/commits afetados, janela, indicador, fonte, data). Job agendado coleta fontes que publicam incidentes antes das bases oficiais (StepSecurity, Socket, Aikido, Phoenix, Snyk, Wiz, The Hacker News, listas do Packagist e npm), deduplica e abre PR propondo registros; humano aprova; só então o scanner consulta o feed ao lado do OSV, com `source: gateseeker-advisories`. Laravel-Lang (maio/2026) é o registro inaugural. Registros aprovados são submetidos ao OSV/GHSA. | Fontes estruturadas não cobrem ataques por reescrita de tag (OSV sem registro dos pacotes Laravel-Lang cinco meses depois, verificado em 2026-10-27). Um feed curado detecta o que `npm audit` e `composer audit` não detectam e gera conteúdo público. |
 | **2b** | `composer.lock` + Packagist/OSV + feed. Heurísticas estruturais de supply chain sem depender de notícia: referência de commit no lock divergente da tag atual na origem, `autoload.files` novo em pacote conhecido, install scripts. | O público PHP responde à história Laravel-Lang. |
-| **3** | GitHub Action oficial com gate configurável. Interface web mínima para ler relatórios e histórico, construída sobre shadcn/ui (ou equivalente headless + Tailwind) como base de componentes, decisão do PO em 2026-10-27. | Alguém paga por histórico, times e política de portão. |
+| **3** | GitHub Action oficial com gate configurável, SARIF, comentário no PR, publicação no npm com proveniência, repositório público. Entregue em 2026-10-28 (`docs/SPRINT_3.md`); a interface web foi movida para a Sprint 4. | Alguém adota o portão. |
+| **4** | **Gateseeker na web**: página pública onde a pessoa cola a URL de um repositório público do GitHub e recebe o relatório em até um minuto, com link compartilhável; mesmo motor, sem instalar nada. Vercel + Supabase, primeiros serviços hospedados (`docs/SPRINT_4.md`). | Alguém que nunca ouviu falar do produto encontra valor em um minuto, e a página vira funil para a Action. |
 
-Fora de qualquer sprint até validação: autenticação, multiusuário, banco de dados, explicações geradas por IA, correção automática.
+Fora de qualquer sprint até validação: autenticação, multiusuário, histórico por usuário, explicações geradas por IA, correção automática. (O banco de dados entra na Sprint 4 apenas para relatórios temporários, limites de uso e lista de espera.)
 
 ## 8. Decisões tomadas e seus motivos
 
@@ -110,3 +111,4 @@ Fora de qualquer sprint até validação: autenticação, multiusuário, banco d
 - Sprint 2a: pipeline rodando sozinho por 4 semanas; ao menos 5 registros aprovados além do Laravel-Lang; ao menos 1 registro aceito upstream no OSV/GHSA.
 - Sprint 2b: 50 instalações orgânicas via npm; 1 relato de supply chain detectado em projeto real.
 - Sprint 3: 10 repositórios com a GitHub Action ativa por 30 dias.
+- Sprint 4: 100 análises de repositórios distintos em 30 dias; 20 links compartilhados abertos por terceiros; 10 cliques em "usar no CI" vindos da página.
