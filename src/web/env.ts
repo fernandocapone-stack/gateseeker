@@ -34,9 +34,15 @@ export interface EnvHandlerOptions {
   env: Env;
   workDir?: string;
   fetch?: typeof fetch;
+  /**
+   * Fail closed: when true and no auth is configured (neither Supabase nor
+   * the stub), the handlers refuse every request instead of serving
+   * anonymously. The Vercel functions set it; the local server does not.
+   */
+  requireAuth?: boolean;
 }
 
-export function handlerOptionsFromEnv({ env, workDir, fetch: fetchFn }: EnvHandlerOptions): HandlerOptions {
+export function handlerOptionsFromEnv({ env, workDir, fetch: fetchFn, requireAuth }: EnvHandlerOptions): HandlerOptions {
   const limit = Number(env.GATESEEKER_SCAN_LIMIT ?? "");
   const quota = Number.isInteger(limit) && limit > 0 ? { limit, windowSeconds: DEFAULT_QUOTA.windowSeconds } : DEFAULT_QUOTA;
   const scan: HandlerOptions["scan"] = {
@@ -64,5 +70,6 @@ export function handlerOptionsFromEnv({ env, workDir, fetch: fetchFn }: EnvHandl
   if (auth.mode === "stub") {
     return { ...base, auth: createStaticAuth({ [STUB_TOKEN]: STUB_USER }), store: createMemoryStore() };
   }
+  if (requireAuth) return { ...base, auth: createStaticAuth({}), store: createMemoryStore(), closed: true };
   return base;
 }

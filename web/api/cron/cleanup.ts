@@ -6,7 +6,7 @@ import { handleCleanupRequest } from "gateseeker/dist/web/handler.js";
  * with `Authorization: Bearer <CRON_SECRET>`; the daily write also keeps the
  * free Supabase project from pausing for inactivity.
  */
-const options = handlerOptionsFromEnv({ env: process.env, workDir: "/tmp" });
+const options = handlerOptionsFromEnv({ env: process.env, workDir: "/tmp", requireAuth: true });
 
 export async function GET(req: Request): Promise<Response> {
   const out = await handleCleanupRequest(options, req.headers.get("authorization"), process.env.CRON_SECRET);

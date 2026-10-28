@@ -78,6 +78,8 @@ export interface HandlerOptions extends Omit<ServiceOptions, "url"> {
   cacheMs?: number;
   retentionDays?: number;
   now?: () => Date;
+  /** Set when the deployment demands auth but none is configured: every request answers 503 until the environment is fixed. */
+  closed?: boolean;
 }
 
 const bodySchema = z.object({ url: z.string().max(400) });
@@ -112,6 +114,7 @@ export function toPublicReport(report: Report): PublicReport {
 }
 
 async function authenticate(options: HandlerOptions, authorization: string | null | undefined): Promise<AuthUser | HttpResponse> {
+  if (options.closed) return fail("store-unavailable", "Sign-in is not configured on this server, so analyses are disabled.");
   if (!options.auth) return { id: "anonymous", login: null };
   const token = bearerToken(authorization);
   if (token === null) return fail("unauthorized", "Sign in to analyze a repository.");

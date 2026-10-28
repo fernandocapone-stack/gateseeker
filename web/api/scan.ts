@@ -8,7 +8,7 @@ import { handleScanRequest } from "gateseeker/dist/web/handler.js";
  */
 export const config = { maxDuration: 150 };
 
-const options = handlerOptionsFromEnv({ env: process.env, workDir: "/tmp" });
+const options = handlerOptionsFromEnv({ env: process.env, workDir: "/tmp", requireAuth: true });
 
 export function GET(): Response {
   return Response.json({ ok: false, error: { code: "bad-request", message: "POST only." } }, { status: 405, headers: { allow: "POST" } });

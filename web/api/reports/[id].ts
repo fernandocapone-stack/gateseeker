@@ -2,7 +2,7 @@ import { handlerOptionsFromEnv } from "gateseeker/dist/web/env.js";
 import { handleReportRequest } from "gateseeker/dist/web/handler.js";
 
 /** GET /api/reports/<id>: a saved report, only for the account that produced it. */
-const options = handlerOptionsFromEnv({ env: process.env, workDir: "/tmp" });
+const options = handlerOptionsFromEnv({ env: process.env, workDir: "/tmp", requireAuth: true });
 
 export async function GET(req: Request): Promise<Response> {
   const id = new URL(req.url).pathname.split("/").pop() ?? "";

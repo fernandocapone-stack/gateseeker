@@ -327,6 +327,15 @@ describe("handlerOptionsFromEnv", () => {
     expect(prod.store).toBeDefined();
   });
 
+  it("fails closed when auth is required but not configured", async () => {
+    const closed = handlerOptionsFromEnv({ env: {}, requireAuth: true });
+    expect(closed.closed).toBe(true);
+    const r = await handleScanRequest({ url: "https://github.com/o/r" }, { ...closed, fetch: fakeGitHub().fetch }, null);
+    expect(r).toMatchObject({ status: 503, body: { ok: false, error: { code: "store-unavailable" } } });
+    expect(await handleReportRequest("x", closed, "Bearer anything")).toMatchObject({ status: 503 });
+    expect(handlerOptionsFromEnv({ env: { GATESEEKER_AUTH_STUB: "1" }, requireAuth: true }).closed).toBeUndefined();
+  });
+
   it("the stub token resolves to the stub user", async () => {
     const stub = handlerOptionsFromEnv({ env: { GATESEEKER_AUTH_STUB: "1" } });
     expect(await stub.auth?.verify(STUB_TOKEN)).toEqual(STUB_USER);
