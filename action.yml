@@ -41,7 +41,7 @@ inputs:
     default: ".gateseeker"
   version:
     description: "gateseeker npm version to run. Pinned to the version this action was released with."
-    default: "1.0.0-beta.6"
+    default: "1.0.0-beta.7"
   local-build:
     description: "Build and run the scanner from this action's own checkout instead of npm (used by the Gateseeker repository itself)."
     default: "false"
