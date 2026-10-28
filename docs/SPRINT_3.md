@@ -1,6 +1,6 @@
 # Gateseeker — Sprint 3: GitHub Action oficial com gate configurável
 
-> Status: **aprovada pelo PO em 2026-10-27** com todas as recomendações (repositório público, npm `1.0.0-beta.1` com proveniência, comentário e SARIF ligados, incompleto bloqueia). Implementação do que não depende da publicação concluída; publicação e validação externa aguardam os passos do PO em `docs/RELEASE.md`.
+> Status: **aprovada pelo PO em 2026-10-27** com todas as recomendações (repositório público, npm `1.0.0-beta.1` com proveniência, comentário e SARIF ligados, incompleto bloqueia). Publicado em 2026-10-28: repositório público, `gateseeker@1.0.0-beta.6` no npm com proveniência verificável (`npm audit signatures`), preparado pelo CI e aprovado pelo PO com 2FA; a `1.0.0-beta.1` saiu antes da máquina do PO sem proveniência (ver `docs/RELEASE.md`). Pendente: validação externa nos dois repositórios de teste (`docs/VALIDATION_SPRINT_3.md`).
 > Última atualização: 2026-10-27
 
 Você é o Software Engineer responsável pelo Gateseeker. O stakeholder, Product Owner, Product Designer e auditor é o usuário humano, que não é desenvolvedor: apresente decisões em linguagem simples. As regras de trabalho, a stack e os controles de segurança das sprints anteriores continuam valendo.
