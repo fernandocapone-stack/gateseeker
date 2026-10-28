@@ -1,5 +1,5 @@
 import { AppShell, Avatar, Logo, Menu, menuItemClass, navItemClass } from "@gateseeker/ui-kit";
-import { ChevronUp, House, ListChecks, LogOut, Palette, ScanSearch } from "lucide-react";
+import { ChevronUp, ListChecks, LogOut, ScanSearch } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { useAuth } from "./auth-context";
@@ -10,7 +10,9 @@ import { Link, navigate } from "./router";
  * The signed-in workspace frame (Figma "Analyze Repository" and "Issues"):
  * header with the logo and the page title, sidebar with the workspace
  * sections and the account menu at the bottom. "Issues" opens the last report
- * saved in this tab and stays disabled until there is one.
+ * saved in this tab and stays disabled until there is one. The design-system
+ * catalogue is product documentation: it uses the frame but has no entry in
+ * the sidebar (open /app/design-system directly).
  */
 
 export type WorkspacePage = "analyze" | "issues" | "design-system";
@@ -33,9 +35,6 @@ export function Workspace({ page, children }: { page: WorkspacePage; children: R
         </button>
       )}
     >
-      <Link role="menuitem" href="/" className={menuItemClass}>
-        <House aria-hidden="true" /> Home page
-      </Link>
       <button role="menuitem" type="button" className={menuItemClass} onClick={() => { void auth.signOut().then(() => { navigate("/"); }); }}>
         <LogOut aria-hidden="true" /> Sign out
       </button>
@@ -56,9 +55,6 @@ export function Workspace({ page, children }: { page: WorkspacePage; children: R
           <ListChecks aria-hidden="true" /> Issues
         </span>
       )}
-      <Link href="/app/design-system" aria-current={page === "design-system" ? "page" : undefined} className={navItemClass(page === "design-system")}>
-        <Palette aria-hidden="true" /> Design system
-      </Link>
     </>
   );
 

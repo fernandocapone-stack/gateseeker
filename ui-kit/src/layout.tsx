@@ -6,18 +6,20 @@ import { cn } from "./utils";
  * split into a 236px brand cell and the page title bar, a 236px sidebar with
  * the navigation on top and the account at the bottom, and the content on the
  * page colour with 16px padding. Every stroke is --border (Color-stroke).
+ * Header and sidebar are fixed to the viewport: only the content scrolls, so
+ * the account stays at the bottom of the window however long the page is.
  */
 export function AppShell({ brand, title, actions, nav, account, children }: { brand: ReactNode; title: ReactNode; actions?: ReactNode; nav: ReactNode; account?: ReactNode; children: ReactNode }) {
   return (
-    <div className="grid min-h-screen grid-cols-1 grid-rows-[51px_1fr] bg-background md:grid-cols-[236px_1fr] print:block print:min-h-0">
-      <div className="hidden items-center border-r border-b bg-sidebar px-4 md:flex print:hidden">{brand}</div>
-      <header className="flex items-center gap-1.5 border-b bg-sidebar px-4 py-2 print:hidden">
+    <div className="grid min-h-dvh grid-cols-1 grid-rows-[51px_1fr] bg-background md:grid-cols-[236px_1fr] print:block print:min-h-0">
+      <div className="sticky top-0 z-30 hidden items-center border-r border-b bg-sidebar px-4 md:flex print:hidden">{brand}</div>
+      <header className="sticky top-0 z-30 flex items-center gap-1.5 border-b bg-sidebar px-4 py-2 print:hidden">
         <div className="mr-2 md:hidden">{brand}</div>
         <p className="min-w-0 flex-1 truncate text-title font-medium">{title}</p>
         {actions && <div className="flex items-center gap-1.5">{actions}</div>}
       </header>
-      <aside className="hidden flex-col justify-between border-r bg-sidebar md:flex print:hidden">
-        <nav aria-label="Workspace" className="flex flex-col py-4">{nav}</nav>
+      <aside className="sticky top-[51px] z-20 hidden h-[calc(100dvh-51px)] flex-col justify-between self-start border-r bg-sidebar md:flex print:hidden">
+        <nav aria-label="Workspace" className="flex min-h-0 flex-col overflow-y-auto py-4">{nav}</nav>
         {account}
       </aside>
       <main className="min-w-0 p-4 print:p-0">

@@ -1,5 +1,5 @@
 import { Avatar, Badge, Button, Card, Drawer, IconInput, Logo, LogoSymbol, MetricCard, Segmented, Table, Td, Th, cn, menuItemClass, navItemClass } from "@gateseeker/ui-kit";
-import { ArrowRight, ArrowUpDown, Bell, Download, House, ListChecks, LogOut, ScanSearch, Search } from "lucide-react";
+import { ArrowRight, ArrowUpDown, Bell, Download, ListChecks, LogOut, ScanSearch, Search } from "lucide-react";
 import { useCallback, useState, type ReactNode } from "react";
 
 /**
@@ -194,7 +194,6 @@ export function DesignSystem() {
           <div className="grid gap-3">
             <div className="flex items-center gap-2.5"><Avatar initials="FT" /><span className="text-body font-medium">@fernando</span></div>
             <div className="w-[204px] overflow-hidden rounded-lg border bg-popover shadow-solid">
-              <span className={menuItemClass}><House aria-hidden="true" /> Home page</span>
               <span className={menuItemClass}><LogOut aria-hidden="true" /> Sign out</span>
             </div>
           </div>
