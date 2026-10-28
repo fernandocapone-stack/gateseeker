@@ -47,7 +47,7 @@ test.describe("public page", () => {
     await page.getByRole("button", { name: "@e2e-user" }).click();
     await page.getByRole("menuitem", { name: "Sign out" }).click();
     await expect(page).toHaveURL(/\/$/);
-    await expect(page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "Log in" })).toBeVisible();
+    await expect(page.getByRole("banner").getByRole("link", { name: "Log in" })).toBeVisible();
     await page.goto("/app");
     await expect(page.getByRole("heading", { level: 1 })).toHaveText("Log in");
   });
@@ -176,7 +176,7 @@ test.describe("public page", () => {
     await expect(page.getByRole("heading", { level: 1 })).toHaveText("About");
     await page.goto("/nothing-here");
     await expect(page.getByRole("heading", { level: 1 })).toHaveText("Page not found");
-    await page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "Log in" }).click();
+    await page.getByRole("banner").getByRole("link", { name: "Log in" }).click();
     await expect(page.getByRole("heading", { level: 1 })).toHaveText("Log in");
     await expect(page.getByRole("button", { name: "Continue with GitHub" })).toBeVisible();
     // A saved report needs a session too.

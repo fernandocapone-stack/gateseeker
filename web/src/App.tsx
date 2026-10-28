@@ -120,48 +120,54 @@ function Shell() {
   const login = auth.session?.user.login;
   const accountLabel = login ? `@${login}` : "Workspace";
 
+  // The active item is only blue: no pill behind it.
   const navLink = (href: string) =>
-    cn("rounded-md px-2.5 py-1.5 transition-colors hover:bg-accent/60 hover:text-foreground", path === href ? "bg-accent/60 text-foreground" : "text-muted-foreground");
+    cn("rounded-md px-2.5 py-1.5 transition-colors", path === href ? "text-primary" : "text-muted-foreground hover:text-foreground");
 
   return (
     <div className="flex min-h-screen flex-col">
       <header className="sticky top-0 z-40 border-b bg-sidebar">
-        <div className="mx-auto flex h-14 max-w-5xl items-center justify-between px-4 sm:px-6">
-          <Brand />
-          <nav aria-label="Main" className="hidden items-center gap-1 text-sm sm:flex">
+        {/* Fluid: the full width of the window, logo left, sections centred, account and call to action right. */}
+        <div className="grid h-14 w-full grid-cols-[1fr_auto_1fr] items-center gap-4 px-4 sm:px-6">
+          <Brand className="justify-self-start" />
+          <nav aria-label="Main" className="hidden items-center gap-1 text-body sm:flex">
             {NAV.map((n) => (
               <Link key={n.href} href={n.href} aria-current={path === n.href ? "page" : undefined} className={navLink(n.href)}>
                 {n.label}
               </Link>
             ))}
-            {signedIn ? (
-              <>
-                <Link href="/app" aria-current={path === "/app" ? "page" : undefined} className={navLink("/app")}>
-                  {accountLabel}
-                </Link>
-                <button type="button" className={cn(navLink("/sign-out"), "inline-flex items-center gap-1.5")} onClick={() => void auth.signOut()}>
-                  <LogOut className="size-3.5" aria-hidden="true" /> Sign out
-                </button>
-              </>
-            ) : (
-              <Link href="/login" aria-current={path === "/login" ? "page" : undefined} className={navLink("/login")}>
-                Log in
-              </Link>
-            )}
-            <Link href="/get-started" className={cn(buttonVariants({ size: "sm" }), "ml-2")}>
-              Get started
-            </Link>
           </nav>
-          <button type="button" className="rounded-md p-1.5 hover:bg-accent/60 sm:hidden" aria-label={open ? "Close menu" : "Open menu"} aria-expanded={open} onClick={() => { setOpen((o) => !o); }}>
-            {open ? <X className="size-5" aria-hidden="true" /> : <Menu className="size-5" aria-hidden="true" />}
-          </button>
+          <div className="col-start-3 flex items-center justify-self-end gap-1 text-body">
+            <div className="hidden items-center gap-1 sm:flex">
+              {signedIn ? (
+                <>
+                  <Link href="/app" className={navLink("/app")}>
+                    {accountLabel}
+                  </Link>
+                  <button type="button" className={cn(navLink("/sign-out"), "inline-flex items-center gap-1.5")} onClick={() => void auth.signOut()}>
+                    <LogOut className="size-3.5" aria-hidden="true" /> Sign out
+                  </button>
+                </>
+              ) : (
+                <Link href="/login" aria-current={path === "/login" ? "page" : undefined} className={navLink("/login")}>
+                  Log in
+                </Link>
+              )}
+              <Link href="/get-started" className={cn(buttonVariants({ size: "sm" }), "ml-2")}>
+                Get started
+              </Link>
+            </div>
+            <button type="button" className="rounded-md p-1.5 hover:bg-accent/60 sm:hidden" aria-label={open ? "Close menu" : "Open menu"} aria-expanded={open} onClick={() => { setOpen((o) => !o); }}>
+              {open ? <X className="size-5" aria-hidden="true" /> : <Menu className="size-5" aria-hidden="true" />}
+            </button>
+          </div>
         </div>
         {open && (
           <nav aria-label="Main (mobile)" className="border-t bg-background px-4 py-3 sm:hidden">
             <ul className="grid gap-1 text-sm">
               {[...NAV, signedIn ? { href: "/app", label: accountLabel } : { href: "/login", label: "Log in" }].map((n) => (
                 <li key={n.href}>
-                  <Link href={n.href} className={cn("block rounded-md px-2.5 py-2", path === n.href ? "bg-accent/60 text-foreground" : "text-muted-foreground")}>
+                  <Link href={n.href} className={cn("block rounded-md px-2.5 py-2", path === n.href ? "text-primary" : "text-muted-foreground")}>
                     {n.label}
                   </Link>
                 </li>
