@@ -1,5 +1,5 @@
 import type { HTMLAttributes } from "react";
-import { cn } from "@/lib/utils";
+import { cn } from "./utils";
 
 /* Cards are a surface one step lighter than the page with a subtle 1px border and no blurred shadow. */
 export function Card({ className, ...props }: HTMLAttributes<HTMLDivElement>) {

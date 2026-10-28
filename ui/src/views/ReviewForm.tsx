@@ -1,10 +1,7 @@
+import { Badge, Button, Card, CardContent, CardHeader, CardTitle, Field, Input, Select, Textarea } from "@gateseeker/ui-kit";
 import { ArrowLeft, ExternalLink, Plus, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { api } from "@/api";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Field, Input, Select, Textarea } from "@/components/ui/field";
 import { isoToLocalInput, localInputToIso } from "@/lib/utils";
 import {
   ECOSYSTEM_LABELS,

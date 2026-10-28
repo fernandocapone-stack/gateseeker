@@ -6,7 +6,7 @@ Read `docs/SPRINT_0.md` (current scope) and `docs/PRODUCT.md` (direction) before
 
 - `pnpm check` runs lint, typecheck, tests and build. Run it before declaring any task done.
 - `pnpm test` runs Vitest. Tests must never reach the network: inject `fetch` into `OsvClient` or use the local HTTP server pattern in `tests/cli.test.ts`.
-- `pnpm test:e2e` runs Playwright against the triage interface (needs `pnpm build` first and `pnpm exec playwright install chromium` once).
+- `pnpm test:e2e` runs Playwright against the triage interface and the public page (needs `pnpm build` and `pnpm build:web` first and `pnpm exec playwright install chromium` once). The page tests use a stub GitHub/OSV from `e2e/start-web.mjs`; nothing reaches the network.
 - `pnpm dev scan <lockfile>` runs the CLI from source.
 
 ## Non-negotiable rules
@@ -32,7 +32,10 @@ src/intel/     OSV client and schema
 src/rules/     CVSS scoring, severity tier, priority table, finding builder
 src/patterns/  directory walker, file classifier, gitignore matcher, rule engine, rules/ (one file per GSK rule)
 src/intel/     OSV client, Packagist p2 client, advisory schema + loader/matcher (incl. tag-rewrite verification), feed/ (RSS parser, collector with OSV coverage check), ui/ (local triage server, git allowlist)
-ui/            separate Vite + React + Tailwind package (shadcn-style components) served by `gateseeker-intel ui`; built into ui/dist
+ui/            separate Vite + React package (triage interface) served by `gateseeker-intel ui`; built into ui/dist
+ui-kit/        shared theme (Sentry-style tokens) and shadcn-style components used by ui/ and web/
+web/           public page (Sprint 4): paste a GitHub URL, get the report; Vite + React, Vercel function in web/api
+src/web/       hosted service: strict GitHub URL parser, dependency-free tar.gz reader with limits, scan service (injected fetch), HTTP handler, local dev server
 e2e/           Playwright tests for the triage interface (webServer: e2e/start.mjs builds a throwaway repo)
 src/report/    text renderer
 src/scan.ts    orchestration and verdict

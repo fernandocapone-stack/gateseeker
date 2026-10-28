@@ -1,6 +1,6 @@
 import { cva, type VariantProps } from "class-variance-authority";
 import type { ButtonHTMLAttributes } from "react";
-import { cn } from "@/lib/utils";
+import { cn } from "./utils";
 
 /*
  * Sentry-style buttons: a visible 1px stroke and a solid drop shadow (no

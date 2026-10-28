@@ -11,14 +11,25 @@ export default defineConfig({
   retries: 0,
   reporter: [["list"]],
   use: {
-    baseURL: "http://127.0.0.1:4311",
     trace: "retain-on-failure",
   },
-  webServer: {
-    command: "node e2e/start.mjs",
-    url: "http://127.0.0.1:4311/",
-    reuseExistingServer: false,
-    timeout: 30_000,
-  },
-  projects: [{ name: "chromium", use: { browserName: "chromium" } }],
+  webServer: [
+    {
+      command: "node e2e/start.mjs",
+      url: "http://127.0.0.1:4311/",
+      reuseExistingServer: false,
+      timeout: 30_000,
+    },
+    {
+      // Public page against a stub GitHub and OSV (e2e/start-web.mjs); needs `pnpm build` and `pnpm build:web` first.
+      command: "node e2e/start-web.mjs",
+      url: "http://127.0.0.1:4321/",
+      reuseExistingServer: false,
+      timeout: 30_000,
+    },
+  ],
+  projects: [
+    { name: "triage", testMatch: /triage\.spec\.ts/, use: { browserName: "chromium", baseURL: "http://127.0.0.1:4311" } },
+    { name: "web", testMatch: /web\.spec\.ts/, use: { browserName: "chromium", baseURL: "http://127.0.0.1:4321" } },
+  ],
 });

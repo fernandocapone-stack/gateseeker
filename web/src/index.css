@@ -1,0 +1,3 @@
+/* Theme and components live in ui-kit/ so the triage interface and the public page share one design. */
+@import "@gateseeker/ui-kit/theme.css";
+@source "../../ui-kit/src";

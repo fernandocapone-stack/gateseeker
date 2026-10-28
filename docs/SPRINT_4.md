@@ -1,6 +1,6 @@
 # Sprint 4 — Gateseeker na web: cole a URL, receba o relatório
 
-> Status: **rascunho para aprovação do PO**. Nada desta sprint foi codado.
+> Status: **aprovada pelo PO em 2026-10-28** com as recomendações (Vercel e Supabase gratuitos até a divulgação, dependências listadas, leitor de tar próprio). Passos 1 a 3 da ordem de trabalho implementados em 2026-10-28: validador de URL, leitor de tar.gz com limites, serviço com `fetch` injetado, handler compartilhado, servidor local, página sem persistência (`web/`), tema e componentes extraídos para `ui-kit/`; 64 testes unitários e 4 testes de navegador novos. Pendente: contas Vercel e Supabase (PO), persistência e limites de uso, deploy, validação com os dez repositórios.
 > Última atualização: 2026-10-28
 
 Você é o Software Engineer responsável pelo Gateseeker. O stakeholder, Product Owner, Product Designer e auditor é o usuário humano, que não é desenvolvedor: apresente decisões em linguagem simples. As regras de trabalho, a stack e os controles de segurança das sprints anteriores continuam valendo, com uma exceção explícita nesta sprint: ela introduz os primeiros serviços hospedados e as primeiras dependências novas, listados na seção 8 para aprovação.

@@ -1,5 +1,4 @@
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge, Card, CardContent, CardDescription, CardHeader, CardTitle } from "@gateseeker/ui-kit";
 import { formatDate } from "@/lib/utils";
 import { ECOSYSTEM_LABELS, SEVERITY_LABELS, TYPE_LABELS, type UiRecord } from "@/types";
 import { severityVariant } from "./PendingList";

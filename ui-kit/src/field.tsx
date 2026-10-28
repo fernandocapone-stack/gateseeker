@@ -1,5 +1,5 @@
 import type { InputHTMLAttributes, LabelHTMLAttributes, ReactNode, SelectHTMLAttributes, TextareaHTMLAttributes } from "react";
-import { cn } from "@/lib/utils";
+import { cn } from "./utils";
 
 /* Controls sit slightly below the surface: darker fill, 1px stroke and a solid (no blur) inner top shadow. */
 const control =

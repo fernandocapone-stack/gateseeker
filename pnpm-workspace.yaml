@@ -23,3 +23,5 @@ minimumReleaseAgeExclude:
   - lucide-react@1.62.0
 packages:
   - ui
+  - ui-kit
+  - web

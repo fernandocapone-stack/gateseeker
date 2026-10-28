@@ -1,7 +1,6 @@
+import { Badge, Button } from "@gateseeker/ui-kit";
 import { useCallback, useEffect, useState } from "react";
 import { api, sessionToken } from "./api";
-import { Badge } from "./components/ui/badge";
-import { Button } from "./components/ui/button";
 import type { UiRecord, UiState } from "./types";
 import { History } from "./views/History";
 import { PendingList } from "./views/PendingList";
