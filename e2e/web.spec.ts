@@ -2,7 +2,8 @@ import { expect, test } from "@playwright/test";
 
 /**
  * Browser tests for the public page, against the stub GitHub/OSV started by
- * e2e/start-web.mjs. Covers: a valid URL producing a report with the
+ * e2e/start-web.mjs. The live scanner lives in the demo workspace (/app); the
+ * Home is marketing only. Covers: a valid URL producing a report with the
  * fixture's findings, an invalid URL, a missing/private repository, a
  * repository over the size limit, and the "use in CI" section.
  */
@@ -11,6 +12,7 @@ test.describe("public page", () => {
   test("analyzes a public repository and shows prioritized findings", async ({ page }) => {
     await page.goto("/");
     await expect(page.getByRole("heading", { level: 1 })).toContainText("Your app was built fast");
+    await page.goto("/app");
     await page.getByLabel("Repository URL").fill("https://github.com/acme/vibe");
     await page.getByRole("button", { name: "Analyze" }).click();
     await expect(page.getByRole("status")).toContainText("Analyzing");
@@ -26,7 +28,7 @@ test.describe("public page", () => {
   });
 
   test("rejects an invalid URL without calling the service", async ({ page }) => {
-    await page.goto("/");
+    await page.goto("/app");
     await page.getByLabel("Repository URL").fill("https://gitlab.com/acme/vibe");
     await page.getByRole("button", { name: "Analyze" }).click();
     const alert = page.getByRole("alert");
@@ -35,7 +37,7 @@ test.describe("public page", () => {
   });
 
   test("explains a missing or private repository and an oversized one", async ({ page }) => {
-    await page.goto("/");
+    await page.goto("/app");
     await page.getByLabel("Repository URL").fill("https://github.com/acme/private");
     await page.getByRole("button", { name: "Analyze" }).click();
     await expect(page.getByRole("alert")).toContainText("not found on GitHub, or it is private");
@@ -60,12 +62,14 @@ test.describe("public page", () => {
     await expect(page.getByRole("heading", { level: 1 })).toHaveText("About");
     await page.goto("/nothing-here");
     await expect(page.getByRole("heading", { level: 1 })).toHaveText("Page not found");
-    // No sign-in link until accounts exist.
-    await expect(page.getByRole("link", { name: /log ?in|sign in/i })).toHaveCount(0);
+    // The sign-in shell exists; the button is inert until accounts are wired.
+    await page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "Log in" }).click();
+    await expect(page.getByRole("heading", { level: 1 })).toHaveText("Log in");
+    await expect(page.getByRole("button", { name: "Continue with GitHub" })).toBeVisible();
   });
 
   test("offers the GitHub Action workflow with the analyzed repository named", async ({ page }) => {
-    await page.goto("/");
+    await page.goto("/app");
     await page.getByLabel("Repository URL").fill("https://github.com/acme/vibe");
     await page.getByRole("button", { name: "Analyze" }).click();
     await expect(page.getByRole("region", { name: "Report" })).toBeVisible({ timeout: 30_000 });
