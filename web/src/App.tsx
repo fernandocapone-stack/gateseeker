@@ -3,17 +3,19 @@ import { Menu, ShieldCheck, X } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { About } from "./pages/About";
+import { AppDemo } from "./pages/AppDemo";
 import { GetStarted } from "./pages/GetStarted";
 import { Home } from "./pages/Home";
 import { HowItWorks } from "./pages/HowItWorks";
+import { Login } from "./pages/Login";
 import { Resources } from "./pages/Resources";
 import { Link, Router, usePath } from "./router";
 
 /**
  * Site shell: header with the five sections the PO asked for (Home, About,
  * How it works, Resources, Get started), the routed page, and the footer.
- * "Login" is intentionally absent until accounts exist (Sprint 5): a sign-in
- * link that leads nowhere would be worse than none.
+ * "Log in" leads to the sign-in shell (/login); the demo workspace (/app) is
+ * provisional and unguarded until accounts exist.
  */
 
 const NAV: { href: string; label: string }[] = [
@@ -29,6 +31,8 @@ const TITLES: Record<string, string> = {
   "/about": "About · Gateseeker",
   "/resources": "Resources · Gateseeker",
   "/get-started": "Get started · Gateseeker",
+  "/login": "Log in · Gateseeker",
+  "/app": "Analyze a repository · Gateseeker",
 };
 
 export function App() {
@@ -53,6 +57,8 @@ function Shell() {
   else if (path === "/about") page = <About />;
   else if (path === "/resources") page = <Resources />;
   else if (path === "/get-started") page = <GetStarted />;
+  else if (path === "/login") page = <Login />;
+  else if (path === "/app") page = <AppDemo />;
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -68,6 +74,9 @@ function Shell() {
                 {n.label}
               </Link>
             ))}
+            <Link href="/login" aria-current={path === "/login" ? "page" : undefined} className={cn("hover:text-foreground", path === "/login" ? "text-foreground" : "text-muted-foreground")}>
+              Log in
+            </Link>
             <Link href="/get-started" className="inline-flex h-8 items-center rounded-md border border-primary-stroke bg-primary px-3 text-xs font-medium text-primary-foreground shadow-solid [--shadow-color:var(--primary-stroke)] hover:bg-primary-hover">
               Get started
             </Link>
@@ -79,7 +88,7 @@ function Shell() {
         {open && (
           <nav aria-label="Main (mobile)" className="border-t px-4 py-3 sm:hidden">
             <ul className="grid gap-2 text-sm">
-              {[...NAV, { href: "/get-started", label: "Get started" }].map((n) => (
+              {[...NAV, { href: "/login", label: "Log in" }, { href: "/get-started", label: "Get started" }].map((n) => (
                 <li key={n.href}>
                   <Link href={n.href} className={cn("block py-1", path === n.href ? "text-foreground" : "text-muted-foreground")}>
                     {n.label}

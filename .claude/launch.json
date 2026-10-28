@@ -6,6 +6,12 @@
       "runtimeExecutable": "node",
       "runtimeArgs": ["dist/web/local-server.js"],
       "port": 4320
+    },
+    {
+      "name": "web-stub",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["e2e/start-web.mjs"],
+      "port": 4321
     }
   ]
 }

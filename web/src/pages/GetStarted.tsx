@@ -20,7 +20,7 @@ export function GetStarted() {
               1. In the browser, no install
             </CardTitle>
             <CardDescription>
-              Paste the URL of a public GitHub repository on the <Link href="/" className="text-primary hover:underline">home page</Link>. You get the full report in under a minute for most projects. Public repositories only, up to 50 MB compressed.
+              Paste the URL of a public GitHub repository in the <Link href="/login" className="text-primary hover:underline">demo workspace</Link> (free, rate limited). You get the full report in under a minute for most projects. Public repositories only, up to 50 MB compressed.
             </CardDescription>
           </CardHeader>
           <CardContent className="hidden" />
