@@ -1,4 +1,5 @@
 import { Button, Card, CardContent, CardDescription, CardHeader } from "@gateseeker/ui-kit";
+import { ShieldCheck } from "lucide-react";
 
 /**
  * Sign-in shell. The button has no behaviour yet: GitHub sign-in (Supabase
@@ -6,9 +7,13 @@ import { Button, Card, CardContent, CardDescription, CardHeader } from "@gatesee
  */
 export function Login() {
   return (
-    <section className="mx-auto max-w-sm py-8">
-      <Card>
-        <CardHeader>
+    <section className="relative mx-auto max-w-sm py-8 sm:py-12">
+      <div className="hero-glow pointer-events-none absolute -inset-x-24 -top-24 h-80" aria-hidden="true" />
+      <Card className="relative">
+        <CardHeader className="items-center text-center">
+          <span className="mb-2 flex size-11 items-center justify-center rounded-lg border border-primary/40 bg-primary/15 text-primary">
+            <ShieldCheck className="size-5" aria-hidden="true" />
+          </span>
           <h1 className="text-xl font-semibold leading-snug tracking-tight">Log in</h1>
           <CardDescription>Sign in to open the demo workspace and analyze a public GitHub repository.</CardDescription>
         </CardHeader>
@@ -16,7 +21,7 @@ export function Login() {
           <Button size="lg" className="h-11 w-full" disabled aria-disabled="true">
             <GitHubMark /> Continue with GitHub
           </Button>
-          <p className="text-xs text-muted-foreground">The demo workspace is free and rate limited. Public repositories only; nothing is installed or executed.</p>
+          <p className="text-center text-xs text-muted-foreground">The demo workspace is free and rate limited. Public repositories only; nothing is installed or executed.</p>
         </CardContent>
       </Card>
     </section>

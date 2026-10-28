@@ -19,6 +19,7 @@ const EXAMPLE = {
 } as const;
 
 const PRIORITY_LABEL: Record<string, string> = { P1: "Fix now", P2: "Fix before release", P3: "Plan a fix", P4: "Keep an eye on it" };
+const PRIORITY_TONE: Record<string, string> = { P1: "text-destructive", P2: "text-severity-high", P3: "text-warning", P4: "text-muted-foreground" };
 
 function priorityVariant(p: string): "critical" | "high" | "moderate" | "low" {
   return p === "P1" ? "critical" : p === "P2" ? "high" : p === "P3" ? "moderate" : "low";
@@ -26,55 +27,58 @@ function priorityVariant(p: string): "critical" | "high" | "moderate" | "low" {
 
 export function ExampleReport({ className }: { className?: string }) {
   return (
-    <figure className={cn("grid gap-3", className)} aria-label="Example report">
-      <figcaption className="flex items-center justify-between gap-3 text-xs text-muted-foreground">
-        <span>
-          <span className="font-medium text-foreground">Example report.</span> Illustrative, not a live analysis.
+    <figure className={cn("rounded-xl border bg-card/50 p-2 sm:p-3", className)} aria-label="Example report">
+      <figcaption className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 px-2 pb-2 pt-1 text-xs text-muted-foreground sm:px-3">
+        <span className="flex items-center gap-2">
+          <Badge variant="secondary">Example</Badge>
+          Illustrative report, not a live analysis.
         </span>
         <span className="font-mono">{EXAMPLE.repository}</span>
       </figcaption>
-      <Card className="border-destructive/60">
-        <CardHeader>
-          <CardTitle className="flex flex-wrap items-center gap-2 text-lg">
-            <ShieldAlert className="size-6 text-destructive" aria-hidden="true" />
-            <span className="text-destructive">FAIL</span>
-            <span className="font-mono text-sm font-normal text-muted-foreground">{EXAMPLE.repository}@a1b2c3d</span>
-          </CardTitle>
-          <p className="text-sm text-muted-foreground">2 findings at priority P1: the gate blocks this merge until they are fixed.</p>
-        </CardHeader>
-        <CardContent>
-          <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            {(["P1", "P2", "P3", "P4"] as const).map((pr) => (
-              <div key={pr} className="rounded-md border bg-background p-3">
-                <dt className="text-xs text-muted-foreground">
-                  {pr} · {PRIORITY_LABEL[pr]}
-                </dt>
-                <dd className="text-2xl font-semibold tabular-nums">{EXAMPLE.counts[pr]}</dd>
-              </div>
-            ))}
-          </dl>
-        </CardContent>
-      </Card>
-      <ol className="grid gap-3">
-        {EXAMPLE.findings.map((f) => (
-          <li key={f.subject}>
-            <Card>
-              <div className="flex items-start gap-3 p-4">
-                <Badge variant={priorityVariant(f.priority)} className="mt-0.5 shrink-0">{f.priority}</Badge>
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="font-mono text-sm">{f.subject}</span>
-                    <Badge variant={f.severity === "CRITICAL" ? "critical" : "high"}>{f.severity}</Badge>
-                    <Badge variant="outline">code pattern</Badge>
-                  </div>
-                  <p className="mt-1 text-sm">{f.rule}: {f.title}</p>
-                  <p className="mt-1 text-sm text-muted-foreground">{f.action}</p>
+      <div className="grid gap-3">
+        <Card className="border-destructive/60">
+          <CardHeader>
+            <CardTitle className="flex flex-wrap items-center gap-2 text-lg">
+              <ShieldAlert className="size-6 text-destructive" aria-hidden="true" />
+              <span className="text-destructive">FAIL</span>
+              <span className="font-mono text-sm font-normal text-muted-foreground">{EXAMPLE.repository}@a1b2c3d</span>
+            </CardTitle>
+            <p className="text-sm text-muted-foreground">2 findings at priority P1: the gate blocks this merge until they are fixed.</p>
+          </CardHeader>
+          <CardContent>
+            <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              {(["P1", "P2", "P3", "P4"] as const).map((pr) => (
+                <div key={pr} className="rounded-md border bg-background p-3">
+                  <dt className="text-xs text-muted-foreground">
+                    <span className={cn("font-medium", EXAMPLE.counts[pr] > 0 ? PRIORITY_TONE[pr] : undefined)}>{pr}</span> · {PRIORITY_LABEL[pr]}
+                  </dt>
+                  <dd className="text-2xl font-semibold tabular-nums">{EXAMPLE.counts[pr]}</dd>
                 </div>
-              </div>
-            </Card>
-          </li>
-        ))}
-      </ol>
+              ))}
+            </dl>
+          </CardContent>
+        </Card>
+        <ol className="grid gap-3">
+          {EXAMPLE.findings.map((f) => (
+            <li key={f.subject}>
+              <Card>
+                <div className="flex items-start gap-3 p-4">
+                  <Badge variant={priorityVariant(f.priority)} className="mt-0.5 shrink-0">{f.priority}</Badge>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="font-mono text-sm">{f.subject}</span>
+                      <Badge variant={f.severity === "CRITICAL" ? "critical" : "high"}>{f.severity}</Badge>
+                      <Badge variant="outline">code pattern</Badge>
+                    </div>
+                    <p className="mt-1 text-sm">{f.rule}: {f.title}</p>
+                    <p className="mt-1 text-sm text-muted-foreground">{f.action}</p>
+                  </div>
+                </div>
+              </Card>
+            </li>
+          ))}
+        </ol>
+      </div>
     </figure>
   );
 }
