@@ -55,9 +55,11 @@ jobs:
           '
 
       - name: Publish to npm with provenance
-        run: pnpm publish --no-git-checks --access public --provenance
-        env:
-          NODE_AUTH_TOKEN: ""
+        run: |
+          set -euo pipefail
+          TAG="latest"
+          case "$GITHUB_REF_NAME" in *-*) TAG="beta";; esac
+          pnpm publish --no-git-checks --access public --provenance --tag "$TAG"
 
       - name: Create GitHub release
         env:

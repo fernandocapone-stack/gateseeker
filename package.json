@@ -9,9 +9,9 @@
   },
   "packageManager": "pnpm@12.15.0",
   "bin": {
-    "gateseeker": "./dist/cli.js",
-    "gateseeker-intel": "./dist/intel-cli.js",
-    "gateseeker-action": "./dist/action-cli.js"
+    "gateseeker": "dist/cli.js",
+    "gateseeker-intel": "dist/intel-cli.js",
+    "gateseeker-action": "dist/action-cli.js"
   },
   "files": [
     "dist",
