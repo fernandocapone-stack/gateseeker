@@ -1,4 +1,4 @@
-import { Avatar, Badge, Button, Card, Drawer, IconInput, Logo, LogoSymbol, MetricCard, Segmented, Table, Td, Th, cn, menuItemClass, navItemClass } from "@gateseeker/ui-kit";
+import { Avatar, Badge, Button, Card, Drawer, IconInput, Skeleton, Switch, Logo, LogoSymbol, MetricCard, Segmented, Table, Td, Th, cn, menuItemClass, navItemClass } from "@gateseeker/ui-kit";
 import { ArrowRight, ArrowUpDown, Bell, Download, ListChecks, LogOut, ScanSearch, Search } from "lucide-react";
 import { useCallback, useState, type ReactNode } from "react";
 
@@ -52,6 +52,7 @@ function Proposal() {
 export function DesignSystem() {
   const [filter, setFilter] = useState<"all" | "open" | "approved" | "resolved">("all");
   const [drawer, setDrawer] = useState(false);
+  const [sampleSwitch, setSampleSwitch] = useState(true);
   const closeDrawer = useCallback(() => { setDrawer(false); }, []);
 
   return (
@@ -200,7 +201,22 @@ export function DesignSystem() {
         </div>
       </Section>
 
-      <Section title="Side panel" note="Built for notifications; not used in the workspace until there is a feature behind it.">
+      <Section title="Switch and skeleton" note="Switch is a proposal (no toggle in the file yet). Skeletons stand in for content while a page loads.">
+        <Card className="grid gap-6 p-4 md:grid-cols-2">
+          <div className="grid gap-4">
+            <Switch label="On" description="Blue track, dark knob." checked={sampleSwitch} onChange={setSampleSwitch} />
+            <Switch label="Disabled" checked={false} disabled onChange={() => undefined} />
+          </div>
+          <div className="grid gap-2">
+            <Skeleton className="h-4 w-48" />
+            <Skeleton className="h-3 w-full" />
+            <Skeleton className="h-3 w-3/4" />
+            <Skeleton className="mt-2 h-[33px] w-[95px]" />
+          </div>
+        </Card>
+      </Section>
+
+      <Section title="Side panel" note="Used by the notifications bell in the workspace header.">
         <div><Button variant="outline" size="sm" onClick={() => { setDrawer(true); }}><Bell className="text-primary" aria-hidden="true" /> Open the panel</Button></div>
       </Section>
 

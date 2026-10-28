@@ -98,6 +98,38 @@ test.describe("public page", () => {
     await expect(report).not.toContainText("sk_live_HoHDwEcLksdRWvioeGponKHY");
   });
 
+  test("records finished and refused analyses as notifications and honours the settings", async ({ page }) => {
+    await signIn(page);
+    const bell = page.getByRole("button", { name: /^Notifications/ });
+    await expect(bell).toHaveAccessibleName("Notifications");
+    await analyze(page, "https://github.com/acme/vibe");
+    await expect(page.getByRole("region", { name: "Report" })).toBeVisible({ timeout: 30_000 });
+    await analyze(page, "https://github.com/acme/private");
+    await expect(page.getByRole("alert")).toBeVisible();
+    // Typing errors are not worth a notification.
+    await analyze(page, "https://gitlab.com/acme/vibe");
+    await expect(bell).toHaveAccessibleName("Notifications, 2 unread");
+
+    await bell.click();
+    const panel = page.getByRole("dialog", { name: "Notifications" });
+    await expect(panel.getByRole("listitem")).toHaveCount(2);
+    await expect(panel.getByRole("listitem").first()).toContainText("Analysis refused");
+    await expect(panel.getByRole("listitem").nth(1)).toContainText("acme/vibe@0123456");
+    await page.getByRole("button", { name: "Close notifications" }).click();
+    await expect(bell).toHaveAccessibleName("Notifications");
+
+    // Turned off in Settings: the next analysis leaves no notification.
+    await page.getByRole("navigation", { name: "Workspace", exact: true }).getByRole("link", { name: "Settings" }).click();
+    await expect(page.getByRole("heading", { level: 1 })).toHaveText("Settings");
+    await page.getByRole("switch", { name: /Notify me when an analysis ends/ }).uncheck({ force: true });
+    await page.getByRole("navigation", { name: "Workspace", exact: true }).getByRole("link", { name: "Analyze repository" }).click();
+    await analyze(page, "https://github.com/acme/private");
+    await expect(page.getByRole("alert")).toBeVisible();
+    await expect(bell).toHaveAccessibleName("Notifications");
+    await bell.click();
+    await expect(panel.getByRole("listitem")).toHaveCount(2);
+  });
+
   test("rejects an invalid URL without calling the service", async ({ page }) => {
     await signIn(page);
     await analyze(page, "https://gitlab.com/acme/vibe");

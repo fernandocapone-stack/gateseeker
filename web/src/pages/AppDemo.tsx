@@ -1,10 +1,10 @@
-import { Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import type { ScanResponseOk } from "../api";
 import { useAuth } from "../auth-context";
 import { CiSnippet } from "../components/CiSnippet";
 import { Scanner } from "../components/Scanner";
+import { PageSkeleton } from "../components/Skeletons";
 import { navigate } from "../router";
 
 /**
@@ -21,11 +21,7 @@ export function AppDemo() {
   }, [auth.status]);
 
   if (auth.status !== "signed-in" || !auth.session) {
-    return (
-      <p role="status" className="flex items-center gap-2 text-body text-muted-foreground">
-        <Loader2 className="size-4 animate-spin" aria-hidden="true" /> Checking your session
-      </p>
-    );
+    return <PageSkeleton label="Checking your session" />;
   }
   return (
     <>

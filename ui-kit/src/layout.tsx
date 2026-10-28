@@ -20,7 +20,7 @@ export function AppShell({ brand, title, actions, nav, account, children }: { br
       </header>
       <aside className="sticky top-[51px] z-20 hidden h-[calc(100dvh-51px)] flex-col justify-between self-start border-r bg-sidebar md:flex print:hidden">
         <nav aria-label="Workspace" className="flex min-h-0 flex-col overflow-y-auto py-4">{nav}</nav>
-        {account}
+        {account && <div className="pb-4">{account}</div>}
       </aside>
       <main className="min-w-0 p-4 print:p-0">
         <nav aria-label="Workspace (mobile)" className="-mx-4 -mt-4 mb-4 flex overflow-x-auto border-b bg-sidebar md:hidden print:hidden [&>*]:shrink-0 [&>*]:whitespace-nowrap">{nav}</nav>
@@ -51,10 +51,11 @@ export function Avatar({ initials, className }: { initials: string; className?: 
 /*
  * Dropdown menu (Figma "dropdown"): 204px wide panel on the card surface,
  * 42px rows with a 16px icon, a 1px divider between rows. Opens upwards from
- * the account button at the bottom of the sidebar. Escape and outside clicks
- * close it.
+ * the account button at the bottom of the sidebar. `align="start"` lines the
+ * panel up with the trigger's 16px inset (the avatar's left edge). Escape and
+ * outside clicks close it.
  */
-export function Menu({ trigger, children, placement = "top", className }: { trigger: (props: { open: boolean; toggle: () => void; id: string }) => ReactNode; children: ReactNode; placement?: "top" | "bottom"; className?: string }) {
+export function Menu({ trigger, children, placement = "top", align = "end", className }: { trigger: (props: { open: boolean; toggle: () => void; id: string }) => ReactNode; children: ReactNode; placement?: "top" | "bottom"; align?: "start" | "end"; className?: string }) {
   const [open, setOpen] = useState(false);
   const id = useId();
   const root = useRef<HTMLDivElement>(null);
@@ -73,7 +74,7 @@ export function Menu({ trigger, children, placement = "top", className }: { trig
     <div ref={root} className={cn("relative", className)}>
       {trigger({ open, toggle: () => { setOpen((o) => !o); }, id })}
       {open && (
-        <div id={id} role="menu" className={cn("absolute right-2 z-50 w-[204px] overflow-hidden rounded-lg border bg-popover shadow-solid", placement === "top" ? "bottom-full mb-1" : "top-full mt-1")} onClick={() => { setOpen(false); }}>
+        <div id={id} role="menu" className={cn("absolute z-50 w-[204px] overflow-hidden rounded-lg border bg-popover shadow-solid", align === "start" ? "left-4" : "right-2", placement === "top" ? "bottom-full mb-1" : "top-full mt-1")} onClick={() => { setOpen(false); }}>
           {children}
         </div>
       )}

@@ -1,10 +1,10 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@gateseeker/ui-kit";
-import { Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { fetchReport, type ReportOutcome } from "../api";
 import { useAuth } from "../auth-context";
 import { CiSnippet } from "../components/CiSnippet";
+import { ReportSkeleton } from "../components/Skeletons";
 import { setLastReportId } from "../last-report";
 import { Link } from "../router";
 import { ReportView } from "../views/Report";
@@ -30,11 +30,7 @@ export function SavedReport({ id }: { id: string }) {
   }, [auth.status, auth.session, id]);
 
   if (auth.status === "loading" || (auth.status === "signed-in" && outcome === null)) {
-    return (
-      <p role="status" className="flex items-center gap-2 text-body text-muted-foreground">
-        <Loader2 className="size-4 animate-spin" aria-hidden="true" /> Loading the saved report
-      </p>
-    );
+    return <ReportSkeleton label="Loading the saved report" />;
   }
   if (auth.status === "signed-out") {
     return (

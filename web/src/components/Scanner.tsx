@@ -3,9 +3,12 @@ import { ArrowRight, Loader2, ShieldAlert, ShieldQuestion } from "lucide-react";
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 
 import { scanRepository, type ScanOutcome, type ScanResponseOk } from "../api";
+import { useAuth } from "../auth-context";
 import { setLastReportId } from "../last-report";
+import { notify } from "../notifications";
 import { Link } from "../router";
 import { ReportView } from "../views/Report";
+import { ReportSkeleton } from "./Skeletons";
 
 /**
  * The product demo (Figma "Analyze Repository"): paste a public GitHub URL,
@@ -29,6 +32,7 @@ export function Scanner({ token, heading, onResult }: { token: string | null; he
   const [url, setUrl] = useState("");
   const [phase, setPhase] = useState<Phase>({ kind: "idle" });
   const abort = useRef<AbortController | null>(null);
+  const userId = useAuth().session?.user.id ?? null;
 
   async function submit(e: FormEvent) {
     e.preventDefault();
@@ -44,6 +48,7 @@ export function Scanner({ token, heading, onResult }: { token: string | null; he
     if (controller.signal.aborted) return;
     setPhase({ kind: "done", url: trimmed, outcome, elapsedMs: Date.now() - startedAt });
     if (outcome.ok && outcome.id !== null) setLastReportId(outcome.id);
+    if (userId) record(userId, trimmed, outcome);
     onResult?.(outcome.ok ? outcome : null);
   }
 
@@ -84,7 +89,12 @@ export function Scanner({ token, heading, onResult }: { token: string | null; he
       </Card>
 
       <div>
-        {phase.kind === "running" && <Progress startedAt={phase.startedAt} url={phase.url} />}
+        {phase.kind === "running" && (
+          <div className="grid gap-4">
+            <Progress startedAt={phase.startedAt} url={phase.url} />
+            <ReportSkeleton />
+          </div>
+        )}
         {phase.kind === "done" && !phase.outcome.ok && <Refusal url={phase.url} code={phase.outcome.error.code} message={phase.outcome.error.message} />}
         {phase.kind === "done" && phase.outcome.ok && (
           <>
@@ -95,6 +105,36 @@ export function Scanner({ token, heading, onResult }: { token: string | null; he
       </div>
     </div>
   );
+}
+
+/* Errors the person sees at once while typing are not worth a notification. */
+const QUIET_CODES = new Set(["invalid-url", "bad-request", "unauthorized"]);
+const INCOMPLETE_CODES = new Set(["timeout", "upstream-error", "download-failed", "store-unavailable"]);
+
+function record(userId: string, url: string, outcome: ScanOutcome): void {
+  if (outcome.ok) {
+    const { report, repository } = outcome;
+    notify(userId, {
+      kind: report.gate.verdict === "incomplete" ? "incomplete" : "finished",
+      subject: `${repository.owner}/${repository.repo}@${repository.sha.slice(0, 7)}`,
+      verdict: report.gate.verdict,
+      p1: report.summary.byPriority.P1,
+      p2: report.summary.byPriority.P2,
+      reportId: outcome.id,
+      message: report.gate.reason,
+    });
+    return;
+  }
+  if (QUIET_CODES.has(outcome.error.code)) return;
+  notify(userId, {
+    kind: INCOMPLETE_CODES.has(outcome.error.code) ? "incomplete" : "refused",
+    subject: url,
+    verdict: null,
+    p1: 0,
+    p2: 0,
+    reportId: null,
+    message: outcome.error.message,
+  });
 }
 
 function SavedNote({ response }: { response: ScanResponseOk }) {

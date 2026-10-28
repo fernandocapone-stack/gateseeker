@@ -3,6 +3,7 @@ import { LogOut, Menu, X } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { AuthProvider, useAuth } from "./auth-context";
+import { PageSkeleton, ReportSkeleton } from "./components/Skeletons";
 
 import { About } from "./pages/About";
 import { AppDemo } from "./pages/AppDemo";
@@ -13,6 +14,7 @@ import { HowItWorks } from "./pages/HowItWorks";
 import { Login } from "./pages/Login";
 import { Resources } from "./pages/Resources";
 import { SavedReport } from "./pages/SavedReport";
+import { SettingsPage } from "./pages/Settings";
 import { Link, Router, usePath } from "./router";
 import { Workspace, type WorkspacePage } from "./Workspace";
 
@@ -39,6 +41,7 @@ const TITLES: Record<string, string> = {
   "/login": "Log in · Gateseeker",
   "/app": "Analyze a repository · Gateseeker",
   "/app/design-system": "Design system · Gateseeker",
+  "/app/settings": "Settings · Gateseeker",
 };
 
 const REPORT_ROUTE = /^\/r\/([A-Za-z0-9-]{1,64})$/;
@@ -80,12 +83,21 @@ function Shell() {
   else if (path === "/login") page = <Login />;
   else if (path === "/app") page = <AppDemo />;
   else if (path === "/app/design-system") page = <DesignSystem />;
+  else if (path === "/app/settings") page = <SettingsPage />;
   else if (reportId) page = <SavedReport id={reportId} />;
 
   const signedIn = auth.status === "signed-in" && auth.session !== null;
   // Signed in, the workspace pages get the application frame instead of the site header and footer.
-  const workspacePage: WorkspacePage | null = path === "/app" ? "analyze" : path === "/app/design-system" ? "design-system" : reportId ? "issues" : null;
+  const workspacePage: WorkspacePage | null = path === "/app" ? "analyze" : path === "/app/design-system" ? "design-system" : path === "/app/settings" ? "settings" : reportId ? "issues" : null;
   if (signedIn && workspacePage) return <Workspace page={workspacePage}>{page}</Workspace>;
+  // While the session is read, workspace pages already show the frame with skeletons.
+  if (auth.status === "loading" && workspacePage) {
+    return (
+      <Workspace page={workspacePage} loading>
+        {workspacePage === "issues" ? <ReportSkeleton label="Loading the saved report" /> : <PageSkeleton label="Checking your session" />}
+      </Workspace>
+    );
+  }
   const login = auth.session?.user.login;
   const accountLabel = login ? `@${login}` : "Workspace";
 
