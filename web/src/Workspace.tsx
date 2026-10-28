@@ -1,5 +1,5 @@
 import { AppShell, Avatar, Button, Logo, Menu, Skeleton, menuItemClass, navItemClass } from "@gateseeker/ui-kit";
-import { Bell, ChevronUp, LayoutDashboard, ListChecks, LogOut, ScanSearch, Settings } from "lucide-react";
+import { Bell, BookOpen, ChevronUp, LayoutDashboard, ListChecks, LogOut, ScanSearch, Settings } from "lucide-react";
 import { useCallback, useState, type ReactNode } from "react";
 
 import { useAuth } from "./auth-context";
@@ -20,9 +20,9 @@ import { Link, navigate } from "./router";
  * skeletons so the page does not jump when it arrives.
  */
 
-export type WorkspacePage = "analyze" | "issues" | "dashboard" | "settings" | "design-system";
+export type WorkspacePage = "analyze" | "issues" | "dashboard" | "resources" | "settings" | "design-system";
 
-const TITLE: Record<WorkspacePage, string> = { analyze: "Analyze repository", issues: "Issues", dashboard: "Dashboard", settings: "Settings", "design-system": "Design system" };
+const TITLE: Record<WorkspacePage, string> = { analyze: "Analyze repository", issues: "Issues", dashboard: "Dashboard", resources: "Resources", settings: "Settings", "design-system": "Design system" };
 
 export function initialsOf(login: string): string {
   return login.replace(/[^A-Za-z0-9]/g, "").slice(0, 2).toUpperCase() || "?";
@@ -78,6 +78,9 @@ export function Workspace({ page, loading = false, children }: { page: Workspace
           <ListChecks aria-hidden="true" /> Issues
         </span>
       )}
+      <Link href="/app/resources" aria-current={page === "resources" ? "page" : undefined} className={navItemClass(page === "resources")}>
+        <BookOpen aria-hidden="true" /> Resources
+      </Link>
     </>
   );
 

@@ -41,7 +41,7 @@ function severityVariant(s: string): "critical" | "high" | "moderate" | "low" {
 
 function RuleTable({ rules }: { rules: { id: string; what: string; severity: string }[] }) {
   return (
-    <ul className="divide-y rounded-md border text-sm">
+    <ul className="divide-y rounded-md border text-body">
       {rules.map((r) => (
         <li key={r.id} className="grid gap-2 p-3 sm:grid-cols-[10.5rem_6rem_1fr] sm:items-start sm:gap-4">
           <span className="font-mono text-xs leading-5 tracking-tight">{r.id}</span>
@@ -55,12 +55,35 @@ function RuleTable({ rules }: { rules: { id: string; what: string; severity: str
   );
 }
 
+const LEAD = "Everything Gateseeker checks is public, and so is how it decides. Start with the rules; the documents below hold the rest.";
+
+/** Public page (/resources, signed-out visitors). */
 export function Resources() {
   return (
     <>
-      <PageIntro title="Resources" lead="Everything Gateseeker checks is public, and so is how it decides. Start with the rules; the documents below hold the rest." />
+      <PageIntro title="Resources" lead={LEAD} />
+      <ResourcesContent />
+    </>
+  );
+}
 
-      <section className="mb-12 grid gap-6">
+/** The same content inside the workspace (/app/resources); the header already says "Resources". */
+export function WorkspaceResources() {
+  return (
+    <div className="grid max-w-[1012px] gap-6">
+      <div>
+        <h1 className="text-display font-medium">Rules, limits and documentation</h1>
+        <p className="text-label text-muted-foreground">{LEAD}</p>
+      </div>
+      <ResourcesContent inWorkspace />
+    </div>
+  );
+}
+
+function ResourcesContent({ inWorkspace = false }: { inWorkspace?: boolean }) {
+  return (
+    <>
+      <section className={inWorkspace ? "grid gap-4" : "mb-12 grid gap-6"}>
         <Card>
           <CardHeader>
             <CardTitle>Code-pattern rules</CardTitle>
@@ -86,7 +109,7 @@ export function Resources() {
             <CardTitle>What the hosted analysis does not cover</CardTitle>
           </CardHeader>
           <CardContent>
-            <ul className="list-disc space-y-1.5 pl-5 text-sm text-muted-foreground">
+            <ul className="list-disc space-y-1.5 pl-5 text-body text-muted-foreground">
               <li>Private repositories, GitLab, Bitbucket, or archives above 50 MB compressed: use the CLI locally.</li>
               <li>Whether vulnerable code is actually reachable; runtime behaviour; infrastructure.</li>
               <li>Dependencies without a lockfile, workspace or linked packages, non-semver versions (declared in the report, not silently skipped).</li>
@@ -96,15 +119,15 @@ export function Resources() {
         </Card>
       </section>
 
-      <section className="mb-10">
-        <h2 className="mb-4 text-xl font-semibold tracking-tight">Documentation</h2>
+      <section className={inWorkspace ? "" : "mb-10"}>
+        <h2 className={inWorkspace ? "mb-3 text-title font-medium" : "mb-4 text-xl font-semibold tracking-tight"}>Documentation</h2>
         <ul className="grid gap-3 sm:grid-cols-2">
           {DOCS.map((d) => (
             <li key={d.title}>
               <Link href={d.href} className="group flex h-full items-start justify-between gap-3 rounded-lg border bg-card p-4 transition-colors hover:border-border-strong hover:bg-accent/40">
                 <span>
                   <span className="font-medium">{d.title}</span>
-                  <p className="mt-1 text-sm text-muted-foreground">{d.text}</p>
+                  <p className="mt-1 text-label text-muted-foreground">{d.text}</p>
                 </span>
                 <ArrowUpRight className="mt-0.5 size-4 shrink-0 text-muted-foreground transition-colors group-hover:text-foreground" aria-hidden="true" />
               </Link>

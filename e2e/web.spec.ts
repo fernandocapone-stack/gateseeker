@@ -38,6 +38,12 @@ test.describe("public page", () => {
       await expect(page).toHaveURL(/\/app\/dashboard$/);
       await expect(page.getByRole("heading", { level: 1 })).toHaveText("How your repositories are doing");
     }
+    // Resources has a workspace counterpart, linked from the sidebar.
+    await page.goto("/resources");
+    await expect(page).toHaveURL(/\/app\/resources$/);
+    await expect(page.getByRole("heading", { level: 1 })).toHaveText("Rules, limits and documentation");
+    await expect(page.getByRole("navigation", { name: "Workspace", exact: true }).getByRole("link", { name: "Resources" })).toHaveAttribute("aria-current", "page");
+    await expect(page.getByText("GSK-SUPABASE-001")).toBeVisible();
     await page.getByRole("button", { name: "@e2e-user" }).click();
     await page.getByRole("menuitem", { name: "Sign out" }).click();
     await expect(page).toHaveURL(/\/$/);

@@ -13,7 +13,7 @@ import { GetStarted } from "./pages/GetStarted";
 import { Home } from "./pages/Home";
 import { HowItWorks } from "./pages/HowItWorks";
 import { Login } from "./pages/Login";
-import { Resources } from "./pages/Resources";
+import { Resources, WorkspaceResources } from "./pages/Resources";
 import { SavedReport } from "./pages/SavedReport";
 import { SettingsPage } from "./pages/Settings";
 import { Link, Router, navigate, usePath } from "./router";
@@ -44,10 +44,13 @@ const TITLES: Record<string, string> = {
   "/app/design-system": "Design system · Gateseeker",
   "/app/settings": "Settings · Gateseeker",
   "/app/dashboard": "Dashboard · Gateseeker",
+  "/app/resources": "Resources · Gateseeker",
 };
 
 /* The public site exists only for signed-out visitors; a session sends these to the workspace. /login forwards on its own. */
-const PUBLIC_ROUTES = new Set(["/", "/how-it-works", "/about", "/resources", "/get-started"]);
+const PUBLIC_ROUTES = new Set(["/", "/how-it-works", "/about", "/get-started"]);
+/* Public pages with a workspace counterpart forward there instead of the Dashboard. */
+const WORKSPACE_COUNTERPART: Record<string, string> = { "/resources": "/app/resources" };
 const WORKSPACE_HOME = "/app/dashboard";
 
 const REPORT_ROUTE = /^\/r\/([A-Za-z0-9-]{1,64})$/;
@@ -80,7 +83,10 @@ function Shell() {
     setOpen(false);
   }, [path, reportId]);
   useEffect(() => {
-    if (auth.status === "signed-in" && PUBLIC_ROUTES.has(path)) navigate(WORKSPACE_HOME, { replace: true });
+    if (auth.status === "signed-out" && path === "/app/resources") navigate("/resources", { replace: true });
+    if (auth.status !== "signed-in") return;
+    if (PUBLIC_ROUTES.has(path)) navigate(WORKSPACE_HOME, { replace: true });
+    else if (WORKSPACE_COUNTERPART[path]) navigate(WORKSPACE_COUNTERPART[path], { replace: true });
   }, [auth.status, path]);
 
   let page = <NotFound />;
@@ -94,14 +100,15 @@ function Shell() {
   else if (path === "/app/design-system") page = <DesignSystem />;
   else if (path === "/app/settings") page = <SettingsPage />;
   else if (path === "/app/dashboard") page = <Dashboard />;
+  else if (path === "/app/resources") page = <WorkspaceResources />;
   else if (reportId) page = <SavedReport id={reportId} />;
 
   const signedIn = auth.status === "signed-in" && auth.session !== null;
   // Signed in, the workspace pages get the application frame instead of the site header and footer.
-  const workspacePage: WorkspacePage | null = path === "/app" ? "analyze" : path === "/app/design-system" ? "design-system" : path === "/app/settings" ? "settings" : path === "/app/dashboard" ? "dashboard" : reportId ? "issues" : null;
+  const workspacePage: WorkspacePage | null = path === "/app" ? "analyze" : path === "/app/design-system" ? "design-system" : path === "/app/settings" ? "settings" : path === "/app/dashboard" ? "dashboard" : path === "/app/resources" ? "resources" : reportId ? "issues" : null;
   if (signedIn && workspacePage) return <Workspace page={workspacePage}>{page}</Workspace>;
   // A public page must not flash for a signed-in visitor: render nothing until the session is known, then redirect (effect above).
-  if (PUBLIC_ROUTES.has(path) && (auth.status === "loading" || signedIn)) return <div className="min-h-dvh bg-background" />;
+  if ((PUBLIC_ROUTES.has(path) || path in WORKSPACE_COUNTERPART) && (auth.status === "loading" || signedIn)) return <div className="min-h-dvh bg-background" />;
   // While the session is read, workspace pages already show the frame with skeletons.
   if (auth.status === "loading" && workspacePage) {
     return (
