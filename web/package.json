@@ -4,6 +4,9 @@
   "private": true,
   "description": "Public web page: paste the URL of a public GitHub repository and get the Gateseeker report.",
   "type": "module",
+  "engines": {
+    "node": "24.x"
+  },
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit -p tsconfig.json && vite build",

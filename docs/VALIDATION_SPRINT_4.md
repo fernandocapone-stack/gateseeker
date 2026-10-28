@@ -44,4 +44,6 @@ Quatro de quatro repositórios analisados com achados idênticos aos da CLI. Nen
 
 ## Rodada 2 (pela página publicada)
 
-Pendente do deploy. Repetir os dez repositórios pela página, anotar o tempo visto pelo usuário e confirmar que o link `/r/<id>` abre o mesmo relatório em outro navegador.
+Primeiro deploy em 2026-10-28, projeto Vercel na conta pessoal do PO, `https://gateseeker.vercel.app`, importado pelo painel com Root Directory `web`. Dois ajustes foram necessários no repositório: comandos de instalação e build em `web/vercel.json` (compila o núcleo antes do site, Node 24) e a função exportada como `POST`/`GET` em vez de export default, que o runtime tratava como handler `(req, res)` e nunca respondia. Fumaça pela função publicada: URL inválida → 400 `invalid-url`; `gateseeker-test-js` main → 0 achados, feed curado presente nas fontes; `gateseeker-test-js@vulnerable-downgrade` → 3 P1 + 3 P2 (lodash 4.17.15), veredito fail; `gateseeker-test-php@vulnerable-downgrade` → 6 P2 (guzzlehttp/psr7 1.8.0), fail. Mesmos ids da validação da Sprint 3; cerca de 1 s por análise.
+
+Pendente: repetir os dez repositórios pela página, anotar o tempo visto pelo usuário e confirmar que o link `/r/<id>` abre o mesmo relatório em outro navegador. A página fica atrás de Vercel Authentication até a área autenticada existir.

@@ -7,8 +7,14 @@ import { handleScanRequest } from "gateseeker/dist/web/handler.js";
  */
 export const config = { maxDuration: 150 };
 
-export default async function handler(req: Request): Promise<Response> {
-  if (req.method !== "POST") return Response.json({ ok: false, error: { code: "bad-request", message: "POST only." } }, { status: 405 });
+// Web-signature exports named after the HTTP method: the shape Vercel's Node.js
+// runtime documents. A default export with a Request parameter was deployed as a
+// (req, res) handler and never answered.
+export function GET(): Response {
+  return Response.json({ ok: false, error: { code: "bad-request", message: "POST only." } }, { status: 405, headers: { allow: "POST" } });
+}
+
+export async function POST(req: Request): Promise<Response> {
   let body: unknown = null;
   try {
     const text = await req.text();

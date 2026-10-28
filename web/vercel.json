@@ -1,6 +1,8 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": "vite",
+  "installCommand": "cd .. && pnpm install --frozen-lockfile",
+  "buildCommand": "cd .. && pnpm exec tsc -p tsconfig.build.json && node dist/intel-cli.js build && pnpm --filter @gateseeker/web build",
   "headers": [
     {
       "source": "/(.*)",
