@@ -75,7 +75,7 @@ export function ReportView({ response, elapsedMs }: { response: ScanResponseOk; 
             {report.analyses.patterns === "analyzed" && report.patterns ? `${report.patterns.filesScanned} file(s) scanned for code patterns.` : ""}
           </p>
           <p className="text-xs text-muted-foreground">
-            {archive.files} files read · {(elapsedMs / 1000).toFixed(1)}s · Gateseeker {report.gateseekerVersion} · sources: {report.sources.map((s) => s.name).join(", ") || "none"}
+            {archive.files} files read{archive.skippedLarge > 0 ? ` (${archive.skippedLarge} large binary file(s) skipped)` : ""} · {(elapsedMs / 1000).toFixed(1)}s · Gateseeker {report.gateseekerVersion} · sources: {report.sources.map((s) => s.name).join(", ") || "none"}
           </p>
         </CardContent>
       </Card>

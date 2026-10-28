@@ -28,12 +28,12 @@ export interface TarLimits {
   maxUncompressedBytes: number;
   /** Regular-file entries. */
   maxEntries: number;
-  /** Largest single file written. */
+  /** Largest single file written; larger files (binaries, media) are skipped, not fatal: the scanner ignores them anyway. */
   maxFileBytes: number;
 }
 
 export const DEFAULT_TAR_LIMITS: TarLimits = {
-  maxCompressedBytes: 25 * 1024 * 1024,
+  maxCompressedBytes: 50 * 1024 * 1024,
   maxUncompressedBytes: 200 * 1024 * 1024,
   maxEntries: 20_000,
   maxFileBytes: 8 * 1024 * 1024,
@@ -45,7 +45,6 @@ export type TarErrorCode =
   | "not-gzip"
   | "malformed"
   | "too-many-entries"
-  | "file-too-large"
   | "link-entry"
   | "unsafe-path"
   | "unsupported-entry";
@@ -59,6 +58,8 @@ export interface TarExtractResult {
   files: number;
   directories: number;
   bytes: number;
+  /** Regular files above maxFileBytes that were not written. */
+  skippedLarge: number;
   /** sha256 of the uncompressed archive, for the cache key and the report. */
   sha256: string;
   /** The stripped top-level directory name, e.g. "repo-abc123". */
@@ -155,6 +156,7 @@ export function extractTarGz(gz: Buffer, destDir: string, limits: TarLimits = DE
   let files = 0;
   let directories = 0;
   let bytes = 0;
+  let skippedLarge = 0;
   let prefix: string | null = null;
   let longName: string | null = null;
   let paxPath: string | null = null;
@@ -223,7 +225,11 @@ export function extractTarGz(gz: Buffer, destDir: string, limits: TarLimits = DE
       mkdirSync(target, { recursive: true });
       directories++;
     } else {
-      if (size > limits.maxFileBytes) return { ok: false, error: { code: "file-too-large", message: `${effectiveName.slice(0, 200)} is larger than ${limits.maxFileBytes} bytes.` } };
+      if (size > limits.maxFileBytes) {
+        skippedLarge++;
+        at = next;
+        continue;
+      }
       files++;
       if (files > limits.maxEntries) return { ok: false, error: { code: "too-many-entries", message: `Archive has more than ${limits.maxEntries} files.` } };
       bytes += size;
@@ -234,5 +240,5 @@ export function extractTarGz(gz: Buffer, destDir: string, limits: TarLimits = DE
   }
 
   const sha256 = createHash("sha256").update(tar).digest("hex");
-  return { ok: true, value: { files, directories, bytes, sha256, prefix } };
+  return { ok: true, value: { files, directories, bytes, skippedLarge, sha256, prefix } };
 }

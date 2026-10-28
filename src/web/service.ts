@@ -48,6 +48,7 @@ export interface ServiceLimits {
 }
 
 export const DEFAULT_SERVICE_LIMITS: ServiceLimits = {
+  // GitHub's reported size is the .git size, a loose proxy; the compressed-archive limit below is the real gate.
   maxRepositoryBytes: 100 * 1024 * 1024,
   maxDownloadBytes: DEFAULT_TAR_LIMITS.maxCompressedBytes,
   totalTimeoutMs: 120_000,
@@ -69,7 +70,7 @@ export interface ServiceOptions {
 
 export interface ServiceSuccess {
   repository: GitHubRepoRef & { sha: string; defaultBranch: string; htmlUrl: string };
-  archive: { files: number; bytes: number; sha256: string };
+  archive: { files: number; bytes: number; skippedLarge: number; sha256: string };
   report: Report;
   timings: { downloadMs: number; extractMs: number; scanMs: number; totalMs: number };
 }
@@ -203,7 +204,7 @@ export async function scanGitHubRepository(options: ServiceOptions): Promise<Ser
         ok: true,
         value: {
           repository: { owner, repo, ref, sha, defaultBranch: repoInfo.data.default_branch, htmlUrl: repoInfo.data.html_url },
-          archive: { files: extracted.value.files, bytes: extracted.value.bytes, sha256: extracted.value.sha256 },
+          archive: { files: extracted.value.files, bytes: extracted.value.bytes, skippedLarge: extracted.value.skippedLarge, sha256: extracted.value.sha256 },
           report,
           timings: { downloadMs, extractMs, scanMs, totalMs: Date.now() - started },
         },

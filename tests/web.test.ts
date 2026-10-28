@@ -218,13 +218,14 @@ describe("extractTarGz", () => {
     });
   }
 
-  it("refuses a file above the per-file limit before writing it", () => {
+  it("skips a file above the per-file limit without writing it, and says so", () => {
     const dest = freshDir();
-    const gz = targz([{ name: "repo/big.bin", data: Buffer.alloc(2048, 1) }]);
+    const gz = targz([{ name: "repo/big.bin", data: Buffer.alloc(2048, 1) }, { name: "repo/small.txt", data: "ok" }]);
     const r = extractTarGz(gz, dest, { ...DEFAULT_TAR_LIMITS, maxFileBytes: 1024 });
-    expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.error.code).toBe("file-too-large");
-    expect(readdirSync(dest)).toEqual([]);
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.value).toMatchObject({ files: 1, skippedLarge: 1 });
+    expect(readdirSync(dest)).toEqual(["small.txt"]);
   });
 
   it("refuses more entries than allowed", () => {
