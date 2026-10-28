@@ -66,10 +66,22 @@ export interface ServiceOptions {
   apiBase?: string; // default https://api.github.com
   archiveBase?: string; // default https://codeload.github.com
   userAgent?: string;
+  /** Optional GitHub token (read-only, public repositories) to lift the anonymous API limit; never logged, never in reports. */
+  githubToken?: string;
+  /** A repository already resolved by `resolveGitHubRepository`; skips the two metadata calls. */
+  resolved?: ResolvedRepository;
 }
 
+export interface ResolvedRepository extends GitHubRepoRef {
+  sha: string;
+  defaultBranch: string;
+  htmlUrl: string;
+}
+
+export type ResolveResult = { ok: true; value: ResolvedRepository } | { ok: false; error: ServiceError };
+
 export interface ServiceSuccess {
-  repository: GitHubRepoRef & { sha: string; defaultBranch: string; htmlUrl: string };
+  repository: ResolvedRepository;
   archive: { files: number; bytes: number; skippedLarge: number; sha256: string };
   report: Report;
   timings: { downloadMs: number; extractMs: number; scanMs: number; totalMs: number };
@@ -110,23 +122,25 @@ async function readLimited(res: Response, max: number): Promise<Buffer | null> {
   return Buffer.concat(chunks);
 }
 
-export async function scanGitHubRepository(options: ServiceOptions): Promise<ServiceResult> {
-  const started = Date.now();
-  const limits: ServiceLimits = { ...DEFAULT_SERVICE_LIMITS, ...options.limits, tar: { ...DEFAULT_TAR_LIMITS, ...options.limits?.tar } };
+const UA = "gateseeker-web (+https://github.com/gateseeker-dev/gateseeker)";
+
+type ApiAnswer = { kind: "http"; status: number; json: unknown } | { kind: "network"; message: string };
+
+function githubApi(options: Pick<ServiceOptions, "fetch" | "apiBase" | "userAgent" | "githubToken">, signal: AbortSignal): (path: string) => Promise<ApiAnswer> {
   const fetchFn = options.fetch ?? globalThis.fetch;
   const apiBase = (options.apiBase ?? "https://api.github.com").replace(/\/$/, "");
-  const archiveBase = (options.archiveBase ?? "https://codeload.github.com").replace(/\/$/, "");
-  const ua = options.userAgent ?? "gateseeker-web (+https://github.com/gateseeker-dev/gateseeker)";
-
-  const parsed = parseGitHubRepoUrl(options.url);
-  if (!parsed.ok) return { ok: false, error: { code: "invalid-url", message: parsed.reason } };
-  const { owner, repo, ref } = parsed.value;
-
-  const controller = new AbortController();
-  const timer = setTimeout(() => { controller.abort(); }, limits.totalTimeoutMs);
-  const api = async (path: string): Promise<{ kind: "http"; status: number; json: unknown } | { kind: "network"; message: string }> => {
+  const ua = options.userAgent ?? UA;
+  return async (path) => {
     try {
-      const res = await fetchFn(`${apiBase}${path}`, { headers: { accept: "application/vnd.github+json", "user-agent": ua, "x-github-api-version": "2022-11-28" }, signal: controller.signal });
+      const res = await fetchFn(`${apiBase}${path}`, {
+        headers: {
+          accept: "application/vnd.github+json",
+          "user-agent": ua,
+          "x-github-api-version": "2022-11-28",
+          ...(options.githubToken ? { authorization: `Bearer ${options.githubToken}` } : {}),
+        },
+        signal,
+      });
       const text = await res.text();
       let json: unknown = null;
       try {
@@ -139,28 +153,77 @@ export async function scanGitHubRepository(options: ServiceOptions): Promise<Ser
       return { kind: "network", message: (e as Error).message };
     }
   };
+}
+
+/**
+ * Steps 1 and 2 of the service on their own: validate the URL, check the
+ * repository exists, is public and within the size limit, and resolve the
+ * ref to a commit. Callers with a cache use this first (two cheap API calls,
+ * no download) and pass the result back as `resolved` to skip repeating them.
+ */
+export async function resolveGitHubRepository(options: Omit<ServiceOptions, "resolved">): Promise<ResolveResult> {
+  const limits: ServiceLimits = { ...DEFAULT_SERVICE_LIMITS, ...options.limits, tar: { ...DEFAULT_TAR_LIMITS, ...options.limits?.tar } };
+  const parsed = parseGitHubRepoUrl(options.url);
+  if (!parsed.ok) return { ok: false, error: { code: "invalid-url", message: parsed.reason } };
+  const { owner, repo, ref } = parsed.value;
+  const controller = new AbortController();
+  const timer = setTimeout(() => { controller.abort(); }, limits.totalTimeoutMs);
+  try {
+    return await resolveWith(githubApi(options, controller.signal), controller.signal, owner, repo, ref, limits);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function resolveWith(api: (path: string) => Promise<ApiAnswer>, signal: AbortSignal, owner: string, repo: string, ref: string | null, limits: ServiceLimits): Promise<ResolveResult> {
+  // 1. Repository metadata: existence, visibility, size, default branch.
+  const meta = await api(`/repos/${owner}/${repo}`);
+  if (meta.kind === "network") return { ok: false, error: { code: signal.aborted ? "timeout" : "upstream-error", message: `GitHub could not be reached: ${meta.message}` } };
+  if (meta.status === 404) return { ok: false, error: { code: "not-found", message: `${owner}/${repo} was not found on GitHub, or it is private. Only public repositories can be analyzed.` } };
+  if (meta.status === 403 || meta.status === 429) return { ok: false, error: { code: "upstream-error", message: "GitHub is rate-limiting this service right now. Try again in a few minutes." } };
+  if (meta.status !== 200) return { ok: false, error: { code: "upstream-error", message: `GitHub answered HTTP ${meta.status} for the repository.` } };
+  const repoInfo = repoSchema.safeParse(meta.json);
+  if (!repoInfo.success) return { ok: false, error: { code: "upstream-error", message: "GitHub returned an unexpected repository record." } };
+  if (repoInfo.data.private) return { ok: false, error: { code: "private", message: `${owner}/${repo} is private. Only public repositories can be analyzed.` } };
+  if (repoInfo.data.size * 1024 > limits.maxRepositoryBytes) return { ok: false, error: { code: "too-large", message: `${owner}/${repo} is about ${Math.round(repoInfo.data.size / 1024)} MB; the hosted analysis accepts repositories up to ${Math.round(limits.maxRepositoryBytes / 1024 / 1024)} MB. Run the CLI locally for larger projects.` } };
+
+  // 2. Resolve the ref to a commit so the archive, the cache key and the report agree.
+  const wanted = ref ?? repoInfo.data.default_branch;
+  const commit = await api(`/repos/${owner}/${repo}/commits/${encodeURIComponent(wanted)}`);
+  if (commit.kind === "network") return { ok: false, error: { code: signal.aborted ? "timeout" : "upstream-error", message: `GitHub could not be reached: ${commit.message}` } };
+  if (commit.status === 404 || commit.status === 422) return { ok: false, error: { code: "ref-not-found", message: `Branch, tag or commit "${wanted}" was not found in ${owner}/${repo}.` } };
+  if (commit.status !== 200) return { ok: false, error: { code: "upstream-error", message: `GitHub answered HTTP ${commit.status} for the commit.` } };
+  const commitInfo = commitSchema.safeParse(commit.json);
+  if (!commitInfo.success) return { ok: false, error: { code: "upstream-error", message: "GitHub returned an unexpected commit record." } };
+  return { ok: true, value: { owner, repo, ref, sha: commitInfo.data.sha, defaultBranch: repoInfo.data.default_branch, htmlUrl: repoInfo.data.html_url } };
+}
+
+export async function scanGitHubRepository(options: ServiceOptions): Promise<ServiceResult> {
+  const started = Date.now();
+  const limits: ServiceLimits = { ...DEFAULT_SERVICE_LIMITS, ...options.limits, tar: { ...DEFAULT_TAR_LIMITS, ...options.limits?.tar } };
+  const fetchFn = options.fetch ?? globalThis.fetch;
+  const archiveBase = (options.archiveBase ?? "https://codeload.github.com").replace(/\/$/, "");
+  const ua = options.userAgent ?? UA;
+
+  const parsed = parseGitHubRepoUrl(options.url);
+  if (!parsed.ok) return { ok: false, error: { code: "invalid-url", message: parsed.reason } };
+  const { owner, repo, ref } = parsed.value;
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => { controller.abort(); }, limits.totalTimeoutMs);
+  const api = githubApi(options, controller.signal);
 
   try {
-    // 1. Repository metadata: existence, visibility, size, default branch.
-    const meta = await api(`/repos/${owner}/${repo}`);
-    if (meta.kind === "network") return { ok: false, error: { code: controller.signal.aborted ? "timeout" : "upstream-error", message: `GitHub could not be reached: ${meta.message}` } };
-    if (meta.status === 404) return { ok: false, error: { code: "not-found", message: `${owner}/${repo} was not found on GitHub, or it is private. Only public repositories can be analyzed.` } };
-    if (meta.status === 403 || meta.status === 429) return { ok: false, error: { code: "upstream-error", message: "GitHub is rate-limiting this service right now. Try again in a few minutes." } };
-    if (meta.status !== 200) return { ok: false, error: { code: "upstream-error", message: `GitHub answered HTTP ${meta.status} for the repository.` } };
-    const repoInfo = repoSchema.safeParse(meta.json);
-    if (!repoInfo.success) return { ok: false, error: { code: "upstream-error", message: "GitHub returned an unexpected repository record." } };
-    if (repoInfo.data.private) return { ok: false, error: { code: "private", message: `${owner}/${repo} is private. Only public repositories can be analyzed.` } };
-    if (repoInfo.data.size * 1024 > limits.maxRepositoryBytes) return { ok: false, error: { code: "too-large", message: `${owner}/${repo} is about ${Math.round(repoInfo.data.size / 1024)} MB; the hosted analysis accepts repositories up to ${Math.round(limits.maxRepositoryBytes / 1024 / 1024)} MB. Run the CLI locally for larger projects.` } };
-
-    // 2. Resolve the ref to a commit so the archive, the cache key and the report agree.
-    const wanted = ref ?? repoInfo.data.default_branch;
-    const commit = await api(`/repos/${owner}/${repo}/commits/${encodeURIComponent(wanted)}`);
-    if (commit.kind === "network") return { ok: false, error: { code: controller.signal.aborted ? "timeout" : "upstream-error", message: `GitHub could not be reached: ${commit.message}` } };
-    if (commit.status === 404 || commit.status === 422) return { ok: false, error: { code: "ref-not-found", message: `Branch, tag or commit "${wanted}" was not found in ${owner}/${repo}.` } };
-    if (commit.status !== 200) return { ok: false, error: { code: "upstream-error", message: `GitHub answered HTTP ${commit.status} for the commit.` } };
-    const commitInfo = commitSchema.safeParse(commit.json);
-    if (!commitInfo.success) return { ok: false, error: { code: "upstream-error", message: "GitHub returned an unexpected commit record." } };
-    const sha = commitInfo.data.sha;
+    // 1-2. Existence, visibility, size and commit, unless the caller resolved them already.
+    let resolved: ResolvedRepository;
+    if (options.resolved?.owner === owner && options.resolved.repo === repo) {
+      resolved = options.resolved;
+    } else {
+      const r = await resolveWith(api, controller.signal, owner, repo, ref, limits);
+      if (!r.ok) return r;
+      resolved = r.value;
+    }
+    const sha = resolved.sha;
 
     // 3. Download the archive for that exact commit.
     const dlStart = Date.now();
@@ -203,7 +266,7 @@ export async function scanGitHubRepository(options: ServiceOptions): Promise<Ser
       return {
         ok: true,
         value: {
-          repository: { owner, repo, ref, sha, defaultBranch: repoInfo.data.default_branch, htmlUrl: repoInfo.data.html_url },
+          repository: resolved,
           archive: { files: extracted.value.files, bytes: extracted.value.bytes, skippedLarge: extracted.value.skippedLarge, sha256: extracted.value.sha256 },
           report,
           timings: { downloadMs, extractMs, scanMs, totalMs: Date.now() - started },
