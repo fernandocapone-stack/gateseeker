@@ -31,16 +31,17 @@ test.describe("public page", () => {
     await expect(page.getByRole("heading", { level: 1 })).toContainText("Your app was built fast");
     await expect(page.getByLabel("Repository URL")).toHaveCount(0);
     await signIn(page);
-    // Signed in, the site header names the account; the workspace has its own frame with the account menu.
+    // Signed in, the public site is gone: its pages forward to the Dashboard.
     await page.getByRole("link", { name: "GateSeeker workspace" }).waitFor();
-    await page.goto("/");
-    const nav = page.getByRole("navigation", { name: "Main" });
-    await expect(nav.getByRole("link", { name: "@e2e-user" })).toBeVisible();
-    await nav.getByRole("link", { name: "@e2e-user" }).click();
-    await expect(page.getByRole("heading", { level: 1 })).toHaveText("Find what to fix before you ship");
+    for (const path of ["/", "/about", "/get-started"]) {
+      await page.goto(path);
+      await expect(page).toHaveURL(/\/app\/dashboard$/);
+      await expect(page.getByRole("heading", { level: 1 })).toHaveText("How your repositories are doing");
+    }
     await page.getByRole("button", { name: "@e2e-user" }).click();
     await page.getByRole("menuitem", { name: "Sign out" }).click();
-    await expect(nav.getByRole("link", { name: "Log in" })).toBeVisible();
+    await expect(page).toHaveURL(/\/$/);
+    await expect(page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "Log in" })).toBeVisible();
     await page.goto("/app");
     await expect(page.getByRole("heading", { level: 1 })).toHaveText("Log in");
   });

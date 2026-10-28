@@ -16,7 +16,7 @@ import { Login } from "./pages/Login";
 import { Resources } from "./pages/Resources";
 import { SavedReport } from "./pages/SavedReport";
 import { SettingsPage } from "./pages/Settings";
-import { Link, Router, usePath } from "./router";
+import { Link, Router, navigate, usePath } from "./router";
 import { Workspace, type WorkspacePage } from "./Workspace";
 
 /**
@@ -45,6 +45,10 @@ const TITLES: Record<string, string> = {
   "/app/settings": "Settings · Gateseeker",
   "/app/dashboard": "Dashboard · Gateseeker",
 };
+
+/* The public site exists only for signed-out visitors; a session sends these to the workspace. /login forwards on its own. */
+const PUBLIC_ROUTES = new Set(["/", "/how-it-works", "/about", "/resources", "/get-started"]);
+const WORKSPACE_HOME = "/app/dashboard";
 
 const REPORT_ROUTE = /^\/r\/([A-Za-z0-9-]{1,64})$/;
 
@@ -75,6 +79,9 @@ function Shell() {
     document.title = TITLES[path] ?? (reportId ? "Saved report · Gateseeker" : "Gateseeker");
     setOpen(false);
   }, [path, reportId]);
+  useEffect(() => {
+    if (auth.status === "signed-in" && PUBLIC_ROUTES.has(path)) navigate(WORKSPACE_HOME, { replace: true });
+  }, [auth.status, path]);
 
   let page = <NotFound />;
   if (path === "/") page = <Home />;
@@ -93,6 +100,8 @@ function Shell() {
   // Signed in, the workspace pages get the application frame instead of the site header and footer.
   const workspacePage: WorkspacePage | null = path === "/app" ? "analyze" : path === "/app/design-system" ? "design-system" : path === "/app/settings" ? "settings" : path === "/app/dashboard" ? "dashboard" : reportId ? "issues" : null;
   if (signedIn && workspacePage) return <Workspace page={workspacePage}>{page}</Workspace>;
+  // A public page must not flash for a signed-in visitor: render nothing until the session is known, then redirect (effect above).
+  if (PUBLIC_ROUTES.has(path) && (auth.status === "loading" || signedIn)) return <div className="min-h-dvh bg-background" />;
   // While the session is read, workspace pages already show the frame with skeletons.
   if (auth.status === "loading" && workspacePage) {
     return (
