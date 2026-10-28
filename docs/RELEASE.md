@@ -23,7 +23,7 @@ O CI não publica diretamente: ele **prepara** a versão no npm (`npm stage publ
 3. **[PO] Aprovar no npm.** Abra https://www.npmjs.com/package/gateseeker, aba **Staged Packages**, confira a versão e clique em **Approve**; confirme com o autenticador. Só então a versão fica instalável. Alternativa pela linha de comando: `npm stage list gateseeker` e `npm stage approve <id>`.
 4. PO: confira que a versão apareceu com o selo "Provenance" na página do pacote e que a release existe em https://github.com/fernandocapone-stack/gateseeker/releases.
 
-Versões `1.0.0-beta.2` e `1.0.0-beta.3` existem como tags no git mas nunca chegaram ao npm (tentativas de publicação direta recusadas); a primeira versão preparada por este fluxo é a `1.0.0-beta.4`.
+Versões `1.0.0-beta.2` a `1.0.0-beta.4` existem como tags no git mas nunca chegaram ao npm (o publicador confiável ainda não estava salvo no npm); a primeira versão preparada por este fluxo é a `1.0.0-beta.5`.
 
 ## Como alguém verifica a proveniência
 

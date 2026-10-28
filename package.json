@@ -1,6 +1,6 @@
 {
   "name": "gateseeker",
-  "version": "1.0.0-beta.4",
+  "version": "1.0.0-beta.5",
   "description": "Security gate for AI-generated code. Sprint 0: npm lockfile analysis against OSV with deterministic prioritization.",
   "license": "MIT",
   "type": "module",
