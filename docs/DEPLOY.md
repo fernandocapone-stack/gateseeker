@@ -28,13 +28,15 @@ Estado: projeto Vercel `gateseeker` criado em 2026-10-28 (conta pessoal, plano H
 
 ## 4. Supabase: chaves
 
-Menu Project Settings → API. Três valores, cada um vai para uma variável no Vercel:
+Menu Project Settings → API Keys (as chaves novas, `sb_publishable_…` e `sb_secret_…`; não crie chaves extras, use as "default"). A URL do projeto está em Project Settings → General (Project URL, `https://<ref>.supabase.co`). Três valores, cada um vai para uma variável no Vercel:
 
 | No Supabase | Variável no Vercel | Pública? |
 |---|---|---|
 | Project URL | `SUPABASE_URL` | sim |
-| `anon` `public` key | `SUPABASE_ANON_KEY` | sim (vai para o navegador) |
-| `service_role` `secret` key | `SUPABASE_SERVICE_ROLE_KEY` | **não**: só a função no Vercel a usa |
+| Publishable key `sb_publishable_…` (antiga `anon`) | `SUPABASE_ANON_KEY` | sim (vai para o navegador) |
+| Secret key `sb_secret_…` (antiga `service_role`; botão do olho para revelar, depois copiar) | `SUPABASE_SERVICE_ROLE_KEY` | **não**: só a função no Vercel a usa |
+
+As chaves antigas em formato JWT (aba Legacy) também funcionam, mas as novas podem ser trocadas sem derrubar o projeto.
 
 ## 5. Vercel: variáveis de ambiente
 

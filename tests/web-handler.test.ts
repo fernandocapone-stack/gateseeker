@@ -184,7 +184,20 @@ describe("createSupabaseStore", () => {
     const { store, calls } = postgrest(() => new Response(JSON.stringify({ allowed: true, used: 1, limit: 10, reset_at: "2026-10-28T11:00:00+00:00" })));
     expect(await store.claimQuota(ALICE.id, 10, 3600)).toEqual({ allowed: true, used: 1, limit: 10, resetAt: "2026-10-28T11:00:00+00:00" });
     expect(calls[0]).toMatchObject({ method: "POST", url: "https://p.supabase.co/rest/v1/rpc/claim_scan", body: JSON.stringify({ p_user: ALICE.id, p_limit: 10, p_window_seconds: 3600 }) });
-    expect(calls[0]?.headers).toMatchObject({ apikey: "service", authorization: "Bearer service" });
+    expect(calls[0]?.headers).toMatchObject({ apikey: "service" });
+    expect(calls[0]?.headers).not.toHaveProperty("authorization");
+  });
+
+  it("sends a legacy JWT service_role key in both headers", async () => {
+    const calls: Call[] = [];
+    // eslint-disable-next-line @typescript-eslint/require-await
+    const f = (async (input: string | URL | Request, init?: RequestInit): Promise<Response> => {
+      calls.push({ method: init?.method ?? "GET", url: typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url, headers: init?.headers as Record<string, string>, body: undefined });
+      return new Response(JSON.stringify([]));
+    }) as typeof fetch;
+    const store = createSupabaseStore({ url: "https://p.supabase.co", serviceKey: "eyJhbGciOi.payload.sig", fetch: f });
+    expect(await store.purgeExpired()).toBe(0);
+    expect(calls[0]?.headers).toMatchObject({ apikey: "eyJhbGciOi.payload.sig", authorization: "Bearer eyJhbGciOi.payload.sig" });
   });
 
   it("queries the cache by commit and age, inserts with return=representation, scopes get by owner", async () => {

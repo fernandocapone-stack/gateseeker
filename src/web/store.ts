@@ -151,7 +151,9 @@ export function createSupabaseStore(options: SupabaseStoreOptions): ReportStore 
   const now = options.now ?? (() => new Date());
   const base = options.url.replace(/\/+$/, "");
   const timeoutMs = options.timeoutMs ?? 10_000;
-  const headers = { apikey: options.serviceKey, authorization: `Bearer ${options.serviceKey}`, "content-type": "application/json" };
+  // Legacy service_role keys are JWTs and go in both headers; the newer sb_secret_* keys are not JWTs and go in `apikey` only.
+  const legacyJwt = options.serviceKey.startsWith("ey");
+  const headers = { apikey: options.serviceKey, ...(legacyJwt ? { authorization: `Bearer ${options.serviceKey}` } : {}), "content-type": "application/json" };
 
   async function call(path: string, init: { method: string; body?: string; prefer?: string }): Promise<unknown> {
     let res: Response;
