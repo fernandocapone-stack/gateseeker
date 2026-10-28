@@ -78,6 +78,7 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm test
       - run: pnpm build
+      - run: pnpm build:web
       - name: Validate advisory records
         run: node dist/intel-cli.js validate
 
@@ -97,7 +98,7 @@ jobs:
       - name: Install Playwright browser
         run: pnpm exec playwright install --with-deps chromium
 
-      - name: End-to-end tests (triage interface)
+      - name: End-to-end tests (triage interface and public page)
         run: pnpm test:e2e
 
       # Smoke test of the built CLI with offline-safe expectations:
