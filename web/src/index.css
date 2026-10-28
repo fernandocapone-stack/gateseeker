@@ -2,7 +2,3 @@
 @import "@gateseeker/ui-kit/theme.css";
 @source "../../ui-kit/src";
 
-/* Site-only helpers. The glow is a radial gradient in --glow fading to transparent. */
-@utility hero-glow {
-  background: radial-gradient(60% 55% at 50% 0%, var(--glow), transparent 70%);
-}

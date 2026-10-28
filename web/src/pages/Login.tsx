@@ -30,7 +30,6 @@ export function Login() {
   const unavailable = auth.status !== "loading" && auth.mode === "none";
   return (
     <section className="relative mx-auto max-w-sm py-8 sm:py-12">
-      <div className="hero-glow pointer-events-none absolute -inset-x-24 -top-24 h-80" aria-hidden="true" />
       <Card className="relative">
         <CardHeader className="items-center text-center">
           <span className="mb-2 flex size-11 items-center justify-center rounded-lg border border-primary/40 bg-primary/15 text-primary">

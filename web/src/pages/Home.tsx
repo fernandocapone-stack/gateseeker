@@ -14,12 +14,7 @@ export function Home() {
   return (
     <>
       <section className="relative mb-14 pt-4 sm:mb-20 sm:pt-10">
-        <div className="hero-glow pointer-events-none absolute -inset-x-6 -top-24 h-[28rem] sm:-top-32" aria-hidden="true" />
         <div className="relative mx-auto max-w-3xl text-center">
-          <p className="mb-5 inline-flex items-center gap-2 rounded-full border border-primary/35 bg-primary/10 px-3 py-1 text-xs font-medium text-primary">
-            <span className="size-1.5 rounded-full bg-primary" aria-hidden="true" />
-            Security gate for AI-generated code
-          </p>
           <h1 className="text-4xl font-semibold leading-[1.08] tracking-tight sm:text-5xl lg:text-[3.5rem]">Your app was built fast. Find out what shipped with it.</h1>
           <p className="mx-auto mt-5 max-w-2xl text-base text-muted-foreground sm:text-lg">
             Gateseeker reads your repository (never runs it), checks the installed dependencies against OSV and a curated advisory feed, looks for the insecure patterns common in vibe-coded apps, and ranks every finding with explainable rules.
@@ -53,7 +48,6 @@ export function Home() {
       </section>
 
       <section className="relative overflow-hidden rounded-xl border bg-card">
-        <div className="hero-glow pointer-events-none absolute inset-x-0 -top-24 h-64" aria-hidden="true" />
         <div className="relative flex flex-col items-start gap-5 p-6 sm:flex-row sm:items-center sm:justify-between sm:p-8">
           <div>
             <h2 className="text-xl font-semibold tracking-tight">Make it a gate on every pull request</h2>

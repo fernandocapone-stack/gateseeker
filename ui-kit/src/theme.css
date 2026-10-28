@@ -114,9 +114,6 @@
   --shadow-offset: 2px;
   --shadow-color: var(--button-stroke);
   --inset-shadow-color: oklch(0 0 0 / 0%);
-
-  /* Soft brand glow behind hero sections (the only blurred thing in the system). */
-  --glow: color-mix(in srgb, var(--gs-body) 18%, transparent);
 }
 
 /* Paper palette for printing and "Save as PDF". */
