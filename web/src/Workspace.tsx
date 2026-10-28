@@ -1,10 +1,9 @@
-import { AppShell, Avatar, Button, Logo, Menu, Skeleton, menuItemClass, navItemClass } from "@gateseeker/ui-kit";
-import { Bell, BookOpen, ChevronUp, LayoutDashboard, ListChecks, LogOut, ScanSearch, Settings } from "lucide-react";
-import { useCallback, useState, type ReactNode } from "react";
+import { AppShell, Avatar, Button, Logo, Menu, Skeleton, buttonVariants, menuItemClass, navItemClass } from "@gateseeker/ui-kit";
+import { ArrowLeft, Bell, BookOpen, ChevronUp, History, LayoutDashboard, LogOut, ScanSearch, Settings } from "lucide-react";
+import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
 
 import { useAuth } from "./auth-context";
 import { NotificationsPanel } from "./components/NotificationsPanel";
-import { useLastReportId } from "./last-report";
 import { useNotifications } from "./notifications";
 import { Link, navigate } from "./router";
 
@@ -12,17 +11,28 @@ import { Link, navigate } from "./router";
  * The signed-in workspace frame (Figma "Analyze Repository" and "Issues"):
  * header with the logo, the page title and the notifications bell, sidebar
  * with the workspace sections and the account menu (Settings, Sign out) at
- * the bottom. "Issues"
- * opens the last report saved in this tab and stays disabled until there is
- * one. The design-system catalogue is product documentation: it uses the
+ * the bottom. "Scans" lists every analysis; an opened scan (/r/<id>) keeps
+ * that item active and puts a back button to the list before its title,
+ * which the page sets with useWorkspaceTitle once the report has loaded. The design-system catalogue is product documentation: it uses the
  * frame but has no entry in the sidebar (open /app/design-system directly).
  * While the session is being read (`loading`), the frame renders with
  * skeletons so the page does not jump when it arrives.
  */
 
-export type WorkspacePage = "analyze" | "issues" | "dashboard" | "resources" | "settings" | "design-system";
+export type WorkspacePage = "analyze" | "scans" | "scan" | "dashboard" | "resources" | "settings" | "design-system";
 
-const TITLE: Record<WorkspacePage, string> = { analyze: "Analyze repository", issues: "Issues", dashboard: "Dashboard", resources: "Resources", settings: "Settings", "design-system": "Design system" };
+const TITLE: Record<WorkspacePage, string> = { analyze: "Analyze repository", scans: "Scans", scan: "Scan", dashboard: "Dashboard", resources: "Resources", settings: "Settings", "design-system": "Design system" };
+
+const TitleContext = createContext<(title: string | null) => void>(() => undefined);
+
+/** Replaces the header title while the calling page is mounted (null keeps the default). */
+export function useWorkspaceTitle(title: string | null): void {
+  const set = useContext(TitleContext);
+  useEffect(() => {
+    set(title);
+    return () => { set(null); };
+  }, [set, title]);
+}
 
 export function initialsOf(login: string): string {
   return login.replace(/[^A-Za-z0-9]/g, "").slice(0, 2).toUpperCase() || "?";
@@ -30,7 +40,7 @@ export function initialsOf(login: string): string {
 
 export function Workspace({ page, loading = false, children }: { page: WorkspacePage; loading?: boolean; children: ReactNode }) {
   const auth = useAuth();
-  const lastReport = useLastReportId();
+  const [customTitle, setCustomTitle] = useState<string | null>(null);
   const login = auth.session?.user.login ?? "";
   const notifications = useNotifications(auth.session?.user.id ?? null);
   const [panel, setPanel] = useState(false);
@@ -69,15 +79,9 @@ export function Workspace({ page, loading = false, children }: { page: Workspace
       <Link href="/app" aria-current={page === "analyze" ? "page" : undefined} className={navItemClass(page === "analyze")}>
         <ScanSearch aria-hidden="true" /> Analyze repository
       </Link>
-      {lastReport ? (
-        <Link href={`/r/${lastReport}`} aria-current={page === "issues" ? "page" : undefined} className={navItemClass(page === "issues")}>
-          <ListChecks aria-hidden="true" /> Issues
-        </Link>
-      ) : (
-        <span aria-disabled="true" title="Analyze a repository first" className={navItemClass(page === "issues")}>
-          <ListChecks aria-hidden="true" /> Issues
-        </span>
-      )}
+      <Link href="/app/scans" aria-current={page === "scans" ? "page" : undefined} className={navItemClass(page === "scans" || page === "scan")}>
+        <History aria-hidden="true" /> Scans
+      </Link>
       <Link href="/app/resources" aria-current={page === "resources" ? "page" : undefined} className={navItemClass(page === "resources")}>
         <BookOpen aria-hidden="true" /> Resources
       </Link>
@@ -94,10 +98,24 @@ export function Workspace({ page, loading = false, children }: { page: Workspace
     </Button>
   );
 
+  const title =
+    page === "scan" ? (
+      <span className="flex min-w-0 items-center gap-2">
+        <Link href="/app/scans" aria-label="Back to scans" title="Back to scans" className={buttonVariants({ variant: "outline", size: "icon" })}>
+          <ArrowLeft className="text-primary" aria-hidden="true" />
+        </Link>
+        <span className="truncate">{customTitle ?? TITLE.scan}</span>
+      </span>
+    ) : (
+      customTitle ?? TITLE[page]
+    );
+
   return (
-    <AppShell brand={<Link href="/app/dashboard" aria-label="GateSeeker workspace" className="flex items-center"><Logo label="GateSeeker" /></Link>} title={TITLE[page]} actions={actions} nav={nav} account={account}>
+    <TitleContext.Provider value={setCustomTitle}>
+    <AppShell brand={<Link href="/app/dashboard" aria-label="GateSeeker workspace" className="flex items-center"><Logo label="GateSeeker" /></Link>} title={title} actions={actions} nav={nav} account={account}>
       {children}
       <NotificationsPanel open={panel} onClose={closePanel} items={notifications.items} onMarkAllRead={notifications.markAllRead} />
     </AppShell>
+    </TitleContext.Provider>
   );
 }

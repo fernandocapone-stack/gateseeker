@@ -15,6 +15,7 @@ import { HowItWorks } from "./pages/HowItWorks";
 import { Login } from "./pages/Login";
 import { Resources, WorkspaceResources } from "./pages/Resources";
 import { SavedReport } from "./pages/SavedReport";
+import { Scans } from "./pages/Scans";
 import { SettingsPage } from "./pages/Settings";
 import { Link, Router, navigate, usePath } from "./router";
 import { Workspace, type WorkspacePage } from "./Workspace";
@@ -44,6 +45,7 @@ const TITLES: Record<string, string> = {
   "/app/design-system": "Design system · Gateseeker",
   "/app/settings": "Settings · Gateseeker",
   "/app/dashboard": "Dashboard · Gateseeker",
+  "/app/scans": "Scans · Gateseeker",
   "/app/resources": "Resources · Gateseeker",
 };
 
@@ -79,7 +81,7 @@ function Shell() {
   const [open, setOpen] = useState(false);
   const reportId = REPORT_ROUTE.exec(path)?.[1] ?? null;
   useEffect(() => {
-    document.title = TITLES[path] ?? (reportId ? "Saved report · Gateseeker" : "Gateseeker");
+    document.title = TITLES[path] ?? (reportId ? "Scan · Gateseeker" : "Gateseeker");
     setOpen(false);
   }, [path, reportId]);
   useEffect(() => {
@@ -100,12 +102,13 @@ function Shell() {
   else if (path === "/app/design-system") page = <DesignSystem />;
   else if (path === "/app/settings") page = <SettingsPage />;
   else if (path === "/app/dashboard") page = <Dashboard />;
+  else if (path === "/app/scans") page = <Scans />;
   else if (path === "/app/resources") page = <WorkspaceResources />;
   else if (reportId) page = <SavedReport id={reportId} />;
 
   const signedIn = auth.status === "signed-in" && auth.session !== null;
   // Signed in, the workspace pages get the application frame instead of the site header and footer.
-  const workspacePage: WorkspacePage | null = path === "/app" ? "analyze" : path === "/app/design-system" ? "design-system" : path === "/app/settings" ? "settings" : path === "/app/dashboard" ? "dashboard" : path === "/app/resources" ? "resources" : reportId ? "issues" : null;
+  const workspacePage: WorkspacePage | null = path === "/app" ? "analyze" : path === "/app/design-system" ? "design-system" : path === "/app/settings" ? "settings" : path === "/app/dashboard" ? "dashboard" : path === "/app/scans" ? "scans" : path === "/app/resources" ? "resources" : reportId ? "scan" : null;
   if (signedIn && workspacePage) return <Workspace page={workspacePage}>{page}</Workspace>;
   // A public page must not flash for a signed-in visitor: render nothing until the session is known, then redirect (effect above).
   if ((PUBLIC_ROUTES.has(path) || path in WORKSPACE_COUNTERPART) && (auth.status === "loading" || signedIn)) return <div className="min-h-dvh bg-background" />;
@@ -113,7 +116,7 @@ function Shell() {
   if (auth.status === "loading" && workspacePage) {
     return (
       <Workspace page={workspacePage} loading>
-        {workspacePage === "issues" ? <ReportSkeleton label="Loading the saved report" /> : <PageSkeleton label="Checking your session" />}
+        {workspacePage === "scan" ? <ReportSkeleton label="Loading the saved report" /> : <PageSkeleton label="Checking your session" />}
       </Workspace>
     );
   }

@@ -9,7 +9,7 @@ import { Link } from "../router";
  * Notifications side panel (Figma "Notifications"): one row per analysis that
  * ended in this browser, newest first. Unread rows sit on the page colour with
  * a blue marker; closing the panel marks them read. A row with a saved report
- * links to its Issues page. All texts are rendered as text nodes.
+ * links to its scan page. All texts are rendered as text nodes.
  */
 
 const ICON = { pass: ShieldCheck, fail: ShieldAlert, incomplete: ShieldQuestion, refused: ShieldX } as const;

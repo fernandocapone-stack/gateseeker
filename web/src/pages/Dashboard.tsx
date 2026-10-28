@@ -1,11 +1,11 @@
-import { Badge, Card, MetricCard, Table, Td, Th, buttonVariants, cn } from "@gateseeker/ui-kit";
+import { Card, MetricCard, buttonVariants } from "@gateseeker/ui-kit";
 import { ArrowRight } from "lucide-react";
 import { useEffect } from "react";
 
 import { useAuth } from "../auth-context";
+import { ScanTable } from "../components/ScanTable";
 import { PageSkeleton } from "../components/Skeletons";
-import { latestPerRepository, useHistory, type AnalysisRecord } from "../history";
-import { formatWhen } from "../notifications";
+import { latestPerRepository, useHistory } from "../history";
 import { Link, navigate } from "../router";
 
 /**
@@ -13,18 +13,6 @@ import { Link, navigate } from "../router";
  * each with its latest verdict and findings per priority. Built only from
  * the local history (history.ts); a saved report opens for 30 days.
  */
-
-const REPORT_DAYS = 30;
-
-function reportOpen(r: AnalysisRecord, now: number): boolean {
-  return r.reportId !== null && now - Date.parse(r.at) < REPORT_DAYS * 24 * 60 * 60 * 1000;
-}
-
-function VerdictBadge({ verdict }: { verdict: AnalysisRecord["verdict"] }) {
-  if (verdict === "fail") return <Badge variant="critical">fail</Badge>;
-  if (verdict === "incomplete") return <Badge variant="high">incomplete</Badge>;
-  return <Badge variant="kind">pass</Badge>;
-}
 
 export function Dashboard() {
   const auth = useAuth();
@@ -37,7 +25,6 @@ export function Dashboard() {
   if (auth.status !== "signed-in" || !auth.session) return <PageSkeleton label="Checking your session" />;
 
   const latest = latestPerRepository(history);
-  const now = Date.now();
   const p1 = latest.reduce((n, r) => n + r.byPriority.P1, 0);
   const p2 = latest.reduce((n, r) => n + r.byPriority.P2, 0);
   const blocked = latest.filter((r) => r.verdict !== "pass").length;
@@ -78,47 +65,7 @@ export function Dashboard() {
       ) : (
         <>
           <h2 className="sr-only">Repositories</h2>
-          <Table aria-label="Repositories">
-            <thead>
-              <tr>
-                <Th>Repository</Th>
-                <Th className="w-28">Verdict</Th>
-                <Th className="w-56">Findings</Th>
-                <Th className="w-[130px]">Action</Th>
-              </tr>
-            </thead>
-            <tbody>
-              {latest.map((r) => (
-                <tr key={`${r.owner}/${r.repo}`} className="border-b last:border-b-0">
-                  <Td>
-                    <div className="grid gap-0.5">
-                      <span className="text-body font-medium break-all">{r.owner}/{r.repo}</span>
-                      <span className="text-label font-light text-muted-foreground">
-                        Commit <span className="font-mono">{r.sha}</span> · <time dateTime={r.at}>{formatWhen(r.at, now)}</time>
-                      </span>
-                    </div>
-                  </Td>
-                  <Td><VerdictBadge verdict={r.verdict} /></Td>
-                  <Td>
-                    <span className="flex flex-wrap gap-x-3 text-body tabular-nums">
-                      {(["P1", "P2", "P3", "P4"] as const).map((p) => (
-                        <span key={p} className={cn(r.byPriority[p] === 0 && "text-muted-foreground")}>
-                          <span className="text-label text-muted-foreground">{p}</span> {r.byPriority[p]}
-                        </span>
-                      ))}
-                    </span>
-                  </Td>
-                  <Td>
-                    {reportOpen(r, now) ? (
-                      <Link href={`/r/${r.reportId ?? ""}`} className={buttonVariants({ variant: "outline", size: "md" })}>View issues</Link>
-                    ) : (
-                      <span className="text-label text-muted-foreground">Report expired</span>
-                    )}
-                  </Td>
-                </tr>
-              ))}
-            </tbody>
-          </Table>
+          <ScanTable rows={latest} label="Repositories" />
           <p className="text-caption text-muted-foreground">Kept in this browser for this account, last 100 analyses. Saved reports open for 30 days.</p>
         </>
       )}

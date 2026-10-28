@@ -5,7 +5,6 @@ import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "rea
 import { scanRepository, type ScanOutcome, type ScanResponseOk } from "../api";
 import { useAuth } from "../auth-context";
 import { recordAnalysis } from "../history";
-import { setLastReportId } from "../last-report";
 import { notify } from "../notifications";
 import { Link } from "../router";
 import { ReportView } from "../views/Report";
@@ -48,7 +47,6 @@ export function Scanner({ token, heading, onResult }: { token: string | null; he
     const outcome = await scanRepository(trimmed, token, controller.signal);
     if (controller.signal.aborted) return;
     setPhase({ kind: "done", url: trimmed, outcome, elapsedMs: Date.now() - startedAt });
-    if (outcome.ok && outcome.id !== null) setLastReportId(outcome.id);
     if (userId) record(userId, trimmed, outcome);
     onResult?.(outcome.ok ? outcome : null);
   }
