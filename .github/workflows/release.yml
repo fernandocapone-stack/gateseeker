@@ -26,8 +26,11 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
-          cache: pnpm
+          # As in npm's trusted-publishing example: registry configured, no cache in release builds.
+          registry-url: "https://registry.npmjs.org"
+          package-manager-cache: false
 
+      - run: node --version && npm --version
       - run: pnpm install --frozen-lockfile
       - run: pnpm check
       - run: pnpm exec playwright install --with-deps chromium
