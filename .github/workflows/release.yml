@@ -56,13 +56,17 @@ jobs:
             console.log(files.length, "files ok");
           '
 
-      - name: Publish to npm with provenance
+      - name: Stage the version on npm with provenance
         run: |
           set -euo pipefail
           TAG="latest"
           case "$GITHUB_REF_NAME" in *-*) TAG="beta";; esac
-          # npm >= 11.5 authenticates with the GitHub OIDC token (id-token: write) when no npm token is present.
-          npm publish --access public --provenance --tag "$TAG"
+          # Staged publishing: npm authenticates with the GitHub OIDC token (id-token: write), signs the
+          # provenance statement, and parks the version for a maintainer to approve with 2FA on npmjs.com
+          # ("Staged Packages" tab) or with `npm stage approve <stage-id>`. Nothing becomes installable
+          # until that approval, which is the human gate the product itself is built around.
+          npm stage publish --access public --provenance --tag "$TAG"
+          echo "::notice::Version staged on npm. A maintainer must approve it on npmjs.com (Staged Packages) with 2FA before it becomes installable."
 
       - name: Create GitHub release
         env:
