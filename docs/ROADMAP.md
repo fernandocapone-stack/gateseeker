@@ -1,4 +1,4 @@
-# Gateseeker — Roadmap proposal (Sprint 4 → 9)
+# Gateseeker — Roadmap proposal (Sprint 4 → 9, plus Track A)
 
 > Status: **proposal for PO approval**, written 2026-10-28. Continues `docs/PRODUCT.md` §7, which covers Sprints 0 to 4. Nothing here starts without approval; the items that need new services, dependencies or GitHub integration are listed in §5 (rule 8 of `CLAUDE.md`).
 
@@ -41,6 +41,27 @@ Each sprint keeps the format of `PRODUCT.md`: delivery, the hypothesis it tests,
 
 *Hypothesis:* people fix more when the fix is one paste away. *Metric:* among users who scan the same repo twice, ≥30% have fewer P1+P2 findings on the second scan.
 
+### Track A (parallel to Sprints 5–6) — Coding agents as a risk surface
+Claude Code, Cursor, Codex and similar agents don't only write code: they run commands, install packages and edit project configuration. Their code flaws are already covered by our rules, whoever wrote the code. Their **agent** flaws are not, and none of the competitors we track checks them. This track adds them in two steps.
+
+**A1: agent configuration rules (no new service).** These are new pattern rules, built under the same rules as every other one: positive, negative and suppression fixtures, a ReDoS timing test, warn mode by default, precision measured on real repositories before any rule can block (gate mode).
+
+| Candidate rule | What it flags | Files |
+|---|---|---|
+| GSK-AGENT-001 | Unrestricted command permission (e.g. `Bash(*)`, `"allow": ["*"]`, auto-approve all) | `.claude/settings.json`, `.cursor/`, `.codex/` and equivalents |
+| GSK-AGENT-002 | A hook that downloads and runs remote code (`curl … \| sh`, `npx <package>@latest`) | agent hook configuration |
+| GSK-AGENT-003 | An MCP server started from an unpinned or remote source, or with secrets inline instead of environment variables | `.mcp.json`, editor MCP configs |
+| GSK-AGENT-004 | Hidden instructions in files agents read: invisible Unicode, HTML comments or encoded text in instruction files | `CLAUDE.md`, `AGENTS.md`, `.cursor/rules`, `.github/copilot-instructions.md` |
+| GSK-AGENT-005 | Safety nets weakened in config: commit-check bypass (`--no-verify`) in scripts or hooks, tests excluded or `skip`ped in CI config | `package.json` scripts, CI workflows, hook config |
+
+Most findings report a configuration, not a vulnerability. The wording says what the setting allows and why it matters ("any command the agent decides to run executes without asking you"). It never claims an attack happened.
+
+**A2: packages that don't exist ("slopsquatting").** AI tools sometimes invent package names, and attackers register those names in advance with malicious code. For each dependency, check the public npm registry and Packagist: package created very recently, very low downloads, a name close to a popular package, or a package that is in the lockfile but not in the registry. The result is a `supply-chain-anomaly` finding with the registry data as evidence. It needs a new external source (the npm registry), so it waits for PO approval; it ships with the same limits, injected `fetch` in tests and `incomplete` on failure as the OSV client.
+
+**A3: Gateseeker inside the agent loop (Sprint 9 candidate, listed here for continuity).** A ready-made hook so Claude Code (and others that support hooks) runs the gate before committing, and blocks on a P1. Hooks run commands on the user's machine, so this is documented as an opt-in snippet; Gateseeker doesn't install it by itself.
+
+*Hypothesis:* vibe coders don't know their agent configuration is a risk, and they change it when told in plain words. *Metric:* among scanned repositories with an agent config file, at least one A1 finding in ≥20%, and ≥5 users who change a setting after seeing one (measured by a later scan of the same repository).
+
 ### Sprint 6 — The product watches for you
 This is the direct answer to "threats appear daily".
 - **U3:** server-side history: "my repositories" and "my reports" in Supabase (RLS, no policies, service_role only, as today). `localStorage` becomes a cache.
@@ -67,7 +88,7 @@ This is the direct answer to "threats appear daily".
 - Optional AI **explanation** of a finding (the third layer of `Finding`, always labeled, never decisive). Paid service, needs approval.
 - Generic secret detection (the gap recorded in `VALIDATION_SPRINT_1.md`), with its own precision budget.
 - More pattern rules for Firebase and Next.js server actions, prioritized by what the monitoring data shows is common.
-- Editor/agent integration: an MCP server or extension so Cursor/Claude Code can run the gate before the user commits.
+- Editor/agent integration: an MCP server or extension so Cursor/Claude Code can run the gate before the user commits (starts with the hook in Track A3).
 
 ## 4. Principles that do not change
 
@@ -81,3 +102,4 @@ Everything above keeps the non-negotiables: deterministic priority, `incomplete`
 4. **GitHub App (Sprint 7):** this is "GitHub integration" under rule 8 and needs explicit approval, plus a security review of the App's permissions.
 5. **pnpm/Yarn support (Sprint 5):** these are new lockfile formats within an existing ecosystem. Confirm whether this counts as a "new ecosystem" under rule 8.
 6. **Pricing:** to be set before Sprint 7, informed by the Sprint 4 waitlist answers.
+7. **Track A:** approve A1 (rules only, no new service) to start alongside Sprint 5? Approve the npm registry as a new external source for A2? Recommendation: A1 yes; A2 after A1 shows that the audience cares.
