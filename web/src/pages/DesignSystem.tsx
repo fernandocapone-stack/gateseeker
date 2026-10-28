@@ -24,7 +24,7 @@ const PALETTE: { name: string; figma: string; varName: string; use: string; prop
 ];
 
 const TYPE: { token: string; size: string; sample: string; className: string }[] = [
-  { token: "display", size: "32 / Medium", sample: "Analyze a repository", className: "text-display font-medium" },
+  { token: "display", size: "32 / Medium", sample: "Find what to fix before you ship", className: "text-display font-medium" },
   { token: "metric", size: "20 / Medium", sample: "12", className: "text-metric font-medium" },
   { token: "title", size: "15 / Medium", sample: "Issues", className: "text-title font-medium" },
   { token: "body", size: "13 / Regular, Medium", sample: "GSK-SECRET-001: Live Stripe secret key hardcoded", className: "text-body font-medium" },
@@ -58,7 +58,7 @@ export function DesignSystem() {
   return (
     <div className="grid max-w-[1012px] gap-10">
       <div>
-        <h1 className="text-display font-medium">Design system</h1>
+        <h1 className="text-display font-medium">Tokens and components</h1>
         <p className="text-label text-muted-foreground">Tokens and components of <code>ui-kit/</code>, taken from the Figma file GateSeeker (page Platform). Marked items are proposals waiting for review.</p>
       </div>
 

@@ -7,6 +7,7 @@ import { PageSkeleton, ReportSkeleton } from "./components/Skeletons";
 
 import { About } from "./pages/About";
 import { AppDemo } from "./pages/AppDemo";
+import { Dashboard } from "./pages/Dashboard";
 import { DesignSystem } from "./pages/DesignSystem";
 import { GetStarted } from "./pages/GetStarted";
 import { Home } from "./pages/Home";
@@ -42,6 +43,7 @@ const TITLES: Record<string, string> = {
   "/app": "Analyze a repository · Gateseeker",
   "/app/design-system": "Design system · Gateseeker",
   "/app/settings": "Settings · Gateseeker",
+  "/app/dashboard": "Dashboard · Gateseeker",
 };
 
 const REPORT_ROUTE = /^\/r\/([A-Za-z0-9-]{1,64})$/;
@@ -84,11 +86,12 @@ function Shell() {
   else if (path === "/app") page = <AppDemo />;
   else if (path === "/app/design-system") page = <DesignSystem />;
   else if (path === "/app/settings") page = <SettingsPage />;
+  else if (path === "/app/dashboard") page = <Dashboard />;
   else if (reportId) page = <SavedReport id={reportId} />;
 
   const signedIn = auth.status === "signed-in" && auth.session !== null;
   // Signed in, the workspace pages get the application frame instead of the site header and footer.
-  const workspacePage: WorkspacePage | null = path === "/app" ? "analyze" : path === "/app/design-system" ? "design-system" : path === "/app/settings" ? "settings" : reportId ? "issues" : null;
+  const workspacePage: WorkspacePage | null = path === "/app" ? "analyze" : path === "/app/design-system" ? "design-system" : path === "/app/settings" ? "settings" : path === "/app/dashboard" ? "dashboard" : reportId ? "issues" : null;
   if (signedIn && workspacePage) return <Workspace page={workspacePage}>{page}</Workspace>;
   // While the session is read, workspace pages already show the frame with skeletons.
   if (auth.status === "loading" && workspacePage) {

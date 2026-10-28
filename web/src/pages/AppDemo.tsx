@@ -30,7 +30,7 @@ export function AppDemo() {
         onResult={setResult}
         heading={
           <div>
-            <h1 className="text-display font-medium">Analyze a repository</h1>
+            <h1 className="text-display font-medium">Find what to fix before you ship</h1>
             <p className="text-label text-muted-foreground">Paste the URL of a public GitHub repository. Gateseeker reads it, never runs it, and returns the prioritized report on this page.</p>
           </div>
         }

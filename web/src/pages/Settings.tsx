@@ -50,7 +50,7 @@ export function SettingsPage() {
   return (
     <div className="grid max-w-[1012px] gap-4">
       <div>
-        <h1 className="text-display font-medium">Settings</h1>
+        <h1 className="text-display font-medium">Account and preferences</h1>
         <p className="text-label text-muted-foreground">Your account, notifications and what Gateseeker keeps about your analyses.</p>
       </div>
 

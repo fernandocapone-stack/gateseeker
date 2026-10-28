@@ -1,5 +1,5 @@
 import { AppShell, Avatar, Button, Logo, Menu, Skeleton, menuItemClass, navItemClass } from "@gateseeker/ui-kit";
-import { Bell, ChevronUp, ListChecks, LogOut, ScanSearch, Settings } from "lucide-react";
+import { Bell, ChevronUp, LayoutDashboard, ListChecks, LogOut, ScanSearch, Settings } from "lucide-react";
 import { useCallback, useState, type ReactNode } from "react";
 
 import { useAuth } from "./auth-context";
@@ -11,7 +11,8 @@ import { Link, navigate } from "./router";
 /**
  * The signed-in workspace frame (Figma "Analyze Repository" and "Issues"):
  * header with the logo, the page title and the notifications bell, sidebar
- * with the workspace sections and the account menu at the bottom. "Issues"
+ * with the workspace sections and the account menu (Settings, Sign out) at
+ * the bottom. "Issues"
  * opens the last report saved in this tab and stays disabled until there is
  * one. The design-system catalogue is product documentation: it uses the
  * frame but has no entry in the sidebar (open /app/design-system directly).
@@ -19,9 +20,9 @@ import { Link, navigate } from "./router";
  * skeletons so the page does not jump when it arrives.
  */
 
-export type WorkspacePage = "analyze" | "issues" | "settings" | "design-system";
+export type WorkspacePage = "analyze" | "issues" | "dashboard" | "settings" | "design-system";
 
-const TITLE: Record<WorkspacePage, string> = { analyze: "Analyze repository", issues: "Issues", settings: "Settings", "design-system": "Design system" };
+const TITLE: Record<WorkspacePage, string> = { analyze: "Analyze repository", issues: "Issues", dashboard: "Dashboard", settings: "Settings", "design-system": "Design system" };
 
 export function initialsOf(login: string): string {
   return login.replace(/[^A-Za-z0-9]/g, "").slice(0, 2).toUpperCase() || "?";
@@ -74,8 +75,8 @@ export function Workspace({ page, loading = false, children }: { page: Workspace
           <ListChecks aria-hidden="true" /> Issues
         </span>
       )}
-      <Link href="/app/settings" aria-current={page === "settings" ? "page" : undefined} className={navItemClass(page === "settings")}>
-        <Settings aria-hidden="true" /> Settings
+      <Link href="/app/dashboard" aria-current={page === "dashboard" ? "page" : undefined} className={navItemClass(page === "dashboard")}>
+        <LayoutDashboard aria-hidden="true" /> Dashboard
       </Link>
     </>
   );

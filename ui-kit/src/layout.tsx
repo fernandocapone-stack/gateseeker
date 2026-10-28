@@ -88,22 +88,56 @@ export const menuItemClass =
 /*
  * Side panel (Figma "Notifications"): 436px wide, header with the title and a
  * 32px close button, content on the sidebar surface. Rendered as a modal
- * dialog over the page.
+ * dialog over the page; it slides in from the right edge and back out
+ * (200ms, ease-out in and ease-in out; no motion with prefers-reduced-motion).
+ * The panel stays mounted until the exit slide ends.
  */
+const DRAWER_MS = 200;
+
 export function Drawer({ open, title, onClose, closeLabel = "Close", children }: { open: boolean; title: string; onClose: () => void; closeLabel?: string; children: ReactNode }) {
+  const [mounted, setMounted] = useState(open);
+  const [shown, setShown] = useState(false);
+  const closeButton = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    if (open) {
+      setMounted(true);
+      // Two frames: the first paints the panel off-screen, the second starts the slide.
+      let second = 0;
+      const first = requestAnimationFrame(() => {
+        second = requestAnimationFrame(() => { setShown(true); });
+      });
+      return () => {
+        cancelAnimationFrame(first);
+        cancelAnimationFrame(second);
+      };
+    }
+    setShown(false);
+    const t = setTimeout(() => { setMounted(false); }, DRAWER_MS);
+    return () => { clearTimeout(t); };
+  }, [open]);
+
   useEffect(() => {
     if (!open) return;
+    closeButton.current?.focus();
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
     document.addEventListener("keydown", onKey);
     return () => { document.removeEventListener("keydown", onKey); };
   }, [open, onClose]);
-  if (!open) return null;
+
+  if (!mounted) return null;
   return (
-    <div className="fixed inset-0 z-50 flex justify-end bg-black/40" onClick={onClose}>
-      <section role="dialog" aria-modal="true" aria-label={title} className="flex h-full w-full max-w-[436px] flex-col border-l bg-sidebar" onClick={(e) => { e.stopPropagation(); }}>
+    <div className={cn("fixed inset-0 z-50 flex justify-end bg-black/40 transition-opacity duration-200 motion-reduce:transition-none", shown ? "opacity-100" : "opacity-0")} onClick={onClose}>
+      <section
+        role="dialog"
+        aria-modal="true"
+        aria-label={title}
+        className={cn("flex h-full w-full max-w-[436px] flex-col border-l bg-sidebar transition-transform duration-200 motion-reduce:transition-none", shown ? "translate-x-0 ease-out" : "translate-x-full ease-in")}
+        onClick={(e) => { e.stopPropagation(); }}
+      >
         <div className="flex h-[51px] items-center justify-between border-b pr-[17px] pl-[17px]">
           <h2 className="text-title font-medium">{title}</h2>
-          <button type="button" onClick={onClose} aria-label={closeLabel} className="flex size-8 items-center justify-center rounded-md border border-button-stroke bg-button text-primary shadow-solid hover:bg-button-hover [&_svg]:size-3">
+          <button ref={closeButton} type="button" onClick={onClose} aria-label={closeLabel} className="flex size-8 items-center justify-center rounded-md border border-button-stroke bg-button text-primary shadow-solid hover:bg-button-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [&_svg]:size-3">
             <svg viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"><path d="M1 1l8 8M9 1l-8 8" /></svg>
           </button>
         </div>

@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "rea
 
 import { scanRepository, type ScanOutcome, type ScanResponseOk } from "../api";
 import { useAuth } from "../auth-context";
+import { recordAnalysis } from "../history";
 import { setLastReportId } from "../last-report";
 import { notify } from "../notifications";
 import { Link } from "../router";
@@ -107,13 +108,14 @@ export function Scanner({ token, heading, onResult }: { token: string | null; he
   );
 }
 
-/* Errors the person sees at once while typing are not worth a notification. */
+/* Errors the person sees at once while typing are not worth a notification. Every returned report also goes to the Dashboard history. */
 const QUIET_CODES = new Set(["invalid-url", "bad-request", "unauthorized"]);
 const INCOMPLETE_CODES = new Set(["timeout", "upstream-error", "download-failed", "store-unavailable"]);
 
 function record(userId: string, url: string, outcome: ScanOutcome): void {
   if (outcome.ok) {
     const { report, repository } = outcome;
+    recordAnalysis(userId, { owner: repository.owner, repo: repository.repo, sha: repository.sha.slice(0, 7), verdict: report.gate.verdict, byPriority: { ...report.summary.byPriority }, reportId: outcome.id });
     notify(userId, {
       kind: report.gate.verdict === "incomplete" ? "incomplete" : "finished",
       subject: `${repository.owner}/${repository.repo}@${repository.sha.slice(0, 7)}`,

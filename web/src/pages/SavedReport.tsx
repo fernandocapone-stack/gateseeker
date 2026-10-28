@@ -61,9 +61,12 @@ export function SavedReport({ id }: { id: string }) {
   const response = { ...outcome.saved, id: outcome.id, cached: false, quota: null };
   return (
     <>
-      <p className="mb-4 text-label text-muted-foreground print:hidden">
-        Saved report <code>{outcome.id}</code>, kept until {new Date(outcome.expiresAt).toLocaleDateString()}. <Link href="/app" className="text-primary hover:underline">Analyze another repository</Link>.
-      </p>
+      <div className="mb-4 print:hidden">
+        <h1 className="text-display font-medium break-all">{outcome.saved.repository.owner}/{outcome.saved.repository.repo}</h1>
+        <p className="text-label text-muted-foreground">
+          Commit <span className="font-mono">{outcome.saved.repository.sha.slice(0, 7)}</span> · Saved report <code>{outcome.id}</code>, kept until {new Date(outcome.expiresAt).toLocaleDateString()}. <Link href="/app" className="text-primary hover:underline">Analyze another repository</Link>.
+        </p>
+      </div>
       <ReportView response={response} elapsedMs={outcome.saved.timings.totalMs} />
       <div className="mt-6 print:hidden">
         <CiSnippet repository={outcome.saved.repository} />

@@ -17,7 +17,7 @@ async function signIn(page: Page): Promise<void> {
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Log in");
   await page.getByRole("button", { name: "Continue with GitHub" }).click();
   await expect(page).toHaveURL(/\/app$/);
-  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Analyze a repository");
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Find what to fix before you ship");
 }
 
 async function analyze(page: Page, url: string): Promise<void> {
@@ -37,7 +37,7 @@ test.describe("public page", () => {
     const nav = page.getByRole("navigation", { name: "Main" });
     await expect(nav.getByRole("link", { name: "@e2e-user" })).toBeVisible();
     await nav.getByRole("link", { name: "@e2e-user" }).click();
-    await expect(page.getByRole("heading", { level: 1 })).toHaveText("Analyze a repository");
+    await expect(page.getByRole("heading", { level: 1 })).toHaveText("Find what to fix before you ship");
     await page.getByRole("button", { name: "@e2e-user" }).click();
     await page.getByRole("menuitem", { name: "Sign out" }).click();
     await expect(nav.getByRole("link", { name: "Log in" })).toBeVisible();
@@ -98,7 +98,7 @@ test.describe("public page", () => {
     await expect(report).not.toContainText("sk_live_HoHDwEcLksdRWvioeGponKHY");
   });
 
-  test("records finished and refused analyses as notifications and honours the settings", async ({ page }) => {
+  test("records analyses as notifications and on the Dashboard, and honours the settings", async ({ page }) => {
     await signIn(page);
     const bell = page.getByRole("button", { name: /^Notifications/ });
     await expect(bell).toHaveAccessibleName("Notifications");
@@ -118,9 +118,17 @@ test.describe("public page", () => {
     await page.getByRole("button", { name: "Close notifications" }).click();
     await expect(bell).toHaveAccessibleName("Notifications");
 
-    // Turned off in Settings: the next analysis leaves no notification.
-    await page.getByRole("navigation", { name: "Workspace", exact: true }).getByRole("link", { name: "Settings" }).click();
-    await expect(page.getByRole("heading", { level: 1 })).toHaveText("Settings");
+    // The Dashboard lists the repository with its latest verdict.
+    await page.getByRole("navigation", { name: "Workspace", exact: true }).getByRole("link", { name: "Dashboard" }).click();
+    const repos = page.getByRole("table", { name: "Repositories" });
+    await expect(repos.getByRole("row")).toHaveCount(2);
+    await expect(repos).toContainText("acme/vibe");
+    await expect(repos.getByRole("link", { name: "View issues" })).toHaveAttribute("href", /^\/r\/mem-/);
+
+    // Turned off in Settings (account menu): the next analysis leaves no notification.
+    await page.getByRole("button", { name: "@e2e-user" }).click();
+    await page.getByRole("menuitem", { name: "Settings" }).click();
+    await expect(page.getByRole("heading", { level: 1 })).toHaveText("Account and preferences");
     await page.getByRole("switch", { name: /Notify me when an analysis ends/ }).uncheck({ force: true });
     await page.getByRole("navigation", { name: "Workspace", exact: true }).getByRole("link", { name: "Analyze repository" }).click();
     await analyze(page, "https://github.com/acme/private");
