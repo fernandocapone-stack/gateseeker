@@ -1,0 +1,39 @@
+{
+  "id": "GSK-ADV-2026-0012",
+  "status": "proposed",
+  "type": "other",
+  "severity": "HIGH",
+  "ecosystem": "npm",
+  "packages": [
+    {
+      "name": "UNKNOWN/fill-in",
+      "affected": {}
+    }
+  ],
+  "window": {
+    "start": "2026-10-29T10:26:33.000Z",
+    "end": null
+  },
+  "indicators": [],
+  "summary": "TODO: one line written by the reviewer after reading the source.",
+  "remediation": "TODO: concrete action written by the reviewer.",
+  "sources": [
+    {
+      "url": "https://thehackernews.com/2026/10/github-launches-npm-firewall-to-block.html",
+      "publisher": "The Hacker News",
+      "title": "GitHub Launches npm Firewall to Block Malicious Packages Before Installation",
+      "published_at": "2026-10-29"
+    }
+  ],
+  "review": {
+    "proposed_by": "collector",
+    "proposed_at": "2026-10-29T13:08:20.235Z",
+    "reviewed_by": null,
+    "reviewed_at": null,
+    "notes": null
+  },
+  "upstream": {
+    "osv": null,
+    "ghsa": null
+  }
+}
