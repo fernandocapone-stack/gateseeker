@@ -1,6 +1,6 @@
 # Gateseeker — Roadmap proposal (Sprint 4 → 9, plus Track A)
 
-> Status: **proposal for PO approval**, written 2026-10-28. Continues `docs/PRODUCT.md` §7, which covers Sprints 0 to 4. Nothing here starts without approval; the items that need new services, dependencies or GitHub integration are listed in §5 (rule 8 of `CLAUDE.md`).
+> Status: written 2026-10-28; **decisions 1, 2 and 7 (A1) approved by the PO on 2026-10-28** (§5), the rest still a proposal. Continues `docs/PRODUCT.md` §7, which covers Sprints 0 to 4. Nothing here starts without approval; the items that need new services, dependencies or GitHub integration are listed in §5 (rule 8 of `CLAUDE.md`).
 
 ## 1. Where we are
 
@@ -95,6 +95,8 @@ This is the direct answer to "threats appear daily".
 Everything above keeps the non-negotiables: deterministic priority, `incomplete` never shown as `pass`, no "secure" language, nothing from the analyzed project executed, secrets redacted everywhere, including monitoring emails, and every pattern rule shipped with fixtures and measured precision.
 
 ## 5. Decisions needed from the PO
+
+Approved by the PO on 2026-10-28: **1** (keep login and measure), **2** (Sprint 5 before Sprint 6), **7** (Track A1 now; A2 waits). Open: 3, 4, 5, 6, and the A2 source.
 
 1. **Anonymous scans on the page (U1):** reopen, with a stricter limit, or keep login? Recommendation (revised 2026-10-28): **launch with login and measure.** Our audience already has a GitHub account, so sign-in is one click; Home shows a real example report so the value is visible before login; and two aggregate counters (visits to `/login`, completed sign-ins) tell us the abandonment rate. If more than 40% of visitors abandon at login over the first 2 weeks or 100 visits, open anonymous scans: 3 per IP per day, a global daily cap, report shown but not saved, "sign in to save and follow this repo" as the next step.
 2. **Order:** Sprint 5 (fix) before Sprint 6 (monitoring)? Recommendation: yes. Monitoring sends people to reports, so the reports must first tell them how to fix.

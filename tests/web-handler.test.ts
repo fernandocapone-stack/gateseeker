@@ -1,6 +1,6 @@
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, readdirSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, relative } from "node:path";
 import { gzipSync } from "node:zlib";
 import { afterEach, describe, expect, it } from "vitest";
 
@@ -8,6 +8,7 @@ import { bearerToken, createStaticAuth, createSupabaseAuth } from "../src/web/au
 import { authConfigFromEnv, handlerOptionsFromEnv, STUB_TOKEN, STUB_USER } from "../src/web/env.js";
 import { handleCleanupRequest, handleReportRequest, handleScanRequest, type HandlerOptions, type ScanResponseOk } from "../src/web/handler.js";
 import { createMemoryStore, createSupabaseStore, type ReportStore } from "../src/web/store.js";
+import { fixturePath, readJsonFixture } from "./helpers.js";
 
 /**
  * The hosted service's layers above the engine: session verification, the
@@ -50,7 +51,7 @@ function targz(files: Record<string, string>): Buffer {
 const SHA = "b".repeat(40);
 const ARCHIVE = targz({ "r-bbbb/package.json": '{"name":"r"}', "r-bbbb/src/server.ts": 'app.use(cors({ origin: "*", credentials: true }));\n' });
 
-function fakeGitHub(): { fetch: typeof fetch; calls: string[] } {
+function fakeGitHub(archive: Buffer = ARCHIVE): { fetch: typeof fetch; calls: string[] } {
   const calls: string[] = [];
   // eslint-disable-next-line @typescript-eslint/require-await -- a fetch double must return a Promise<Response>
   const f = (async (input: string | URL | Request, init?: RequestInit): Promise<Response> => {
@@ -60,7 +61,7 @@ function fakeGitHub(): { fetch: typeof fetch; calls: string[] } {
       return new Response(JSON.stringify({ full_name: "o/r", private: false, size: 10, default_branch: "main", html_url: "https://github.com/o/r" }), { status: 200 });
     }
     if (url.includes("/commits/")) return new Response(JSON.stringify({ sha: SHA }), { status: 200 });
-    if (url.startsWith("https://codeload.github.com/")) return new Response(ARCHIVE, { status: 200 });
+    if (url.startsWith("https://codeload.github.com/")) return new Response(archive, { status: 200 });
     if (url.includes("osv.dev")) return new Response(JSON.stringify({ vulns: [] }), { status: 200 });
     return new Response("unexpected", { status: 500 });
   }) as typeof fetch;
@@ -266,6 +267,34 @@ describe("handleScanRequest with auth and store", () => {
     expect(await handleReportRequest(a.id ?? "", opts, "Bearer tok-bob")).toMatchObject({ status: 404 });
     expect(await handleReportRequest(a.id ?? "", opts, null)).toMatchObject({ status: 401 });
     expect(await handleReportRequest("../etc", opts, "Bearer tok-alice")).toMatchObject({ status: 404 });
+  });
+
+  it("saves a report without any full credential from the scanned project", async () => {
+    // The vibe fixture carries the synthetic credentials of fixtures/projects/secrets.json; the saved JSON must hold none of them in full.
+    const root = fixturePath("projects/vibe-next-supabase");
+    const files: Record<string, string> = {};
+    const walk = (dir: string): void => {
+      for (const e of readdirSync(dir, { withFileTypes: true })) {
+        const full = join(dir, e.name);
+        if (e.isDirectory()) walk(full);
+        else files[`r-bbbb/${relative(root, full).replace(/\\/g, "/")}`] = readFileSync(full, "utf8");
+      }
+    };
+    walk(root);
+    const secrets = readJsonFixture("projects/secrets.json") as Record<string, string>;
+    const store = createMemoryStore();
+    const opts = baseOptions(fakeGitHub(targz(files)), { auth, store });
+    const res = await handleScanRequest({ url: "https://github.com/o/r" }, opts, "Bearer tok-alice");
+    expect(res.status).toBe(200);
+    const id = (res.body as ScanResponseOk).id ?? "";
+    expect((res.body as ScanResponseOk).report.findings.some((f) => f.evidence.kind === "insecure-pattern" && f.evidence.ruleId === "GSK-SECRET-001")).toBe(true);
+    const saved = await handleReportRequest(id, opts, "Bearer tok-alice");
+    expect(saved.status).toBe(200);
+    const json = JSON.stringify(saved.body);
+    for (const [name, value] of Object.entries(secrets)) {
+      // The anon key is public by design and never reported; every other value must not survive redaction.
+      if (name !== "anon") expect(json, `secret ${name} reached the store`).not.toContain(value);
+    }
   });
 
   it("answers 429 with the quota when the window is exhausted, before any download", async () => {

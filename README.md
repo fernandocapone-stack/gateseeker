@@ -4,7 +4,18 @@ Security gate for AI-generated code. *(working description; branding and tagline
 
 Gateseeker points at a project directory, checks the code for the security mistakes most common in AI-generated apps, asks [OSV](https://osv.dev) which installed npm versions have known vulnerabilities, ranks every finding with deterministic and auditable rules, and returns a gate verdict with an exit code you can wire into CI.
 
-**Status after Sprint 2b:** npm (`package-lock.json` v2/v3) and Composer (`composer.lock`) dependencies checked against OSV **and** a curated, human-approved advisory feed, with tag-rewrite verification against Packagist; structural supply-chain rules that compare a lockfile with a baseline; eight code-pattern rules for JavaScript/TypeScript projects. CLI only. See [docs/PRODUCT.md](docs/PRODUCT.md) for direction and `docs/SPRINT_*.md` for the scope this code implements.
+**Status after Sprint 4:** npm (`package-lock.json` v2/v3) and Composer (`composer.lock`) dependencies checked against OSV **and** a curated, human-approved advisory feed, with tag-rewrite verification against Packagist; structural supply-chain rules that compare a lockfile with a baseline; eight code-pattern rules for JavaScript/TypeScript projects. Runs as a CLI, as a GitHub Action, and in the browser. See [docs/PRODUCT.md](docs/PRODUCT.md) for direction and `docs/SPRINT_*.md` for the scope this code implements.
+
+## Try it in the browser
+
+Sign in with GitHub at [gateseeker.vercel.app](https://gateseeker.vercel.app), paste the URL of a **public** GitHub repository and get the same report the CLI produces, usually in under a minute. Nothing to install.
+
+- Same engine, rules and wording as the CLI; pattern and supply-chain rules run in warn mode, and there is no baseline on the web.
+- The repository is downloaded as an archive and read as text: nothing is cloned, installed or executed. Archives over 50 MB compressed are refused (use the CLI for those).
+- Reports are saved for 30 days and open only for the account that produced them. Secrets are redacted before anything is saved.
+- 10 analyses per account per hour; the same commit within 24 hours reuses the saved report without counting.
+
+The workspace links each report to the GitHub Action below, with the repository already filled in.
 
 ## Use in GitHub Actions
 
@@ -277,6 +288,8 @@ Unit tests never reach the network: the OSV client takes an injected `fetch`, an
 - [docs/SPRINT_0.md](docs/SPRINT_0.md), [docs/SPRINT_1.md](docs/SPRINT_1.md): scope and acceptance criteria implemented here.
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md): modules, data flow, trust boundaries, limitations.
 - [docs/THREAT_MODEL.md](docs/THREAT_MODEL.md): assets, threat agents, attack surfaces, mitigations and the tests that cover them.
+- [docs/ROADMAP.md](docs/ROADMAP.md): proposed Sprints 5 to 9, UX problems found, decisions for the PO.
+- [docs/SPRINT_4.md](docs/SPRINT_4.md), [docs/DEPLOY.md](docs/DEPLOY.md): the hosted service and how it is deployed.
 - [docs/VALIDATION_SPRINT_1.md](docs/VALIDATION_SPRINT_1.md): results of the pattern rules on five real projects.
 - [docs/UPSTREAM.md](docs/UPSTREAM.md): how approved advisories are submitted to OSV/GHSA.
 - [advisories/README.md](advisories/README.md): the curated advisory feed, its lifecycle and format.

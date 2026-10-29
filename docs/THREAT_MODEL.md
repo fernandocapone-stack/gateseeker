@@ -1,6 +1,6 @@
-# Threat model (after Sprint 3)
+# Threat model (after Sprint 4)
 
-Gateseeker processes attacker-controlled input (any project's files and lockfile), data from an external service (OSV), and prints results into a terminal and a file. This document lists what we protect, who might attack, where, how we mitigate, and which test proves each mitigation.
+Gateseeker processes attacker-controlled input (any project's files and lockfile), data from an external service (OSV), and prints results into a terminal and a file. Since Sprint 4 it also runs as a hosted service (Vercel functions + Supabase) that downloads public GitHub repositories on behalf of signed-in users. This document lists what we protect, who might attack, where, how we mitigate, and which test proves each mitigation.
 
 ## Assets
 
@@ -12,12 +12,15 @@ Gateseeker processes attacker-controlled input (any project's files and lockfile
 | Secrets found in the project | The scanner sees real credentials; it must never copy them into reports, logs or terminals. |
 | The user's terminal and logs | Output must not be able to spoof results or inject escape sequences. |
 | Trust in the tool | Invented, misattributed or noisy findings destroy the product's only differentiator. |
+| Saved reports and accounts (hosted) | A report belongs to the account that produced it; another user must not read it by guessing or enumerating ids. |
+| Hosting quota and cost (hosted) | Vercel, Supabase, OSV and the anonymous GitHub API limit are shared; abuse can deny service to every user or create a bill. |
 
 ## Threat agents
 
 - **Malicious project author**: publishes a repository whose files are crafted to crash, hang, mislead, or exfiltrate through the scanner.
 - **Malicious package maintainer**: controls a package name, version string or advisory text that ends up in the report.
 - **Network attacker / compromised source**: tampers with, delays or blocks OSV responses.
+- **Abusive visitor (hosted)**: signs in only to burn the shared quota, submits hostile URLs, or crafts a repository whose archive attacks the extractor.
 - **Careless user**: runs the tool on untrusted repositories expecting it to be safe to do so, or shares a report without realising it contains secrets.
 
 ## Attack surfaces and mitigations
@@ -123,6 +126,23 @@ Residual: Gateseeker trusts TLS and OSV itself.
 | Invented findings | Dependency findings come only from OSV records, copied verbatim; pattern findings cite file, line and a redacted snippet. | `osv.test.ts`, `priority.test.ts`, `patterns.test.ts` |
 | AI layer takes action | No AI exists in this version. `aiExplanation` is reserved and always `null`. | `cli.test.ts` asserts `aiExplanation === null` |
 
+### 11. Hosted service (Sprint 4)
+
+| Threat | Mitigation | Test |
+|---|---|---|
+| Hostile URL reaches the network (other hosts, credentials in the URL, ports, IPs, `javascript:`, look-alike Unicode) | Fixed grammar for `https://github.com/<owner>/<repo>[/tree/<ref>]` only, 300-character cap, checked before any request; the refusal never echoes the input. | `web.test.ts` "parseGitHubRepoUrl" accept/reject tables, "never leaks the input back in the reason", "stays fast on adversarial input (ReDoS budget)" |
+| Archive writes outside its directory (absolute paths, `..`, PAX or GNU long-name traversal, symbolic or hard links) | Own tar reader, no dependency: regular files and directories only; any link or unsafe path rejects the whole archive; nothing is left behind. | `web.test.ts` "refuses … and writes nothing outside the destination" (table), "refuses an archive above the download limit and a rejected archive, leaving no temp directory behind" |
+| Decompression bomb, huge repository or slow download exhausts the function | 50 MB compressed, 200 MB uncompressed, 20,000 entries, 8 MB per file, 120 s total; above any of them the analysis is refused or marked incomplete, never `pass`. | `web.test.ts` "refuses an archive that expands past the uncompressed limit", "refuses more entries than allowed", "honours the total timeout" |
+| Anything from the repository is executed | No git, no package manager, no child process: bytes become files and the engine reads them as text. | By construction (`src/web/service.ts`, `tar.ts`) |
+| Quota abuse (OSV, Vercel, GitHub API) | Sign-in required for scans; 10 analyses per user per hour claimed atomically in Postgres (`claim_scan`) before any download; reuse of a report of the same commit for 24 h without spending quota; a store outage answers 503 instead of scanning unmetered. | `web-handler.test.ts` "answers 429 … before any download", "scans once … reuses it for the same commit without spending quota", "answers 503 when the store is unreachable" |
+| Sign-in misconfigured in production opens anonymous scans | Functions fail closed: with `requireAuth` and no auth configured, every scan is refused. | `web-handler.test.ts` "fails closed when auth is required but not configured" |
+| Forged or foreign session | Bearer token checked with Supabase Auth on every call; malformed tokens never leave the server; unknown tokens get 401. | `web-handler.test.ts` "treats 401, malformed bodies, odd logins and network failures as no user", "never calls Supabase for a token that is not token-shaped" |
+| Another user reads a saved report | Report ids are random UUID v4 (122 random bits), not enumerable; the store returns a report only to its owner (404 otherwise); the browser never talks to Supabase tables; RLS is on with no policies, so only the service key can read. | `web-handler.test.ts` "serves reports only to their owner", "scopes get by owner"; `supabase/migrations/` |
+| A secret found in a scanned repository is stored | The saved report is the engine's JSON, already redacted; a test scans the fixture with synthetic credentials through the handler and checks the stored JSON. | `web-handler.test.ts` "saves a report without any full credential from the scanned project"; e2e "analyzes a public repository …" (page text) |
+| Malicious package name or snippet rendered as HTML or a link in a shared report | React text nodes only; no links built from report content; strict CSP (`default-src 'self'`, no inline scripts, no third-party scripts), `Referrer-Policy: no-referrer` so the report id does not leak, `frame-ancestors 'none'`. | `web/vercel.json`; e2e redaction checks |
+| Cleanup endpoint abused | `/api/cron/cleanup` requires `CRON_SECRET` as a bearer token. | `web-handler.test.ts` "requires the cron secret …" |
+| Keys leak from the repository or the page | Service key only in Vercel environment variables; the page receives only the publishable key, which RLS makes useless for table access. | `web-handler.test.ts` env tests; `docs/DEPLOY.md` |
+
 ## Residual risks
 
 - A dependency that is vulnerable but not yet in OSV yields `no-known-vulnerabilities`.
@@ -130,3 +150,6 @@ Residual: Gateseeker trusts TLS and OSV itself.
 - Pattern rules miss anything expressed indirectly (configuration through variables, SQL outside migrations, secrets without a recognisable prefix) and may misclassify files in unconventional layouts.
 - A `pass` is a statement about the sources and rules at scan time only.
 - Priority does not account for reachability or for how the application is deployed.
+- Hosted: a determined abuser with many GitHub accounts can multiply the per-user quota; the anonymous GitHub API limit (60 requests per hour per server IP) is shared by every user until a read-only token is configured.
+- Hosted: whether the curated advisory set is bundled into the Vercel function is checked after each deploy (`docs/DEPLOY.md` §7); when missing, the report says so, but the page then consults OSV only.
+- Hosted: scan history and notifications live in the browser (`localStorage`) and are lost on another device; they hold no secrets, only repository names and counts.
