@@ -1,10 +1,12 @@
 import { Badge, Button, Card, Logo, MetricCard, Segmented, Table, Td, Th, cn } from "@gateseeker/ui-kit";
+import { PRIORITY_LABEL } from "gateseeker/dist/report/labels.js";
 import { renderPdf } from "gateseeker/dist/report/pdf.js";
 import { ArrowUpDown, Download, ExternalLink, Printer, ShieldAlert, ShieldCheck, ShieldQuestion } from "lucide-react";
 import { useEffect, useState } from "react";
 import { flushSync } from "react-dom";
 
 import type { Finding, ScanResponseOk } from "../api";
+import { FixGuidance } from "../components/FixGuidance";
 
 /**
  * The report as a page: verdict, one KPI card per priority and the Issues
@@ -20,7 +22,6 @@ import type { Finding, ScanResponseOk } from "../api";
  * the filter is ignored, so a printout always carries the whole report.
  */
 
-const PRIORITY_LABEL: Record<string, string> = { P1: "Fix now", P2: "Fix before release", P3: "Plan a fix", P4: "Keep an eye on it" };
 const PRIORITIES = ["P1", "P2", "P3", "P4"] as const;
 type Filter = "all" | (typeof PRIORITIES)[number];
 type Sort = "priority" | "severity";
@@ -301,6 +302,7 @@ function FindingRow({ finding: f, printing }: { finding: Finding; printing: bool
                 </p>
               </div>
             )}
+            <FixGuidance finding={f} />
             <p className="text-label text-muted-foreground">
               Why this priority: <span className="font-mono">{f.rationale.join(" → ")}</span>
             </p>

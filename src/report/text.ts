@@ -1,4 +1,5 @@
 import type { Finding, Report } from "../types.js";
+import { PRIORITY_LABEL } from "./labels.js";
 
 /**
  * Human-readable terminal output. All strings coming from the lockfile, from
@@ -130,6 +131,7 @@ export function renderText(report: Report): string {
   } else {
     out.push(
       `Findings: ${report.findings.length}  (P1 ${s.byPriority.P1}, P2 ${s.byPriority.P2}, P3 ${s.byPriority.P3}, P4 ${s.byPriority.P4})  dependencies ${s.byKind["dependency-vulnerability"]}, supply-chain advisories ${s.byKind["supply-chain-anomaly"]}, code patterns ${s.byKind["insecure-pattern"]}`,
+      `  ${(["P1", "P2", "P3", "P4"] as const).map((p) => `${p} ${PRIORITY_LABEL[p].toLowerCase()}`).join(" · ")}`,
     );
     for (const f of report.findings) {
       out.push(...renderFinding(f));

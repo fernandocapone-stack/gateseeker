@@ -234,6 +234,34 @@ test.describe("public page", () => {
     await expect(page.getByText("Sign in to open this report")).toBeVisible();
   });
 
+  test("shows how to fix a finding, copies the AI prompt and builds the accept-risk comment", async ({ page, context }) => {
+    await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+    await signIn(page);
+    await analyze(page, "https://github.com/acme/vibe");
+    await expect(page.getByRole("region", { name: "Report" })).toBeVisible({ timeout: 30_000 });
+    const row = page.getByRole("row").filter({ hasText: "GSK-CORS-001" }).first();
+    await row.getByRole("button", { name: "View issue" }).click();
+    const detail = page.locator("tr[id^=finding-]").filter({ visible: true }).first();
+    await expect(detail.getByText("What could happen")).toBeVisible();
+    await expect(detail.getByText("How to fix it")).toBeVisible();
+    const prompt = detail.getByTestId("ai-prompt");
+    await expect(prompt).toContainText("Gateseeker (security check, rule GSK-CORS-001)");
+    await expect(prompt).toContainText("Do not weaken or turn off any check");
+
+    await detail.getByRole("button", { name: "Copy prompt" }).click();
+    await expect(detail.getByRole("button", { name: "Copied" })).toBeVisible();
+    expect(await page.evaluate("navigator.clipboard.readText()")).toContain("rule GSK-CORS-001");
+
+    await detail.getByRole("button", { name: "Accept the risk" }).click();
+    const create = detail.getByRole("button", { name: "Create comment" });
+    await expect(create).toBeDisabled();
+    await detail.getByLabel(/Why is this acceptable/).fill("public read-only API, no cookies */ evil");
+    await create.click();
+    const comment = detail.getByTestId("suppression-comment");
+    await expect(comment).toHaveText(/^(\/\/ |\/\* )gateseeker-ignore GSK-CORS-001 public read-only API, no cookies {2}evil/);
+    await expect(detail.getByText(/Paste this on the line above line \d+ of/)).toBeVisible();
+  });
+
   test("offers the GitHub Action workflow with the analyzed repository named", async ({ page }) => {
     await signIn(page);
     await analyze(page, "https://github.com/acme/vibe");

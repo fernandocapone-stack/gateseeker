@@ -1,4 +1,5 @@
 import type { Finding, Report } from "../types.js";
+import { PRIORITY_LABEL } from "./labels.js";
 import { sanitize } from "./text.js";
 
 /**
@@ -26,7 +27,7 @@ export function renderSummary(report: Report): string {
   const verdictIcon = report.gate.verdict === "pass" ? "✅" : report.gate.verdict === "fail" ? "❌" : "⚠️";
   const lines: string[] = [SUMMARY_MARKER, `### ${verdictIcon} Gateseeker: ${report.gate.verdict.toUpperCase()}`, ""];
   lines.push(md(report.gate.reason, 300), "");
-  lines.push(`| | P1 | P2 | P3 | P4 | Total |`, `|---|---|---|---|---|---|`);
+  lines.push(`| | P1 ${PRIORITY_LABEL.P1} | P2 ${PRIORITY_LABEL.P2} | P3 ${PRIORITY_LABEL.P3} | P4 ${PRIORITY_LABEL.P4} | Total |`, `|---|---|---|---|---|---|`);
   lines.push(`| Findings | ${s.byPriority.P1} | ${s.byPriority.P2} | ${s.byPriority.P3} | ${s.byPriority.P4} | ${report.findings.length} |`);
   lines.push("");
   lines.push(`Dependencies ${s.byKind["dependency-vulnerability"]} · supply chain ${s.byKind["supply-chain-anomaly"]} · code patterns ${s.byKind["insecure-pattern"]} · gate: fail-on ${report.gate.failOn}, patterns ${report.gate.patternsMode}, supply-chain rules ${report.gate.supplyChainMode}`);
@@ -45,7 +46,7 @@ export function renderSummary(report: Report): string {
   if (report.findings.length > 0) {
     lines.push(`| Priority | Subject | Finding | Severity | Action |`, `|---|---|---|---|---|`);
     for (const f of report.findings.slice(0, MAX_ROWS)) {
-      lines.push(`| ${f.priority} | ${md(f.subject, 80)} | ${md(describe(f), 140)} | ${f.severity.tier} | ${md(f.remediation.action, 200)} |`);
+      lines.push(`| ${f.priority} · ${PRIORITY_LABEL[f.priority]} | ${md(f.subject, 80)} | ${md(describe(f), 140)} | ${f.severity.tier} | ${md(f.remediation.action, 200)} |`);
     }
     if (report.findings.length > MAX_ROWS) lines.push("", `… and ${report.findings.length - MAX_ROWS} more in the JSON report.`);
     lines.push("");

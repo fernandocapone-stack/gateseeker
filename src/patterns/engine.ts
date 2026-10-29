@@ -2,6 +2,7 @@ import { sanitize } from "../report/text.js";
 import { decidePriority } from "../rules/priority.js";
 import { patternGuidance } from "../rules/remediation/patterns.js";
 import type { Finding } from "../types.js";
+import { SUPPRESS_RE } from "./suppression.js";
 import type { FileClass, PatternsSummary, ProjectSnapshot, Rule, RuleMatch, Suppression } from "./types.js";
 
 /**
@@ -10,8 +11,6 @@ import type { FileClass, PatternsSummary, ProjectSnapshot, Rule, RuleMatch, Supp
  */
 
 export const PATTERN_SOURCE_NAME = "gateseeker-rules";
-
-const SUPPRESS_RE = /gateseeker-ignore\s+(GSK-[A-Z]+-\d{3})(?:\s+(.*))?$/;
 
 interface SuppressionLookup {
   active: Map<string, Suppression>; // key: `${file}:${line}:${ruleId}`

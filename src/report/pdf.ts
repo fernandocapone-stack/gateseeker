@@ -1,4 +1,5 @@
 import type { Finding, Report } from "../types.js";
+import { PRIORITY_LABEL } from "./labels.js";
 import { sanitize } from "./text.js";
 
 /**
@@ -27,7 +28,6 @@ export interface PdfMeta {
   notes?: string[];
 }
 
-const PRIORITY_LABEL: Record<string, string> = { P1: "Fix now", P2: "Fix before release", P3: "Plan a fix", P4: "Keep an eye on it" };
 const SEVERITY_RANK: Record<string, number> = { CRITICAL: 0, HIGH: 1, MODERATE: 2, MEDIUM: 2, LOW: 3 };
 
 // --- logo -----------------------------------------------------------------------
@@ -317,7 +317,11 @@ function writeFinding(doc: Layout, f: Finding): void {
   );
   doc.text(findingTitle(f), { font: "F2", size: 11, max: 300, gapAfter: 2 });
   doc.text(f.subject, { font: "F3", size: 8.5, color: MUTED, max: 300, gapAfter: 8 });
-  doc.text(f.remediation.action, { size: 9.5, max: 600, gapAfter: 10 });
+  doc.text(f.remediation.action, { size: 9.5, max: 600, gapAfter: f.remediation.impact || f.remediation.manualSteps ? 6 : 10 });
+  if (f.remediation.impact) doc.text(`What could happen: ${f.remediation.impact}`, { size: 9.5, max: 400, gapAfter: 4 });
+  const steps = f.remediation.manualSteps ?? [];
+  steps.slice(0, 4).forEach((step, i) => { doc.text(`${String(i + 1)}. ${step}`, { size: 9, indent: 10, max: 300, gapAfter: i === Math.min(steps.length, 4) - 1 ? 10 : 2 }); });
+  if (f.remediation.impact && steps.length === 0) doc.space(6);
 
   if (e.kind === "insecure-pattern") {
     doc.text(`${e.file}:${String(e.line)} · classified as ${e.fileClass}`, { font: "F3", size: 8.5, color: MUTED, max: 300, gapAfter: 4 });
