@@ -159,6 +159,24 @@ test.describe("public page", () => {
     await expect(panel.getByRole("listitem")).toHaveCount(2);
   });
 
+  test("returns to the page that asked for sign-in and counts the login funnel once per tab", async ({ page }) => {
+    const events: string[] = [];
+    page.on("request", (r) => {
+      if (r.url().endsWith("/api/event")) events.push((JSON.parse(r.postData() ?? "{}") as { kind?: string }).kind ?? "?");
+    });
+    await page.goto("/app/scans");
+    await expect(page.getByRole("heading", { level: 1 })).toHaveText("Log in");
+    await page.reload();
+    await expect(page.getByRole("heading", { level: 1 })).toHaveText("Log in");
+    await page.getByRole("button", { name: "Continue with GitHub" }).click();
+    await expect(page).toHaveURL(/\/app\/scans$/);
+    await expect(page.getByRole("heading", { level: 1 })).toHaveText("Your scans");
+    // A signed-in visit to /login forwards without counting a new sign-in.
+    await page.goto("/login");
+    await expect(page).toHaveURL(/\/app$/);
+    await expect.poll(() => events).toEqual(["login_view", "login_start", "signin_complete"]);
+  });
+
   test("rejects an invalid URL without calling the service", async ({ page }) => {
     await signIn(page);
     await analyze(page, "https://gitlab.com/acme/vibe");

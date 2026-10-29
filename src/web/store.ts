@@ -32,6 +32,10 @@ export interface StoredReport {
 
 export type NewReport = Omit<StoredReport, "id" | "createdAt">;
 
+/** Aggregate page events (login funnel): counted per UTC day, no user, IP or user agent. */
+export const EVENT_KINDS = ["login_view", "login_start", "signin_complete"] as const;
+export type EventKind = (typeof EVENT_KINDS)[number];
+
 export interface ReportStore {
   claimQuota(userId: string, limit: number, windowSeconds: number): Promise<QuotaDecision>;
   /** Most recent report for this commit not older than `maxAgeMs`, from any user (public repositories give everyone the same report). */
@@ -41,16 +45,19 @@ export interface ReportStore {
   get(id: string, userId: string): Promise<StoredReport | null>;
   /** Deletes reports past their `expiresAt`; returns how many. */
   purgeExpired(): Promise<number>;
+  /** Adds one to today's counter for this kind. */
+  countEvent(kind: EventKind): Promise<void>;
 }
 
 export interface StoreClock {
   now?: () => Date;
 }
 
-export function createMemoryStore(clock: StoreClock = {}): ReportStore {
+export function createMemoryStore(clock: StoreClock = {}): ReportStore & { eventCounts(): Record<string, number> } {
   const now = clock.now ?? (() => new Date());
   const reports = new Map<string, StoredReport>();
   const quota = new Map<string, { windowStart: number; used: number }>();
+  const events = new Map<string, number>();
   let seq = 0;
   return {
     // eslint-disable-next-line @typescript-eslint/require-await
@@ -102,6 +109,15 @@ export function createMemoryStore(clock: StoreClock = {}): ReportStore {
         }
       }
       return n;
+    },
+    // eslint-disable-next-line @typescript-eslint/require-await
+    async countEvent(kind) {
+      const key = `${now().toISOString().slice(0, 10)}:${kind}`;
+      events.set(key, (events.get(key) ?? 0) + 1);
+    },
+    /** "YYYY-MM-DD:kind" -> count, for tests and the local server. */
+    eventCounts() {
+      return Object.fromEntries(events);
     },
   };
 }
@@ -215,6 +231,9 @@ export function createSupabaseStore(options: SupabaseStoreOptions): ReportStore 
       const out = await call(`/rest/v1/reports?${q.toString()}`, { method: "DELETE", prefer: "return=representation" });
       const parsed = z.array(z.unknown()).safeParse(out);
       return parsed.success ? parsed.data.length : 0;
+    },
+    async countEvent(kind) {
+      await call("/rest/v1/rpc/count_event", { method: "POST", body: JSON.stringify({ p_kind: kind }) });
     },
   };
 }

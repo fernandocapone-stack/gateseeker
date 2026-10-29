@@ -4,7 +4,7 @@ import { dirname, extname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { authConfigFromEnv, handlerOptionsFromEnv } from "./env.js";
-import { handleCleanupRequest, handleReportRequest, handleScanRequest } from "./handler.js";
+import { handleCleanupRequest, handleEventRequest, handleReportRequest, handleScanRequest } from "./handler.js";
 
 /**
  * Development and end-to-end server for the public page: serves web/dist and
@@ -15,6 +15,7 @@ import { handleCleanupRequest, handleReportRequest, handleScanRequest } from "./
  *   POST /api/scan            analyze (bearer token when auth is configured)
  *   GET  /api/reports/<id>    a saved report of the signed-in user
  *   GET  /api/cron/cleanup    purge expired reports (bearer CRON_SECRET)
+ *   POST /api/event           count a login-funnel event (anonymous, aggregate)
  *
  * Environment: see env.ts, plus
  *   GATESEEKER_WEB_PORT      default 4320
@@ -117,6 +118,24 @@ const server = createServer((req, res) => {
   const reportMatch = /^\/api\/reports\/([A-Za-z0-9-]{1,64})$/.exec(url.pathname);
   if (reportMatch) {
     void handleReportRequest(reportMatch[1] ?? "", options, authorization).then((out) => { json(res, out.status, out.body); });
+    return;
+  }
+  if (url.pathname === "/api/event") {
+    if (req.method !== "POST") {
+      json(res, 405, { ok: false, error: { code: "bad-request", message: "POST only." } });
+      return;
+    }
+    void (async () => {
+      const raw = await readBody(req);
+      let body: unknown;
+      try {
+        body = raw === null ? null : (JSON.parse(raw) as unknown);
+      } catch {
+        body = null;
+      }
+      const out = await handleEventRequest(body, options);
+      json(res, out.status, out.body);
+    })();
     return;
   }
   if (url.pathname === "/api/cron/cleanup") {

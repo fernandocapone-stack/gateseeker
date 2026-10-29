@@ -4,12 +4,14 @@ import { useEffect, useState } from "react";
 
 import { safeNext, takeNext } from "../auth";
 import { useAuth } from "../auth-context";
+import { countLoginStart, countLoginView, countSignInIfPending } from "../funnel";
 import { navigate } from "../router";
 
 /**
  * Sign-in page. "Continue with GitHub" starts Supabase Auth's OAuth flow
  * (or the stub in local/test mode). After the round trip the page lands here
- * again with a session and forwards to the remembered in-app path.
+ * again with a session and forwards to the remembered in-app path. The visit,
+ * the click and the completed sign-in feed the anonymous funnel counters.
  */
 export function Login() {
   const auth = useAuth();
@@ -17,11 +19,17 @@ export function Login() {
   const next = safeNext(new URLSearchParams(window.location.search).get("next") ?? "/app");
 
   useEffect(() => {
-    if (auth.status === "signed-in") navigate(takeNext() === "/app" ? next : takeNext());
+    if (auth.status === "signed-out") countLoginView();
+    if (auth.status !== "signed-in") return;
+    countSignInIfPending();
+    // takeNext() clears what it returns, so it is read once.
+    const remembered = takeNext();
+    navigate(remembered === "/app" ? next : remembered);
   }, [auth.status, next]);
 
   async function start() {
     setBusy(true);
+    countLoginStart();
     await auth.signIn(next);
     // On OAuth the browser navigates away; in stub mode the session appears at once and the effect above forwards.
     setBusy(false);

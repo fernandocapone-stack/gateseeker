@@ -6,7 +6,7 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import { bearerToken, createStaticAuth, createSupabaseAuth } from "../src/web/auth.js";
 import { authConfigFromEnv, handlerOptionsFromEnv, STUB_TOKEN, STUB_USER } from "../src/web/env.js";
-import { handleCleanupRequest, handleReportRequest, handleScanRequest, type HandlerOptions, type ScanResponseOk } from "../src/web/handler.js";
+import { handleCleanupRequest, handleEventRequest, handleReportRequest, handleScanRequest, type HandlerOptions, type ScanResponseOk } from "../src/web/handler.js";
 import { createMemoryStore, createSupabaseStore, type ReportStore } from "../src/web/store.js";
 import { fixturePath, readJsonFixture } from "./helpers.js";
 
@@ -189,6 +189,12 @@ describe("createSupabaseStore", () => {
     expect(calls[0]?.headers).not.toHaveProperty("authorization");
   });
 
+  it("counts events through the count_event function with the kind only", async () => {
+    const { store, calls } = postgrest(() => new Response(""));
+    await store.countEvent("login_view");
+    expect(calls[0]).toMatchObject({ method: "POST", url: "https://p.supabase.co/rest/v1/rpc/count_event", body: JSON.stringify({ p_kind: "login_view" }) });
+  });
+
   it("sends a legacy JWT service_role key in both headers", async () => {
     const calls: Call[] = [];
     // eslint-disable-next-line @typescript-eslint/require-await
@@ -313,6 +319,22 @@ describe("handleScanRequest with auth and store", () => {
     const r = await handleScanRequest({ url: "https://github.com/o/r" }, baseOptions(gh, { auth, store: broken }), "Bearer tok-alice");
     expect(r).toMatchObject({ status: 503, body: { ok: false, error: { code: "store-unavailable" } } });
     expect(gh.calls.filter((c) => c.includes("codeload")).length).toBe(0);
+  });
+
+  it("counts known login-funnel events per day, refuses anything else, and needs no session", async () => {
+    const store = createMemoryStore({ now: () => new Date("2026-10-29T10:00:00Z") });
+    const opts: HandlerOptions = { auth, store };
+    expect(await handleEventRequest({ kind: "login_view" }, opts)).toEqual({ status: 200, body: { ok: true } });
+    expect(await handleEventRequest({ kind: "login_view" }, opts)).toEqual({ status: 200, body: { ok: true } });
+    expect(await handleEventRequest({ kind: "signin_complete" }, opts)).toEqual({ status: 200, body: { ok: true } });
+    for (const bad of [null, {}, { kind: "page_view" }, { kind: "login_view'; drop table events; --" }, { kind: 1 }]) {
+      expect(await handleEventRequest(bad, opts)).toMatchObject({ status: 400, body: { ok: false, error: { code: "bad-request" } } });
+    }
+    expect(store.eventCounts()).toEqual({ "2026-10-29:login_view": 2, "2026-10-29:signin_complete": 1 });
+    // Bare (local server without a store) it accepts and drops; a broken store answers 503.
+    expect(await handleEventRequest({ kind: "login_start" }, {})).toEqual({ status: 200, body: { ok: true } });
+    const broken: ReportStore = { ...createMemoryStore(), countEvent: () => Promise.reject(new Error("db down")) };
+    expect(await handleEventRequest({ kind: "login_start" }, { store: broken })).toMatchObject({ status: 503, body: { ok: false, error: { code: "store-unavailable" } } });
   });
 
   it("still works bare (no auth, no store) for the local server", async () => {

@@ -3,7 +3,7 @@ import { z } from "zod";
 import type { Report } from "../types.js";
 import { bearerToken, type AuthUser, type AuthVerifier } from "./auth.js";
 import { resolveGitHubRepository, scanGitHubRepository, type ServiceErrorCode, type ServiceOptions, type ServiceSuccess } from "./service.js";
-import { StoreError, type QuotaDecision, type ReportStore } from "./store.js";
+import { EVENT_KINDS, StoreError, type QuotaDecision, type ReportStore } from "./store.js";
 
 /**
  * Framework-agnostic HTTP handlers for the hosted service, shared by the
@@ -43,7 +43,7 @@ export interface ScanResponseError {
 
 export interface HttpResponse {
   status: number;
-  body: ScanResponseOk | ScanResponseError | ReportResponseOk | CleanupResponse;
+  body: ScanResponseOk | ScanResponseError | ReportResponseOk | CleanupResponse | EventResponse;
 }
 
 /** What is persisted per report: the scan answer minus id, quota and cache flag, which belong to the moment of the request. */
@@ -60,6 +60,10 @@ export interface ReportResponseOk {
 export interface CleanupResponse {
   ok: true;
   deleted: number;
+}
+
+export interface EventResponse {
+  ok: true;
 }
 
 export interface QuotaPolicy {
@@ -83,6 +87,7 @@ export interface HandlerOptions extends Omit<ServiceOptions, "url"> {
 }
 
 const bodySchema = z.object({ url: z.string().max(400) });
+const eventSchema = z.object({ kind: z.enum(EVENT_KINDS) });
 
 const STATUS: Record<HandlerErrorCode, number> = {
   "bad-request": 400,
@@ -210,6 +215,25 @@ export async function handleCleanupRequest(options: HandlerOptions, authorizatio
   try {
     const deleted = await store.purgeExpired();
     return { status: 200, body: { ok: true, deleted } };
+  } catch (e) {
+    return storeFailure(e);
+  }
+}
+
+/**
+ * POST /api/event: one aggregate counter per kind and UTC day (the login
+ * funnel). Anonymous by necessity, since visits to /login happen before
+ * sign-in; it stores no user, IP or user agent, accepts only the known
+ * kinds, and the database caps each daily counter. Failures are reported but
+ * the page never waits on them.
+ */
+export async function handleEventRequest(body: unknown, options: HandlerOptions): Promise<HttpResponse> {
+  const parsed = eventSchema.safeParse(body);
+  if (!parsed.success) return fail("bad-request", `Send a JSON body with a "kind" of ${EVENT_KINDS.join(", ")}.`);
+  if (!options.store) return { status: 200, body: { ok: true } };
+  try {
+    await options.store.countEvent(parsed.data.kind);
+    return { status: 200, body: { ok: true } };
   } catch (e) {
     return storeFailure(e);
   }
