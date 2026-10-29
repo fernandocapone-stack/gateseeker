@@ -1,6 +1,6 @@
 # Gateseeker — Roadmap proposal (Sprint 4 → 9, plus Track A)
 
-> Status: **proposal for PO approval**, written 2026-10-28. Continues `docs/PRODUCT.md` §7, which covers Sprints 0 to 4. Nothing here starts without approval; the items that need new services, dependencies or GitHub integration are listed in §5 (rule 8 of `CLAUDE.md`).
+> Status: written 2026-10-28; **decisions 1, 2 and 7 (A1) approved by the PO on 2026-10-28** (§5), the rest still a proposal. Continues `docs/PRODUCT.md` §7, which covers Sprints 0 to 4. Nothing here starts without approval; the items that need new services, dependencies or GitHub integration are listed in §5 (rule 8 of `CLAUDE.md`).
 
 ## 1. Where we are
 
@@ -34,6 +34,8 @@ Each sprint keeps the format of `PRODUCT.md`: delivery, the hypothesis it tests,
 *Metric:* unchanged from Sprint 4.
 
 ### Sprint 5 — From finding to fix
+Detailed scope, with Track A1, in `docs/SPRINT_5.md` (approved 2026-10-29). Note: the web already uses plain priority labels ("Fix now", "Fix before release", …), so U8 there reduces to the impact sentence and the same labels in the CLI and the Action.
+
 - **U2, "Fix with your AI tool":** each finding gets a copyable, deterministic fix prompt written per rule ("In `src/lib/supabase.ts`, the service-role key is exposed through `NEXT_PUBLIC_…`. Move it to a server-only variable and …"). The templates are written by us and tested like rules; no LLM generates them. A short manual fix is also shown for people who don't use AI tools.
 - **U8, plain language:** priorities renamed in the UI to *Fix today / This week / When you can / For your information* (P-codes stay as a secondary label and in JSON/SARIF). One "what could happen" sentence per rule.
 - **U5, accept risk:** "Accept this finding" on the web writes a suggested `gateseeker-ignore` line with a reason, to paste into the code. The decision stays in the repository, reviewable in the PR, with no server state.
@@ -95,6 +97,8 @@ This is the direct answer to "threats appear daily".
 Everything above keeps the non-negotiables: deterministic priority, `incomplete` never shown as `pass`, no "secure" language, nothing from the analyzed project executed, secrets redacted everywhere, including monitoring emails, and every pattern rule shipped with fixtures and measured precision.
 
 ## 5. Decisions needed from the PO
+
+Approved by the PO on 2026-10-28: **1** (keep login and measure), **2** (Sprint 5 before Sprint 6), **7** (Track A1 now; A2 waits). On 2026-10-29: **5** (pnpm and Yarn are not a new ecosystem; Sprint 5 reads them) and the Sprint 5 scope. Open: 3, 4, 6, and the A2 source.
 
 1. **Anonymous scans on the page (U1):** reopen, with a stricter limit, or keep login? Recommendation (revised 2026-10-28): **launch with login and measure.** Our audience already has a GitHub account, so sign-in is one click; Home shows a real example report so the value is visible before login; and two aggregate counters (visits to `/login`, completed sign-ins) tell us the abandonment rate. If more than 40% of visitors abandon at login over the first 2 weeks or 100 visits, open anonymous scans: 3 per IP per day, a global daily cap, report shown but not saved, "sign in to save and follow this repo" as the next step.
 2. **Order:** Sprint 5 (fix) before Sprint 6 (monitoring)? Recommendation: yes. Monitoring sends people to reports, so the reports must first tell them how to fix.

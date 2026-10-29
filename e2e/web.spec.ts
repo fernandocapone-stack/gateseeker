@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { expect, test, type Page } from "@playwright/test";
 
 /**
@@ -84,12 +85,29 @@ test.describe("public page", () => {
     await expect(page.getByTestId("saved-note")).not.toContainText("analyses used");
   });
 
-  test("exports the whole report for PDF: every finding expanded, workspace frame hidden", async ({ page }) => {
+  test("downloads the report as a PDF file without opening the print dialog", async ({ page }) => {
+    await signIn(page);
+    await analyze(page, "https://github.com/acme/vibe");
+    await expect(page.getByRole("region", { name: "Report" })).toBeVisible({ timeout: 30_000 });
+    await page.evaluate("window.__printed = false; window.print = () => { window.__printed = true; }");
+    const [download] = await Promise.all([page.waitForEvent("download"), page.getByRole("button", { name: "Download PDF" }).click()]);
+    expect(download.suggestedFilename()).toBe("gateseeker-acme-vibe-0123456.pdf");
+    const path = await download.path();
+    const bytes = readFileSync(path);
+    const text = bytes.toString("latin1");
+    expect(text.startsWith("%PDF-1.4")).toBe(true);
+    expect(text).toContain("acme/vibe@0123456");
+    expect(text).toContain("GSK-SECRET-001");
+    expect(text).not.toContain("sk_live_HoHDwEcLksdRWvioeGponKHY");
+    expect(await page.evaluate("window.__printed")).toBe(false);
+  });
+
+  test("prints the whole report: every finding expanded, workspace frame hidden", async ({ page }) => {
     await signIn(page);
     await analyze(page, "https://github.com/acme/vibe");
     const report = page.getByRole("region", { name: "Report" });
     await expect(report).toBeVisible({ timeout: 30_000 });
-    await expect(page.getByRole("button", { name: "Export PDF" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Print" })).toBeVisible();
     const details = page.locator("tr[id^=finding-]");
     const total = await details.count();
     expect(total).toBeGreaterThan(0);
@@ -157,6 +175,24 @@ test.describe("public page", () => {
     await expect(bell).toHaveAccessibleName("Notifications");
     await bell.click();
     await expect(panel.getByRole("listitem")).toHaveCount(2);
+  });
+
+  test("returns to the page that asked for sign-in and counts the login funnel once per tab", async ({ page }) => {
+    const events: string[] = [];
+    page.on("request", (r) => {
+      if (r.url().endsWith("/api/event")) events.push((JSON.parse(r.postData() ?? "{}") as { kind?: string }).kind ?? "?");
+    });
+    await page.goto("/app/scans");
+    await expect(page.getByRole("heading", { level: 1 })).toHaveText("Log in");
+    await page.reload();
+    await expect(page.getByRole("heading", { level: 1 })).toHaveText("Log in");
+    await page.getByRole("button", { name: "Continue with GitHub" }).click();
+    await expect(page).toHaveURL(/\/app\/scans$/);
+    await expect(page.getByRole("heading", { level: 1 })).toHaveText("Your scans");
+    // A signed-in visit to /login forwards without counting a new sign-in.
+    await page.goto("/login");
+    await expect(page).toHaveURL(/\/app$/);
+    await expect.poll(() => events).toEqual(["login_view", "login_start", "signin_complete"]);
   });
 
   test("rejects an invalid URL without calling the service", async ({ page }) => {

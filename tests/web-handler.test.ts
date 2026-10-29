@@ -1,13 +1,14 @@
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, readdirSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, relative } from "node:path";
 import { gzipSync } from "node:zlib";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { bearerToken, createStaticAuth, createSupabaseAuth } from "../src/web/auth.js";
 import { authConfigFromEnv, handlerOptionsFromEnv, STUB_TOKEN, STUB_USER } from "../src/web/env.js";
-import { handleCleanupRequest, handleReportRequest, handleScanRequest, type HandlerOptions, type ScanResponseOk } from "../src/web/handler.js";
+import { handleCleanupRequest, handleEventRequest, handleReportRequest, handleScanRequest, type HandlerOptions, type ScanResponseOk } from "../src/web/handler.js";
 import { createMemoryStore, createSupabaseStore, type ReportStore } from "../src/web/store.js";
+import { fixturePath, readJsonFixture } from "./helpers.js";
 
 /**
  * The hosted service's layers above the engine: session verification, the
@@ -50,7 +51,7 @@ function targz(files: Record<string, string>): Buffer {
 const SHA = "b".repeat(40);
 const ARCHIVE = targz({ "r-bbbb/package.json": '{"name":"r"}', "r-bbbb/src/server.ts": 'app.use(cors({ origin: "*", credentials: true }));\n' });
 
-function fakeGitHub(): { fetch: typeof fetch; calls: string[] } {
+function fakeGitHub(archive: Buffer = ARCHIVE): { fetch: typeof fetch; calls: string[] } {
   const calls: string[] = [];
   // eslint-disable-next-line @typescript-eslint/require-await -- a fetch double must return a Promise<Response>
   const f = (async (input: string | URL | Request, init?: RequestInit): Promise<Response> => {
@@ -60,7 +61,7 @@ function fakeGitHub(): { fetch: typeof fetch; calls: string[] } {
       return new Response(JSON.stringify({ full_name: "o/r", private: false, size: 10, default_branch: "main", html_url: "https://github.com/o/r" }), { status: 200 });
     }
     if (url.includes("/commits/")) return new Response(JSON.stringify({ sha: SHA }), { status: 200 });
-    if (url.startsWith("https://codeload.github.com/")) return new Response(ARCHIVE, { status: 200 });
+    if (url.startsWith("https://codeload.github.com/")) return new Response(archive, { status: 200 });
     if (url.includes("osv.dev")) return new Response(JSON.stringify({ vulns: [] }), { status: 200 });
     return new Response("unexpected", { status: 500 });
   }) as typeof fetch;
@@ -188,6 +189,12 @@ describe("createSupabaseStore", () => {
     expect(calls[0]?.headers).not.toHaveProperty("authorization");
   });
 
+  it("counts events through the count_event function with the kind only", async () => {
+    const { store, calls } = postgrest(() => new Response(""));
+    await store.countEvent("login_view");
+    expect(calls[0]).toMatchObject({ method: "POST", url: "https://p.supabase.co/rest/v1/rpc/count_event", body: JSON.stringify({ p_kind: "login_view" }) });
+  });
+
   it("sends a legacy JWT service_role key in both headers", async () => {
     const calls: Call[] = [];
     // eslint-disable-next-line @typescript-eslint/require-await
@@ -268,6 +275,34 @@ describe("handleScanRequest with auth and store", () => {
     expect(await handleReportRequest("../etc", opts, "Bearer tok-alice")).toMatchObject({ status: 404 });
   });
 
+  it("saves a report without any full credential from the scanned project", async () => {
+    // The vibe fixture carries the synthetic credentials of fixtures/projects/secrets.json; the saved JSON must hold none of them in full.
+    const root = fixturePath("projects/vibe-next-supabase");
+    const files: Record<string, string> = {};
+    const walk = (dir: string): void => {
+      for (const e of readdirSync(dir, { withFileTypes: true })) {
+        const full = join(dir, e.name);
+        if (e.isDirectory()) walk(full);
+        else files[`r-bbbb/${relative(root, full).replace(/\\/g, "/")}`] = readFileSync(full, "utf8");
+      }
+    };
+    walk(root);
+    const secrets = readJsonFixture("projects/secrets.json") as Record<string, string>;
+    const store = createMemoryStore();
+    const opts = baseOptions(fakeGitHub(targz(files)), { auth, store });
+    const res = await handleScanRequest({ url: "https://github.com/o/r" }, opts, "Bearer tok-alice");
+    expect(res.status).toBe(200);
+    const id = (res.body as ScanResponseOk).id ?? "";
+    expect((res.body as ScanResponseOk).report.findings.some((f) => f.evidence.kind === "insecure-pattern" && f.evidence.ruleId === "GSK-SECRET-001")).toBe(true);
+    const saved = await handleReportRequest(id, opts, "Bearer tok-alice");
+    expect(saved.status).toBe(200);
+    const json = JSON.stringify(saved.body);
+    for (const [name, value] of Object.entries(secrets)) {
+      // The anon key is public by design and never reported; every other value must not survive redaction.
+      if (name !== "anon") expect(json, `secret ${name} reached the store`).not.toContain(value);
+    }
+  });
+
   it("answers 429 with the quota when the window is exhausted, before any download", async () => {
     const gh = fakeGitHub();
     const store = createMemoryStore();
@@ -284,6 +319,22 @@ describe("handleScanRequest with auth and store", () => {
     const r = await handleScanRequest({ url: "https://github.com/o/r" }, baseOptions(gh, { auth, store: broken }), "Bearer tok-alice");
     expect(r).toMatchObject({ status: 503, body: { ok: false, error: { code: "store-unavailable" } } });
     expect(gh.calls.filter((c) => c.includes("codeload")).length).toBe(0);
+  });
+
+  it("counts known login-funnel events per day, refuses anything else, and needs no session", async () => {
+    const store = createMemoryStore({ now: () => new Date("2026-10-29T10:00:00Z") });
+    const opts: HandlerOptions = { auth, store };
+    expect(await handleEventRequest({ kind: "login_view" }, opts)).toEqual({ status: 200, body: { ok: true } });
+    expect(await handleEventRequest({ kind: "login_view" }, opts)).toEqual({ status: 200, body: { ok: true } });
+    expect(await handleEventRequest({ kind: "signin_complete" }, opts)).toEqual({ status: 200, body: { ok: true } });
+    for (const bad of [null, {}, { kind: "page_view" }, { kind: "login_view'; drop table events; --" }, { kind: 1 }]) {
+      expect(await handleEventRequest(bad, opts)).toMatchObject({ status: 400, body: { ok: false, error: { code: "bad-request" } } });
+    }
+    expect(store.eventCounts()).toEqual({ "2026-10-29:login_view": 2, "2026-10-29:signin_complete": 1 });
+    // Bare (local server without a store) it accepts and drops; a broken store answers 503.
+    expect(await handleEventRequest({ kind: "login_start" }, {})).toEqual({ status: 200, body: { ok: true } });
+    const broken: ReportStore = { ...createMemoryStore(), countEvent: () => Promise.reject(new Error("db down")) };
+    expect(await handleEventRequest({ kind: "login_start" }, { store: broken })).toMatchObject({ status: 503, body: { ok: false, error: { code: "store-unavailable" } } });
   });
 
   it("still works bare (no auth, no store) for the local server", async () => {

@@ -1,4 +1,4 @@
-# Architecture (after Sprint 3)
+# Architecture (after Sprint 4)
 
 ## Data flow
 
@@ -61,10 +61,20 @@ The only runtime dependency is Zod. HTTP uses Node's global `fetch`; argument pa
 | `scan.ts` | Orchestrate `scan()` (lockfile only) and `scanDirectory()` (patterns + optional deps); produce `QueryRecord`s, summary, verdict. | File or network I/O of its own beyond reading the root lockfile. |
 | `report/text.ts` | Human-readable output; strips control characters from every untrusted string. | Colour, interactivity. |
 | `report/sarif.ts` | SARIF 2.1.0: one result per finding, levels by priority, stable fingerprints, file:line for patterns and the lockfile for the rest. | Upload (the Action does that). |
+| `report/pdf.ts` | PDF 1.4 writer for the report (standard fonts, WinAnsi, word wrap, pagination), browser- and Node-safe; behind the page's "Download PDF". | Embed fonts, draw links or actions, add data the JSON lacks. |
 | `report/summary.ts` | Markdown for the job summary and the sticky PR comment; untrusted strings escaped, table capped at 20 rows. | Links built from project data. |
 | `action/run.ts`, `action/github.ts`, `action-cli.ts` | The GitHub Action runner: reads `INPUT_*`, fetches the baseline lockfile from the base branch with `git show` (the only git call in the product, inside the user's workflow), runs `scanDirectory`, writes report/SARIF/summary/outputs, upserts the sticky comment, maps the verdict to the exit code. | Anything the CLI does not. |
 | `action.yml` | Composite action: setup-node, pinned `npx --package=gateseeker@<version> gateseeker-action` (or a local build for this repository), base-branch fetch, SARIF upload. | Third-party actions beyond checkout/setup-node/codeql upload. |
 | `cli.ts` | Arguments, path type detection, report writing, exit code. | Business logic. |
+| `web/github-url.ts` | Strict grammar for `https://github.com/<owner>/<repo>[/tree/<ref>]`; rejects before any request. | Parse general URLs, accept other hosts. |
+| `web/tar.ts` | Dependency-free `.tar.gz` reader with limits; regular files and directories only; strips GitHub's top-level folder. | Follow links, write outside the destination. |
+| `web/service.ts` | Resolve the repository and commit on the GitHub API, download the archive, extract, run `scanDirectory`, clean up; injected `fetch`. | git, child processes, tokens (optional read-only `GITHUB_TOKEN` only for the API limit). |
+| `web/auth.ts` | Verify the bearer token with Supabase Auth; static and stub verifiers for tests. | Pass the user to the engine. |
+| `web/store.ts` | Saved reports (30 days), per-user quota (`claim_scan`), per-commit cache; memory and Supabase (PostgREST, service key) implementations. | Interpret report content. |
+| `web/handler.ts` | Framework-agnostic handlers: auth → quota → cache → scan → save; report read by owner; cleanup with `CRON_SECRET`. | Know about Vercel or Node HTTP. |
+| `web/env.ts`, `web/local-server.ts` | Build handler options from environment variables (fail closed when auth is required and missing); local server for development and e2e. | Log keys. |
+| `web/` (separate package) and `web/api/` | Public site and workspace (React + Vite, `@supabase/supabase-js` for sign-in only); Vercel functions are thin wrappers around `src/web/handler.ts`. | Reimplement rules, priorities or texts; talk to Supabase tables. |
+| `ui-kit/` (separate package) | Theme tokens and components shared by `ui/` and `web/`. | Business logic. |
 
 ## Curated advisory flow
 
@@ -77,6 +87,25 @@ public feeds ──(Intel feed workflow, every 6 h)──▶ advisories/proposed
 
 The workflow is the only one with write permissions and uses the repository's own token. CI validates every record on every push. The scanner never reads `proposed` or `rejected` records.
 
+## Hosted service flow (Sprint 4)
+
+```
+browser (/app, signed in with GitHub via Supabase Auth)
+   │  POST /api/scan { url }  + bearer token
+   ▼
+web/api/scan.ts ──▶ src/web/handler.ts
+                      1. auth     src/web/auth.ts      (401 without a valid session)
+                      2. quota    src/web/store.ts     (claim_scan, 429 when exhausted, before any download)
+                      3. cache    same commit within 24 h ──▶ reuse the saved report
+                      4. scan     src/web/service.ts ──▶ github-url.ts ──▶ GitHub API (repo, commit)
+                                                     ──▶ codeload .tar.gz ──▶ tar.ts (/tmp, limits)
+                                                     ──▶ scanDirectory (same engine as the CLI) ──▶ Report
+                      5. save     src/web/store.ts     (Supabase reports, 30 days) ──▶ { id, report }
+   ◀── JSON; GET /api/reports/<id> returns it to its owner only; Vercel Cron purges expired rows daily
+```
+
+The engine is the published package at the pinned version; the web adds no rule, priority or wording of its own.
+
 ## Trust boundaries
 
 1. **Project files → walker and rules.** Everything in the directory is attacker-controlled. Controls: symlinks skipped; containment check on every path; fixed directory exclusions; file-count, file-size and depth limits that abort with a typed error (exit 3); binary detection by extension and NUL probe; lines over 5000 characters skipped by rules; regexes reviewed and timed against adversarial 1 MB inputs; snippets sanitized and secrets redacted; rule exceptions caught and reported as a `GSK-ENGINE-000` finding instead of crashing.
@@ -88,6 +117,7 @@ The workflow is the only one with write permissions and uses the repository's ow
 7. **Advisory records → scanner.** Records are data in the repository, reviewed in PRs and validated by schema in CI and at load time; credential-looking tokens are rejected; only `approved` records match.
 8. **Browser → triage server.** Only 127.0.0.1; every API call needs the session token printed by the CLI (the page strips it from the address bar); CSP and nosniff headers; static files are confined to `ui/dist`; request bodies capped at 512 KB; the record id in a decision is taken from the server-side pending record, not from the client; approve/reject refuse to run when git has no `user.name`.
 9. **User workflow → Action.** Inputs are untrusted strings: enumerations are validated, numbers parsed, paths resolved under the workspace; the baseline is read with `git show` of a ref the user named and written into the output directory; the comment body is Markdown-escaped; failures to comment or upload never change the verdict.
+11. **Internet → hosted service.** Only signed-in users can scan; the URL grammar is checked before any request; the archive is extracted by our own reader under hard limits; nothing is executed; quota is claimed before downloading; the store is reachable only with the service key (RLS on, no policies) and returns a report only to its owner; the page renders report content as text under a strict CSP. Details in `docs/THREAT_MODEL.md` §11.
 10. **Report → terminal / file.** `sanitize()` removes control characters and newlines, truncates long values. Secrets never appear in full in any output; tests assert this for the JSON report and the terminal text.
 
 ## Query states and the verdict
