@@ -1,5 +1,7 @@
 import { beforeAll, describe, expect, it } from "vitest";
-import { renderPdf, toWinAnsi, type PdfReport } from "../src/report/pdf.js";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import { LOGO_SYMBOL, LOGO_WORDMARK, renderPdf, svgPathToPdf, toWinAnsi, type PdfReport } from "../src/report/pdf.js";
 import { scanDirectory } from "../src/scan.js";
 import type { Finding, Report } from "../src/types.js";
 import { fixturePath, readJsonFixture } from "./helpers.js";
@@ -112,6 +114,29 @@ describe("renderPdf", () => {
     // The action is capped at 600 characters and ends with an ellipsis (WinAnsi 0x85) instead of running on.
     expect(text).toMatch(/\(x+\x85\) Tj/);
     expect(text).not.toContain("x".repeat(105));
+  });
+});
+
+describe("logo", () => {
+  it("uses the same paths as the ui-kit <Logo> (the PO's Figma export)", () => {
+    const source = readFileSync(join(process.cwd(), "ui-kit", "src", "logo.tsx"), "utf8");
+    expect(/const SYMBOL = "([^"]*)"/.exec(source)?.[1]).toBe(LOGO_SYMBOL);
+    expect(/const WORDMARK = "([^"]*)"/.exec(source)?.[1]).toBe(LOGO_WORDMARK);
+  });
+
+  it("converts absolute SVG commands, flipping y, and refuses anything else", () => {
+    expect(svgPathToPdf("M0 0L10 0H20V5C1 2 3 4 5 6Z", 2, 100, 500)).toBe("100 500 m 120 500 l 140 500 l 140 490 l 102 496 106 492 110 488 c h");
+    // Exponent notation, as in the Figma export.
+    expect(svgPathToPdf("M8.16603e-05 1e-2", 1, 0, 0)).toBe("0 -0.01 m");
+    expect(() => svgPathToPdf("M0 0 a1 1 0 0 1 2 2", 1, 0, 0)).toThrow(/unsupported/);
+  });
+
+  it("draws the logo at the top of the first page, filled in brand colour and ink", () => {
+    const text = latin1(renderPdf(report, META));
+    const firstContent = /stream\n([\s\S]*?)\nendstream/.exec(text)?.[1] ?? "";
+    expect(firstContent.startsWith("0.71 0.47 1 rg ")).toBe(true);
+    expect(firstContent).toMatch(/ h f\n0\.1 0\.1 0\.12 rg /);
+    expect(firstContent.split("\n")[1]?.endsWith(" f")).toBe(true);
   });
 });
 
