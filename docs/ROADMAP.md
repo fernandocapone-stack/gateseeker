@@ -34,6 +34,8 @@ Each sprint keeps the format of `PRODUCT.md`: delivery, the hypothesis it tests,
 *Metric:* unchanged from Sprint 4.
 
 ### Sprint 5 — From finding to fix
+Detailed scope, with Track A1, in `docs/SPRINT_5.md` (awaiting PO approval). Note: the web already uses plain priority labels ("Fix now", "Fix before release", …), so U8 there reduces to the impact sentence and the same labels in the CLI and the Action.
+
 - **U2, "Fix with your AI tool":** each finding gets a copyable, deterministic fix prompt written per rule ("In `src/lib/supabase.ts`, the service-role key is exposed through `NEXT_PUBLIC_…`. Move it to a server-only variable and …"). The templates are written by us and tested like rules; no LLM generates them. A short manual fix is also shown for people who don't use AI tools.
 - **U8, plain language:** priorities renamed in the UI to *Fix today / This week / When you can / For your information* (P-codes stay as a secondary label and in JSON/SARIF). One "what could happen" sentence per rule.
 - **U5, accept risk:** "Accept this finding" on the web writes a suggested `gateseeker-ignore` line with a reason, to paste into the code. The decision stays in the repository, reviewable in the PR, with no server state.
