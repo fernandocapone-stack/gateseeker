@@ -1,5 +1,6 @@
 import { sanitize } from "../report/text.js";
 import { decidePriority } from "../rules/priority.js";
+import { supplyChainGuidance } from "../rules/remediation/dependencies.js";
 import type { Finding, SeverityTier } from "../types.js";
 import type { LockPackage, LockSnapshot } from "./snapshot.js";
 
@@ -191,7 +192,7 @@ export function runSupplyChainRules(current: LockSnapshot, baseline: LockSnapsho
       severity: { tier: m.severity, declared: null, cvss: [] },
       priority: decision.priority,
       rationale: decision.rationale,
-      remediation: { fixedVersions: [], action: m.action },
+      remediation: { fixedVersions: [], action: m.action, ...supplyChainGuidance("structural", m.pkg.name) },
       references: [],
       aiExplanation: null,
     });

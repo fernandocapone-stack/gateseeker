@@ -1,7 +1,7 @@
 # Gateseeker — Sprint 5: do achado à correção, mais a Track A1 (configuração de agentes)
 
 > Status: **aprovada pelo PO em 2026-10-29**, com a decisão 5 do roadmap: pnpm e Yarn **não** contam como ecossistema novo, então o §3.4 entra completo (parsers de `pnpm-lock.yaml` e `yarn.lock`). A ordem (Sprint 5 antes da 6) e a Track A1 foram aprovadas em 2026-10-28. Pendente antes do passo 4: a lista dos 10 repositórios com configuração de agente (§8.3).
-> Última atualização: 2026-10-29
+> Última atualização: 2026-10-29. **Passos 1 e 2 implementados** (branch `sprint5/fix-guidance`): campos `impact`, `manualSteps` e `aiPrompt` com textos para as oito regras de padrão, para atualização de dependência e para supply chain (sem prompt), mostrados no terminal; veredito `incomplete` para lockfile não suportado. Dois ajustes ao texto abaixo, decididos na implementação: os textos das regras ficam num registro por regra em `src/rules/remediation/patterns.ts` (um arquivo só, mais fácil de revisar que oito); e o teste 2 proíbe as instruções de silenciar (`gateseeker-ignore`, `--no-verify`) em vez de palavras soltas como "disable", porque o parágrafo final de todo prompt precisa dizer "não desligue verificações".
 
 Você é o Software Engineer responsável pelo Gateseeker. O stakeholder, Product Owner, Product Designer e auditor é o usuário humano, que não é desenvolvedor: apresente decisões em linguagem simples. As regras de trabalho, a stack e os controles de segurança das sprints anteriores continuam valendo. Esta sprint não traz serviço hospedado novo nem dependência nova.
 

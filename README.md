@@ -146,6 +146,10 @@ Findings: 18  (P1 13, P2 3, P3 2, P4 0)  dependencies 0, code patterns 18
        code:     SUPABASE_SERVICE_ROLE_KEY=eyJh…[219 chars]
        severity: CRITICAL (env file)   why: rule:GSK-SECRET-001, base:critical/direct-prod=P1, fix-available
        action:   Revoke the credential at the provider, move it to a server-side environment variable or secret manager, and purge it from git history.
+       impact:   Anyone who can read this code (the repository, the published bundle or a leaked copy) can use this Supabase service_role key as you.
+       steps:    1. Revoke or rotate the Supabase service_role key at the provider now: assume it is already exposed.
+                 2. Replace the literal with an environment variable read only in server code.
+                 3. If the repository is or was public, remove the value from the git history too.
   ...
 
 GATE: PASS (fail-on P2, patterns warn)
@@ -153,6 +157,10 @@ GATE: PASS (fail-on P2, patterns warn)
 ```
 
 Secrets are never printed: a matched credential is shown as its first four characters and its length.
+
+Each finding also carries plain-language fix guidance: `impact` (what could happen) and `manualSteps`, shown above, plus `aiPrompt` in the JSON report and on the web, a text to paste into Cursor, Lovable or Claude Code. The guidance is written per rule by the maintainers and is deterministic; no model generates it, and it is built only from the finding's location and names, never from the matched code.
+
+A project whose only lockfile is `pnpm-lock.yaml`, `yarn.lock` or `bun.lock` gets the verdict `incomplete` (exit code 2): those formats are not read yet, so the absence of dependency findings cannot be asserted.
 
 ## Supply-chain signals (Composer and npm)
 

@@ -1,5 +1,6 @@
 import { sanitize } from "../report/text.js";
 import { decidePriority } from "../rules/priority.js";
+import { patternGuidance } from "../rules/remediation/patterns.js";
 import type { Finding } from "../types.js";
 import type { FileClass, PatternsSummary, ProjectSnapshot, Rule, RuleMatch, Suppression } from "./types.js";
 
@@ -116,7 +117,7 @@ function toFinding(rule: Rule, path: string, fileClass: FileClass, m: RuleMatch,
     severity: { tier: severity, declared: null, cvss: [] },
     priority: decision.priority,
     rationale: decision.rationale,
-    remediation: { fixedVersions: [], action: m.action ?? rule.action },
+    remediation: { fixedVersions: [], action: m.action ?? rule.action, ...patternGuidance(rule.id, { file: path, line: m.line, details: m.details ?? null }) },
     references: [],
     aiExplanation: null,
   };

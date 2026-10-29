@@ -32,6 +32,8 @@ export function renderSummary(report: Report): string {
   lines.push(`Dependencies ${s.byKind["dependency-vulnerability"]} · supply chain ${s.byKind["supply-chain-anomaly"]} · code patterns ${s.byKind["insecure-pattern"]} · gate: fail-on ${report.gate.failOn}, patterns ${report.gate.patternsMode}, supply-chain rules ${report.gate.supplyChainMode}`);
   if (report.analyses.dependencies === "analyzed") {
     lines.push(`Queried ${s.queried} dependency version(s): ${s.byQueryState.vulnerable} with known issues, ${s.byQueryState["no-known-vulnerabilities"]} without, ${s.byQueryState["query-failed"]} failed, ${s.byQueryState["not-queried"]} not queried.`);
+  } else if (report.analyses.dependencies === "not-supported") {
+    lines.push(`Dependencies were not analyzed: ${md((report.project.unsupportedLockfiles ?? []).join(", "), 120)} is not supported yet, so the gate is incomplete.`);
   } else {
     lines.push("Dependencies were not analyzed (no lockfile at the project root, or `only: patterns`).");
   }

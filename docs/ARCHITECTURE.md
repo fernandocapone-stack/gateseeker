@@ -51,6 +51,7 @@ The only runtime dependency is Zod. HTTP uses Node's global `fetch`; argument pa
 | `rules/cvss.ts` | CVSS 3.0/3.1 base score from a vector string. | Score CVSS 2 or 4. |
 | `rules/severity.ts` | Severity tier: max CVSS 3.x score → tier; else declared rating; else UNKNOWN. | Guess from free text. |
 | `rules/priority.ts` | The priority table and modifiers, shared by both finding kinds. Returns priority plus rule ids applied. | Anything beyond the table. |
+| `rules/remediation/*.ts` | Fix guidance as rule conclusions: `impact`, `manualSteps` and `aiPrompt` per pattern rule (`patterns.ts`), for dependency updates and supply-chain findings (`dependencies.ts`); every interpolated value passes an allowlist (`safe.ts`). | Quote file contents, call a model, suggest suppressing the finding. |
 | `rules/findings.ts` | Build a dependency `Finding` from one OSV record; extract fixed versions for that exact package; pick the smallest fix above the installed version. | Rewrite source text. |
 | `patterns/walker.ts` | Walk a directory into a `ProjectSnapshot` under limits; skip symlinks, fixed directories, `.gitignore` matches, binaries; keep `.env*` and `.gitignore` even when gitignored. | Follow links, leave the root, run git. |
 | `patterns/gitignore.ts` | Minimal `.gitignore` matcher (no negation, root file only). | Full git semantics. |

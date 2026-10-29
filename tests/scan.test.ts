@@ -1,5 +1,8 @@
-import { describe, expect, it } from "vitest";
-import { decideVerdict, scan } from "../src/scan.js";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { afterEach, describe, expect, it } from "vitest";
+import { decideVerdict, scan, scanDirectory } from "../src/scan.js";
 import type { Finding, QueryState } from "../src/types.js";
 import { readFixture } from "./helpers.js";
 
@@ -170,5 +173,53 @@ describe("decideVerdict", () => {
     expect(decideVerdict([finding("P3"), finding("P4")], none, "P2").verdict).toBe("pass");
     expect(decideVerdict([finding("P3")], none, "P3").verdict).toBe("fail");
     expect(decideVerdict([finding("P4")], none, "P4").verdict).toBe("fail");
+  });
+});
+
+describe("unsupported lockfiles (docs/SPRINT_5.md 3.4)", () => {
+  const none: Record<QueryState, number> = { vulnerable: 0, "no-known-vulnerabilities": 0, "query-failed": 0, "not-queried": 0 };
+  const ran = { deps: false, patterns: true, patternsMode: "warn" as const, unsupported: ["pnpm-lock.yaml"] };
+  const dirs: string[] = [];
+  function project(files: Record<string, string>): string {
+    const d = mkdtempSync(join(tmpdir(), "gsk-unsupported-"));
+    dirs.push(d);
+    for (const [name, text] of Object.entries(files)) writeFileSync(join(d, name), text);
+    return d;
+  }
+  afterEach(() => {
+    for (const d of dirs.splice(0)) rmSync(d, { recursive: true, force: true });
+  });
+  const emptyLock = JSON.stringify({ name: "x", lockfileVersion: 3, packages: { "": { name: "x" } } });
+
+  it("is incomplete, never pass, when only an unsupported lockfile exists; a gated finding still fails", () => {
+    expect(decideVerdict([], none, "P2", ran)).toMatchObject({ verdict: "incomplete", reason: expect.stringContaining("pnpm-lock.yaml is not supported yet") as string });
+    expect(decideVerdict([{ priority: "P1" } as Finding], none, "P2", ran).verdict).toBe("fail");
+  });
+
+  it("marks the dependencies as not supported in a directory scan", async () => {
+    const r = await scanDirectory({ root: project({ "pnpm-lock.yaml": "lockfileVersion: '9.0'\n", "index.js": "console.log(1);\n" }), now: fixedNow });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.report.analyses.dependencies).toBe("not-supported");
+    expect(r.report.project.unsupportedLockfiles).toEqual(["pnpm-lock.yaml"]);
+    expect(r.report.gate.verdict).toBe("incomplete");
+    expect(r.report.limitations.join(" ")).toContain("npm dependencies were not analyzed: pnpm-lock.yaml is not supported yet");
+  });
+
+  it("analyzes package-lock.json when it sits next to yarn.lock, and says the other file was not read", async () => {
+    const r = await scanDirectory({ root: project({ "package-lock.json": emptyLock, "yarn.lock": "# yarn lockfile v1\n" }), now: fixedNow, only: "deps" });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.report.analyses.dependencies).toBe("analyzed");
+    expect(r.report.gate.verdict).toBe("pass");
+    expect(r.report.limitations.join(" ")).toContain("yarn.lock was not read");
+  });
+
+  it("does not look at lockfiles when dependencies were excluded on purpose", async () => {
+    const r = await scanDirectory({ root: project({ "bun.lockb": "\u0000bin", "a.js": "x\n" }), now: fixedNow, only: "patterns" });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.report.analyses.dependencies).toBe("not-analyzed");
+    expect(r.report.gate.verdict).toBe("pass");
   });
 });

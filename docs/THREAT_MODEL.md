@@ -126,6 +126,8 @@ Residual: Gateseeker trusts TLS and OSV itself.
 | Pattern rules with unmeasured precision block builds | Pattern findings are `warn` by default and only gate with `--patterns gate`; precision on real projects is tracked in `docs/VALIDATION_SPRINT_1.md`. | `patterns.test.ts` "gate mode counts pattern findings in the verdict"; `cli.test.ts` warn vs gate |
 | Invented findings | Dependency findings come only from OSV records, copied verbatim; pattern findings cite file, line and a redacted snippet. | `osv.test.ts`, `priority.test.ts`, `patterns.test.ts` |
 | AI layer takes action | No AI exists in this version. `aiExplanation` is reserved and always `null`. | `cli.test.ts` asserts `aiExplanation === null` |
+| The fix prompt becomes an injection vector into the user's AI coding tool (a crafted file, variable, table or package name carrying instructions) | Prompts are written per rule and filled only with finding facts; each value passes a strict allowlist (`src/rules/remediation/safe.ts`: paths, identifiers, table and package names, versions), anything else becomes "?"; matched code is never quoted; every prompt ends with a fixed paragraph that forbids weakening checks or printing secrets; supply-chain findings get no prompt. | `remediation.test.ts` "neutralizes crafted paths and names", "filters crafted package names and versions", "never quotes the matched code", "never suggests silencing the check", "contains no full credential" |
+| A project with only a pnpm, Yarn or Bun lockfile reads as `pass` | Those lockfiles are detected at the root; alone they make `analyses.dependencies` `not-supported` and the verdict `incomplete`. | `scan.test.ts` "unsupported lockfiles" |
 
 ### 11. Hosted service (Sprint 4)
 

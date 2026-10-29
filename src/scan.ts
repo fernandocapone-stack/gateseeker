@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
-import { readFile } from "node:fs/promises";
+import { access, readFile } from "node:fs/promises";
 import { basename, dirname, join, resolve } from "node:path";
 import { ADVISORY_SOURCE_NAME, advisoryMatches, advisoryTagMatch, buildAdvisoryFinding, loadAdvisories, type AdvisorySet } from "./intel/advisories.js";
 import { OSV_QUERY_ENDPOINT, OSV_SOURCE_NAME, OsvClient, type OsvClientOptions } from "./intel/osv.js";
@@ -25,6 +25,9 @@ import { GATESEEKER_VERSION } from "./version.js";
 
 export type Analysis = "deps" | "patterns";
 export type LockfileKind = "package-lock.json" | "composer.lock";
+
+/** npm-ecosystem lockfiles Gateseeker cannot read yet; alone at the root they make the verdict incomplete. */
+export const UNSUPPORTED_LOCKFILES = ["pnpm-lock.yaml", "yarn.lock", "bun.lock", "bun.lockb"] as const;
 
 export interface ScanCommonOptions {
   failOn?: Priority;
@@ -277,7 +280,16 @@ export async function scanDirectory(options: ScanDirectoryOptions): Promise<Scan
   const only = options.only;
 
   const locks: LockOutcome[] = [];
+  const unsupported: string[] = [];
   if (only !== "patterns") {
+    for (const name of UNSUPPORTED_LOCKFILES) {
+      try {
+        await access(join(root, name));
+        unsupported.push(name);
+      } catch {
+        /* absent */
+      }
+    }
     const advisories = await resolveAdvisories(options);
     for (const kind of ["package-lock.json", "composer.lock"] as LockfileKind[]) {
       const lockfilePath = join(root, kind);
@@ -309,11 +321,12 @@ export async function scanDirectory(options: ScanDirectoryOptions): Promise<Scan
     patterns = result.patterns;
   }
 
-  return finishScan({ root, startedAt, locks, patterns, options, now });
+  return finishScan({ root, startedAt, locks, patterns, options, now, unsupported });
 }
 
-function finishScan(args: { root: string; startedAt: string; locks: LockOutcome[]; patterns: PatternsOutcome | null; options: ScanCommonOptions; now: () => Date }): ScanResult {
+function finishScan(args: { root: string; startedAt: string; locks: LockOutcome[]; patterns: PatternsOutcome | null; options: ScanCommonOptions; now: () => Date; unsupported?: string[] }): ScanResult {
   const { root, startedAt, locks, patterns, options, now } = args;
+  const unsupported = args.unsupported ?? [];
   const failOn = options.failOn ?? "P2";
   const patternsMode = options.patternsMode ?? "warn";
   const supplyChainMode = options.supplyChainMode ?? "warn";
@@ -359,7 +372,9 @@ function finishScan(args: { root: string; startedAt: string; locks: LockOutcome[
     return true;
   });
   const deps = locks.length > 0;
-  const gate = decideVerdict(gateFindings, byQueryState, failOn, { deps, patterns: patterns !== null, patternsMode });
+  // A pnpm/Yarn/Bun lockfile next to package-lock.json is noted; alone, it means the npm dependencies went unread.
+  const npmUnread = unsupported.length > 0 && !locks.some((l) => l.kind === "package-lock.json");
+  const gate = decideVerdict(gateFindings, byQueryState, failOn, { deps, patterns: patterns !== null, patternsMode, unsupported: npmUnread ? unsupported : [] });
 
   for (const lock of locks) errors.push(...lock.errors);
   const advisorySet = locks[0]?.advisories;
@@ -372,9 +387,11 @@ function finishScan(args: { root: string; startedAt: string; locks: LockOutcome[
     if (advisorySet?.origin === "none") limitations.push("No curated advisory set was available (not built and no advisories/approved directory); only OSV was consulted for dependencies.");
     if (options.packagist === false) limitations.push("Packagist lookups were disabled; tag-rewrite matches are reported as unverified.");
     if (!options.baseline) limitations.push("No --baseline given: lockfile comparison rules (GSK-SC-002, 003, 005) did not run.");
-  } else {
+  } else if (!npmUnread) {
     limitations.push("Dependencies were not analyzed: no package-lock.json or composer.lock at the project root (or --only patterns).");
   }
+  if (npmUnread) limitations.push(`npm dependencies were not analyzed: ${unsupported.join(", ")} ${unsupported.length === 1 ? "is" : "are"} not supported yet, and there is no package-lock.json.`);
+  else if (unsupported.length > 0) limitations.push(`${unsupported.join(", ")} ${unsupported.length === 1 ? "was" : "were"} not read; dependencies come from package-lock.json, which may differ.`);
   if (patterns) limitations.push(...PATTERN_LIMITATIONS);
   else limitations.push("Code patterns were not analyzed (lockfile-only scan or --only deps).");
 
@@ -403,8 +420,9 @@ function finishScan(args: { root: string; startedAt: string; locks: LockOutcome[
       lockfileVersion: first?.lockfileVersion ?? null,
       name: locks.find((l) => l.name !== null)?.name ?? null,
       lockfiles: locks.map((l) => ({ path: l.lockfilePath, kind: l.kind, sha256: l.sha256, lockfileVersion: l.lockfileVersion })),
+      unsupportedLockfiles: unsupported,
     },
-    analyses: { dependencies: deps ? "analyzed" : "not-analyzed", patterns: patterns ? "analyzed" : "not-analyzed" },
+    analyses: { dependencies: deps ? "analyzed" : npmUnread ? "not-supported" : "not-analyzed", patterns: patterns ? "analyzed" : "not-analyzed" },
     patterns: patterns?.summary ?? null,
     baseline: baselineReport,
     dependencies: locks.flatMap((l) => l.dependencies),
@@ -428,18 +446,27 @@ function finishScan(args: { root: string; startedAt: string; locks: LockOutcome[
 /**
  * Gate rule, in order:
  *   1. any gated finding at or above the threshold -> fail;
- *   2. otherwise any failed or skipped registry query -> incomplete (never pass);
+ *   2. otherwise any failed or skipped registry query, or npm dependencies
+ *      left unread because only an unsupported lockfile exists -> incomplete
+ *      (never pass);
  *   3. otherwise pass, stating which analyses ran.
  */
 export function decideVerdict(
   findings: Finding[],
   byQueryState: Record<QueryState, number>,
   failOn: Priority,
-  ran: { deps: boolean; patterns: boolean; patternsMode: PatternsMode } = { deps: true, patterns: false, patternsMode: "warn" },
+  ran: { deps: boolean; patterns: boolean; patternsMode: PatternsMode; unsupported?: string[] } = { deps: true, patterns: false, patternsMode: "warn" },
 ): { verdict: Verdict; reason: string } {
   const blocking = findings.filter((f) => priorityAtLeast(f.priority, failOn)).length;
   if (blocking > 0) {
     return { verdict: "fail", reason: `${blocking} gated finding(s) at priority ${failOn} or higher.` };
+  }
+  const unsupported = ran.unsupported ?? [];
+  if (unsupported.length > 0) {
+    return {
+      verdict: "incomplete",
+      reason: `npm dependencies were not analyzed: ${unsupported.join(", ")} ${unsupported.length === 1 ? "is" : "are"} not supported yet; absence of findings cannot be asserted.`,
+    };
   }
   const unresolved = byQueryState["query-failed"] + byQueryState["not-queried"];
   if (unresolved > 0) {

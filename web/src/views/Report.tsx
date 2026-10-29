@@ -141,7 +141,9 @@ export function ReportView({ response, elapsedMs }: { response: ScanResponseOk; 
         <p className="text-label text-muted-foreground">
           {report.analyses.dependencies === "analyzed"
             ? `Queried ${String(report.summary.queried)} dependency version(s): ${String(report.summary.byQueryState.vulnerable)} with known issues, ${String(report.summary.byQueryState["no-known-vulnerabilities"])} without, ${String(report.summary.byQueryState["query-failed"])} failed, ${String(report.summary.byQueryState["not-queried"])} not queried.`
-            : "Dependencies were not analyzed: no package-lock.json or composer.lock at the repository root."}{" "}
+            : report.analyses.dependencies === "not-supported"
+              ? `Dependencies were not analyzed: ${(report.project.unsupportedLockfiles ?? []).join(", ")} is not supported yet, so the result is incomplete.`
+              : "Dependencies were not analyzed: no package-lock.json or composer.lock at the repository root."}{" "}
           {report.analyses.patterns === "analyzed" && report.patterns ? `${String(report.patterns.filesScanned)} file(s) scanned for code patterns.` : ""}
         </p>
         <p className="text-caption text-muted-foreground">

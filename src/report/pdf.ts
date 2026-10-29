@@ -17,7 +17,7 @@ import { sanitize } from "./text.js";
  * data the JSON report does not carry.
  */
 
-export type PdfReport = Pick<Report, "gate" | "summary" | "analyses" | "patterns" | "findings" | "errors" | "limitations" | "sources" | "gateseekerVersion">;
+export type PdfReport = Pick<Report, "gate" | "summary" | "analyses" | "patterns" | "findings" | "errors" | "limitations" | "sources" | "gateseekerVersion"> & { project: Pick<Report["project"], "unsupportedLockfiles"> };
 
 export interface PdfMeta {
   /** What was analyzed, e.g. "owner/repo@abc1234". */
@@ -354,7 +354,9 @@ function layoutReport(report: PdfReport, meta: PdfMeta): Layout {
   doc.text(
     report.analyses.dependencies === "analyzed"
       ? `Queried ${String(s.queried)} dependency version(s): ${String(s.byQueryState.vulnerable)} with known issues, ${String(s.byQueryState["no-known-vulnerabilities"])} without, ${String(s.byQueryState["query-failed"])} failed, ${String(s.byQueryState["not-queried"])} not queried.`
-      : "Dependencies were not analyzed: no supported lockfile at the repository root.",
+      : report.analyses.dependencies === "not-supported"
+        ? `Dependencies were not analyzed: ${(report.project.unsupportedLockfiles ?? []).join(", ")} is not supported yet.`
+        : "Dependencies were not analyzed: no supported lockfile at the repository root.",
     { size: 9, color: MUTED, gapAfter: 2 },
   );
   if (report.analyses.patterns === "analyzed" && report.patterns) doc.text(`${String(report.patterns.filesScanned)} file(s) scanned for code patterns.`, { size: 9, color: MUTED, gapAfter: 2 });
