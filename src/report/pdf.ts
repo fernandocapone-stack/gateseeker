@@ -173,6 +173,7 @@ const PAGE_H = 841.89;
 const MARGIN = 50;
 const BOTTOM = 60; // room for the footer
 const CONTENT_W = PAGE_W - 2 * MARGIN;
+const LINE_HEIGHT = 1.45;
 
 type Rgb = [number, number, number];
 const INK: Rgb = [0.1, 0.1, 0.12];
@@ -213,7 +214,7 @@ class Layout {
     const font = o.font ?? "F1";
     const size = o.size ?? 10;
     const indent = o.indent ?? 0;
-    const lead = size * 1.35;
+    const lead = size * LINE_HEIGHT;
     const lines = wrap(font, size, toWinAnsi(sanitize(raw, o.max ?? 2000)), CONTENT_W - indent);
     for (const l of lines) {
       this.ensure(lead);
@@ -226,7 +227,7 @@ class Layout {
   /** Several runs on one line (short labels only; no wrapping). */
   runs(parts: { text: string; font?: FontKey; size?: number; color?: Rgb }[], gapAfter = 0): void {
     const size = Math.max(...parts.map((p) => p.size ?? 10));
-    const lead = size * 1.35;
+    const lead = size * LINE_HEIGHT;
     this.ensure(lead);
     this.y -= lead;
     let x = MARGIN;
@@ -304,78 +305,83 @@ function ordered(findings: Finding[]): Finding[] {
 
 function writeFinding(doc: Layout, f: Finding): void {
   const e = f.evidence;
-  doc.keep(70);
-  doc.rule(4, 2);
-  doc.runs([
-    { text: `${f.priority} · ${PRIORITY_LABEL[f.priority] ?? ""}`, font: "F2", size: 9, color: f.priority === "P1" ? RED : f.priority === "P2" ? AMBER : MUTED },
-    { text: `   ${f.severity.tier} · ${kindLabel(f)} · ${f.source.name}`, size: 9, color: MUTED },
-  ]);
-  doc.text(findingTitle(f), { font: "F2", size: 10.5, max: 300 });
-  doc.text(f.subject, { font: "F3", size: 8.5, color: MUTED, max: 300 });
-  doc.text(f.remediation.action, { size: 9.5, max: 600, gapAfter: 2 });
+  // Groups inside a finding: label, title and location, what to do, evidence, why. Space separates the groups, not the lines.
+  doc.keep(110);
+  doc.rule(14, 10);
+  doc.runs(
+    [
+      { text: `${f.priority} · ${PRIORITY_LABEL[f.priority] ?? ""}`, font: "F2", size: 9, color: f.priority === "P1" ? RED : f.priority === "P2" ? AMBER : MUTED },
+      { text: `    ${f.severity.tier} · ${kindLabel(f)} · ${f.source.name}`, size: 9, color: MUTED },
+    ],
+    4,
+  );
+  doc.text(findingTitle(f), { font: "F2", size: 11, max: 300, gapAfter: 2 });
+  doc.text(f.subject, { font: "F3", size: 8.5, color: MUTED, max: 300, gapAfter: 8 });
+  doc.text(f.remediation.action, { size: 9.5, max: 600, gapAfter: 10 });
 
   if (e.kind === "insecure-pattern") {
-    doc.text(`${e.file}:${String(e.line)} · classified as ${e.fileClass}`, { font: "F3", size: 8.5, color: MUTED, max: 300 });
-    doc.text(e.snippet, { font: "F3", size: 8.5, indent: 8, max: 600 });
-    doc.text(e.message, { size: 9.5, max: 800 });
+    doc.text(`${e.file}:${String(e.line)} · classified as ${e.fileClass}`, { font: "F3", size: 8.5, color: MUTED, max: 300, gapAfter: 4 });
+    doc.text(e.snippet, { font: "F3", size: 8.5, indent: 12, max: 600, gapAfter: 6 });
+    doc.text(e.message, { size: 9.5, max: 800, gapAfter: 10 });
   } else if (e.kind === "supply-chain-anomaly") {
-    doc.text(e.summary, { size: 9.5, max: 800 });
-    for (const i of e.indicators.slice(0, 12)) doc.text(`• ${i}`, { font: "F3", size: 8.5, indent: 8, max: 300 });
-    doc.text(`Verification: ${e.verification}${e.reviewedBy ? ` · reviewed by ${e.reviewedBy}` : ""}`, { size: 9, color: MUTED, max: 300 });
+    doc.text(e.summary, { size: 9.5, max: 800, gapAfter: 6 });
+    for (const i of e.indicators.slice(0, 12)) doc.text(`• ${i}`, { font: "F3", size: 8.5, indent: 12, max: 300, gapAfter: 2 });
+    doc.text(`Verification: ${e.verification}${e.reviewedBy ? ` · reviewed by ${e.reviewedBy}` : ""}`, { size: 9, color: MUTED, max: 300, gapAfter: 10 });
   } else {
-    if (e.details) doc.text(e.details.length > 1200 ? `${e.details.slice(0, 1200)}…` : e.details, { size: 9, color: MUTED, max: 1300 });
+    if (e.details) doc.text(e.details.length > 1200 ? `${e.details.slice(0, 1200)}…` : e.details, { size: 9, color: MUTED, max: 1300, gapAfter: 6 });
     const fixed = f.remediation.fixedVersions.length > 0 ? `fixed in ${f.remediation.fixedVersions.join(", ")}` : "no fixed version published";
-    doc.text(`Published ${e.published ?? "unknown"} · source ${f.source.name} · ${fixed}`, { size: 9, color: MUTED, max: 400 });
+    doc.text(`Published ${e.published ?? "unknown"} · source ${f.source.name} · ${fixed}`, { size: 9, color: MUTED, max: 400, gapAfter: 10 });
   }
-  doc.text(`Why this priority: ${f.rationale.join(" -> ")}`, { size: 8.5, color: MUTED, max: 600 });
+  doc.text(`Why this priority: ${f.rationale.join(" -> ")}`, { size: 8.5, color: MUTED, max: 600, gapAfter: 3 });
   for (const r of f.references.slice(0, 6)) {
     const url = safeUrl(r.url);
-    doc.text(url ? `${r.type}: ${url}` : r.type, { size: 8.5, color: MUTED, max: 400 });
+    doc.text(url ? `${r.type}: ${url}` : r.type, { size: 8.5, color: MUTED, max: 400, gapAfter: 1 });
   }
-  doc.space(4);
 }
 
 function layoutReport(report: PdfReport, meta: PdfMeta): Layout {
   const doc = new Layout();
   const v = report.gate.verdict;
 
-  doc.logo(22, 8);
-  doc.runs([{ text: "Report ", font: "F2", size: 12 }, { text: meta.subject, font: "F3", size: 10, color: MUTED }]);
-  doc.text(`Exported ${meta.exportedAt.toISOString().replace("T", " ").slice(0, 16)} UTC · Gateseeker ${report.gateseekerVersion}`, { size: 8.5, color: MUTED, gapAfter: 4 });
-  doc.rule(2, 6);
+  doc.logo(22, 14);
+  doc.runs([{ text: "Report ", font: "F2", size: 12 }, { text: meta.subject, font: "F3", size: 10, color: MUTED }], 2);
+  doc.text(`Exported ${meta.exportedAt.toISOString().replace("T", " ").slice(0, 16)} UTC · Gateseeker ${report.gateseekerVersion}`, { size: 8.5, color: MUTED });
+  doc.rule(12, 16);
 
-  doc.runs([{ text: verdictWord(v), font: "F2", size: 14, color: verdictColor(v) }], 2);
-  doc.text(report.gate.reason, { size: 10, max: 800, gapAfter: 2 });
+  doc.runs([{ text: verdictWord(v), font: "F2", size: 14, color: verdictColor(v) }], 4);
+  doc.text(report.gate.reason, { size: 10, max: 800, gapAfter: 8 });
   const s = report.summary;
   doc.text(
     report.analyses.dependencies === "analyzed"
       ? `Queried ${String(s.queried)} dependency version(s): ${String(s.byQueryState.vulnerable)} with known issues, ${String(s.byQueryState["no-known-vulnerabilities"])} without, ${String(s.byQueryState["query-failed"])} failed, ${String(s.byQueryState["not-queried"])} not queried.`
       : "Dependencies were not analyzed: no supported lockfile at the repository root.",
-    { size: 9, color: MUTED },
+    { size: 9, color: MUTED, gapAfter: 2 },
   );
-  if (report.analyses.patterns === "analyzed" && report.patterns) doc.text(`${String(report.patterns.filesScanned)} file(s) scanned for code patterns.`, { size: 9, color: MUTED });
+  if (report.analyses.patterns === "analyzed" && report.patterns) doc.text(`${String(report.patterns.filesScanned)} file(s) scanned for code patterns.`, { size: 9, color: MUTED, gapAfter: 2 });
   const g = report.gate;
-  doc.text([`Gate: fail on ${g.failOn}, patterns ${g.patternsMode}, supply-chain rules ${g.supplyChainMode}`, ...(meta.notes ?? []), `sources: ${report.sources.map((x) => x.name).join(", ") || "none"}`].join(" · "), { size: 8.5, color: MUTED, max: 800, gapAfter: 6 });
+  doc.text([`Gate: fail on ${g.failOn}, patterns ${g.patternsMode}, supply-chain rules ${g.supplyChainMode}`, ...(meta.notes ?? []), `sources: ${report.sources.map((x) => x.name).join(", ") || "none"}`].join(" · "), { size: 8.5, color: MUTED, max: 800, gapAfter: 16 });
 
   doc.runs(
     (["P1", "P2", "P3", "P4"] as const).map((p) => ({ text: `${p} ${PRIORITY_LABEL[p] ?? ""}: ${String(s.byPriority[p])}     `, font: "F2" as const, size: 9.5, color: p === "P1" && s.byPriority[p] > 0 ? RED : INK })),
-    4,
+    0,
   );
+  doc.rule(16, 14);
 
-  doc.text(`Findings (${String(report.findings.length)})`, { font: "F2", size: 12, gapAfter: 2 });
+  doc.text(`Findings (${String(report.findings.length)})`, { font: "F2", size: 13, gapAfter: 0 });
   if (report.findings.length === 0) doc.text("No known vulnerabilities or insecure patterns were found in the sources consulted.", { size: 10 });
   for (const f of ordered(report.findings)) writeFinding(doc, f);
 
   if (report.errors.length > 0) {
-    doc.keep(40);
-    doc.text(`Errors and warnings (${String(report.errors.length)})`, { font: "F2", size: 11, gapAfter: 2 });
-    for (const e of report.errors) doc.text(`• ${e}`, { size: 9, color: MUTED, indent: 6, max: 600 });
-    doc.space(6);
+    doc.keep(60);
+    doc.rule(16, 14);
+    doc.text(`Errors and warnings (${String(report.errors.length)})`, { font: "F2", size: 11, gapAfter: 6 });
+    for (const e of report.errors) doc.text(`• ${e}`, { size: 9, color: MUTED, indent: 6, max: 600, gapAfter: 3 });
   }
-  doc.keep(40);
-  doc.text("Limitations", { font: "F2", size: 11, gapAfter: 2 });
-  for (const l of report.limitations) doc.text(`• ${l}`, { size: 9, color: MUTED, indent: 6, max: 600 });
-  doc.space(8);
+  doc.keep(60);
+  doc.rule(16, 14);
+  doc.text("Limitations", { font: "F2", size: 11, gapAfter: 6 });
+  for (const l of report.limitations) doc.text(`• ${l}`, { size: 9, color: MUTED, indent: 6, max: 600, gapAfter: 3 });
+  doc.space(14);
   doc.text('"No known vulnerabilities" means none was returned by the sources consulted at query time, not that a project is secure.', { size: 8.5, color: MUTED });
   return doc;
 }
