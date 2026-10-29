@@ -116,6 +116,7 @@ Residual: Gateseeker trusts TLS and OSV itself.
 |---|---|---|
 | Package name, advisory summary or code snippet containing ANSI escapes or newlines spoofs a `GATE: PASS` line | `sanitize()` strips C0/C1 controls, DEL, U+2028/2029 and collapses newlines before any untrusted string is printed; values are truncated. | `cli.test.ts` "strips control characters", "renders an untrusted summary without letting it break lines" |
 | Attacker-controlled URL in `ref:` or in an advisory source is auto-opened | Nothing is opened; URLs are printed as text only. | By construction |
+| Report strings inject PDF syntax (close a string, add operators, actions, JavaScript or links) in the downloaded PDF | Own writer (`src/report/pdf.ts`), no dependency: every string goes through `sanitize()`, is mapped to WinAnsi and has ``, `(` and `)` escaped; the file has no annotations, actions or scripts; URLs are plain text. | `pdf.test.ts` "never lets report strings escape the text string they are drawn in", "writes a structurally valid PDF …" (no `/JavaScript`, `/OpenAction`, `/URI`), "contains no full credential from the scanned project" |
 
 ### 10. Language and interpretation
 

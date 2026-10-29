@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { expect, test, type Page } from "@playwright/test";
 
 /**
@@ -84,12 +85,29 @@ test.describe("public page", () => {
     await expect(page.getByTestId("saved-note")).not.toContainText("analyses used");
   });
 
-  test("exports the whole report for PDF: every finding expanded, workspace frame hidden", async ({ page }) => {
+  test("downloads the report as a PDF file without opening the print dialog", async ({ page }) => {
+    await signIn(page);
+    await analyze(page, "https://github.com/acme/vibe");
+    await expect(page.getByRole("region", { name: "Report" })).toBeVisible({ timeout: 30_000 });
+    await page.evaluate("window.__printed = false; window.print = () => { window.__printed = true; }");
+    const [download] = await Promise.all([page.waitForEvent("download"), page.getByRole("button", { name: "Download PDF" }).click()]);
+    expect(download.suggestedFilename()).toBe("gateseeker-acme-vibe-0123456.pdf");
+    const path = await download.path();
+    const bytes = readFileSync(path);
+    const text = bytes.toString("latin1");
+    expect(text.startsWith("%PDF-1.4")).toBe(true);
+    expect(text).toContain("acme/vibe@0123456");
+    expect(text).toContain("GSK-SECRET-001");
+    expect(text).not.toContain("sk_live_HoHDwEcLksdRWvioeGponKHY");
+    expect(await page.evaluate("window.__printed")).toBe(false);
+  });
+
+  test("prints the whole report: every finding expanded, workspace frame hidden", async ({ page }) => {
     await signIn(page);
     await analyze(page, "https://github.com/acme/vibe");
     const report = page.getByRole("region", { name: "Report" });
     await expect(report).toBeVisible({ timeout: 30_000 });
-    await expect(page.getByRole("button", { name: "Export PDF" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Print" })).toBeVisible();
     const details = page.locator("tr[id^=finding-]");
     const total = await details.count();
     expect(total).toBeGreaterThan(0);

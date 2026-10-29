@@ -111,7 +111,7 @@ export function DesignSystem() {
             <Button size="sm">Primary small</Button>
             <Button variant="outline" size="md">View issue</Button>
             <Button variant="outline" size="sm" className="pr-2 text-label">Highest priority <ArrowUpDown className="text-primary" aria-hidden="true" /></Button>
-            <Button variant="outline" size="icon" aria-label="Export PDF"><Download className="text-primary" aria-hidden="true" /></Button>
+            <Button variant="outline" size="icon" aria-label="Download PDF"><Download className="text-primary" aria-hidden="true" /></Button>
             <Button variant="outline" size="icon" aria-label="Notifications" onClick={() => { setDrawer(true); }}><Bell className="text-primary" aria-hidden="true" /></Button>
             <Button disabled>Disabled</Button>
           </div>

@@ -1,6 +1,6 @@
 # Gateseeker — Sprint 5: do achado à correção, mais a Track A1 (configuração de agentes)
 
-> Status: **proposta para aprovação do PO**, escrita em 2026-10-29. A ordem (Sprint 5 antes da 6) e o início da Track A1 foram aprovados em 2026-10-28 (`docs/ROADMAP.md` §5, decisões 2 e 7). Este documento detalha o escopo; nenhum código começa antes da aprovação dele. O suporte a pnpm e Yarn (§3.4) depende da decisão 5, ainda aberta.
+> Status: **aprovada pelo PO em 2026-10-29**, com a decisão 5 do roadmap: pnpm e Yarn **não** contam como ecossistema novo, então o §3.4 entra completo (parsers de `pnpm-lock.yaml` e `yarn.lock`). A ordem (Sprint 5 antes da 6) e a Track A1 foram aprovadas em 2026-10-28. Pendente antes do passo 4: a lista dos 10 repositórios com configuração de agente (§8.3).
 > Última atualização: 2026-10-29
 
 Você é o Software Engineer responsável pelo Gateseeker. O stakeholder, Product Owner, Product Designer e auditor é o usuário humano, que não é desenvolvedor: apresente decisões em linguagem simples. As regras de trabalho, a stack e os controles de segurança das sprints anteriores continuam valendo. Esta sprint não traz serviço hospedado novo nem dependência nova.

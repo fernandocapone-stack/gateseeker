@@ -1,5 +1,6 @@
 import { Badge, Button, Card, Logo, MetricCard, Segmented, Table, Td, Th, cn } from "@gateseeker/ui-kit";
-import { ArrowUpDown, Download, ExternalLink, ShieldAlert, ShieldCheck, ShieldQuestion } from "lucide-react";
+import { renderPdf } from "gateseeker/dist/report/pdf.js";
+import { ArrowUpDown, Download, ExternalLink, Printer, ShieldAlert, ShieldCheck, ShieldQuestion } from "lucide-react";
 import { useEffect, useState } from "react";
 import { flushSync } from "react-dom";
 
@@ -12,9 +13,11 @@ import type { Finding, ScanResponseOk } from "../api";
  * (React escapes them) and never turned into links or HTML. The only links
  * are the references the sources provide, and only when they are http(s).
  *
- * "Export PDF" prints the page with the paper palette from theme.css: the
+ * "Download PDF" saves a file built by the engine's own PDF writer
+ * (src/report/pdf.ts, no dependency): the whole report as a plain document.
+ * "Print" prints the page with the paper palette from theme.css: the
  * workspace frame and the controls are hidden, every finding is expanded and
- * the filter is ignored, so the PDF always carries the whole report.
+ * the filter is ignored, so a printout always carries the whole report.
  */
 
 const PRIORITY_LABEL: Record<string, string> = { P1: "Fix now", P2: "Fix before release", P3: "Plan a fix", P4: "Keep an eye on it" };
@@ -66,6 +69,26 @@ function usePrinting(): boolean {
     };
   }, []);
   return printing;
+}
+
+/** Builds the PDF in the browser and saves it; nothing is sent anywhere. */
+function downloadPdf(response: ScanResponseOk, elapsedMs: number): void {
+  const { report, repository, archive } = response;
+  const sha = repository.sha.slice(0, 7);
+  const bytes = renderPdf(report, {
+    subject: `${repository.owner}/${repository.repo}@${sha}`,
+    exportedAt: new Date(),
+    notes: [`${String(archive.files)} files read`, `${(elapsedMs / 1000).toFixed(1)}s`],
+  });
+  const name = `gateseeker-${repository.owner}-${repository.repo}-${sha}.pdf`.replace(/[^A-Za-z0-9._-]/g, "_");
+  const url = URL.createObjectURL(new Blob([bytes], { type: "application/pdf" }));
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = name;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => { URL.revokeObjectURL(url); }, 10_000);
 }
 
 function plural(n: number, one: string, many: string): string {
@@ -149,8 +172,11 @@ export function ReportView({ response, elapsedMs }: { response: ScanResponseOk; 
             <Button variant="outline" size="sm" className="pr-2 text-label" onClick={() => { setSort((s) => (s === "priority" ? "severity" : "priority")); }}>
               {sort === "priority" ? "Highest priority" : "Highest severity"} <ArrowUpDown className="text-primary" aria-hidden="true" />
             </Button>
-            <Button variant="outline" size="icon" aria-label="Export PDF" title="Export PDF" onClick={() => { window.print(); }}>
-              <Download className="text-primary" aria-hidden="true" />
+            <Button variant="outline" size="sm" className="pr-2 text-label" onClick={() => { downloadPdf(response, elapsedMs); }}>
+              Download PDF <Download className="text-primary" aria-hidden="true" />
+            </Button>
+            <Button variant="outline" size="icon" aria-label="Print" title="Print" onClick={() => { window.print(); }}>
+              <Printer className="text-primary" aria-hidden="true" />
             </Button>
           </div>
         </div>
