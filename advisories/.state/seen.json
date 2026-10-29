@@ -86,7 +86,8 @@
     "https://thehackernews.com/2026/10/critical-x402-sdk-flaw-could-let.html": "2026-10-27T18:03:52.375Z",
     "https://thehackernews.com/2026/10/litellm-suspects-github-token-leak-in.html": "2026-10-27T18:03:52.375Z",
     "https://www.sonatype.com/blog/hijacked-tensorlake-npm-turned-install-into-credential-risk": "2026-10-27T18:03:52.375Z",
-    "https://www.reversinglabs.com/blog/malicious-npm-campaign-twilio": "2026-10-27T18:03:52.375Z"
+    "https://www.reversinglabs.com/blog/malicious-npm-campaign-twilio": "2026-10-27T18:03:52.375Z",
+    "https://thehackernews.com/2026/10/github-launches-npm-firewall-to-block.html": "2026-10-29T13:08:20.235Z"
   },
   "titles": {
     "ea48cb3956a9b65a": "https://www.stepsecurity.io/blog/litellm-1-107-0-compromised-pypi-backdoored-wheels-credential-stealer",
@@ -175,6 +176,7 @@
     "01cc0a384d7bdb94": "https://thehackernews.com/2026/10/critical-x402-sdk-flaw-could-let.html",
     "c22d89d8a0171681": "https://thehackernews.com/2026/10/litellm-suspects-github-token-leak-in.html",
     "016038733d8c29cf": "https://www.sonatype.com/blog/hijacked-tensorlake-npm-turned-install-into-credential-risk",
-    "2bbb9605784df59d": "https://www.reversinglabs.com/blog/malicious-npm-campaign-twilio"
+    "2bbb9605784df59d": "https://www.reversinglabs.com/blog/malicious-npm-campaign-twilio",
+    "bbf1fbb05bc9945d": "https://thehackernews.com/2026/10/github-launches-npm-firewall-to-block.html"
   }
 }
