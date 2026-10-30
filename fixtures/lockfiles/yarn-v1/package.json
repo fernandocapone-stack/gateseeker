@@ -1,0 +1,12 @@
+{
+  "name": "fixture-yarn-v1",
+  "version": "1.0.0",
+  "dependencies": {
+    "debug": "4.3.4",
+    "lodash": "^4.17.20",
+    "tiny-git-dep": "github:example/tiny-git-dep#abc1234"
+  },
+  "devDependencies": {
+    "fake-test-runner": "1.0.0"
+  }
+}

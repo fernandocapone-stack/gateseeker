@@ -9,7 +9,7 @@ project directory ──▶ src/patterns/walker.ts ──▶ ProjectSnapshot ─
         └── package-lock.json (if present at root)
                   │
                   ▼
-        src/parser/lockfile.ts (npm) or src/parser/composer.ts ──▶ Dependency[] ──▶ src/intel/osv.ts ──▶ src/rules/{cvss,severity,findings}.ts ──▶ Finding[] (dependency-vulnerability)
+        src/parser/{lockfile,pnpm,yarn}.ts (npm) or src/parser/composer.ts ──▶ Dependency[] ──▶ src/intel/osv.ts ──▶ src/rules/{cvss,severity,findings}.ts ──▶ Finding[] (dependency-vulnerability)
                                       │
                                       ├──▶ src/intel/advisories.ts (approved records; versions/ranges locally, tag rewrites via src/intel/packagist.ts) ──▶ Finding[] (supply-chain-anomaly, origin advisory)
                                       │
@@ -36,6 +36,10 @@ The only runtime dependency is Zod. HTTP uses Node's global `fetch`; argument pa
 | `parser/lockfile.ts` | Parse and validate `package-lock.json` v2/v3; classify each entry's version status and exposure; collapse to unique `name@version`; compare semver. | Read the file system, resolve ranges, verify integrity hashes, run npm. |
 | `intel/osv-schema.ts` | Zod schema for the subset of the OSV record Gateseeker reads. Unknown fields pass through. | Reject records for unknown fields. |
 | `intel/osv.ts` | Query OSV with timeout, concurrency limit, per-run memoisation, pagination cap, and explicit failure outcomes. | Interpret results, retry. |
+| `parser/yaml-subset.ts` | The YAML subset pnpm and Yarn Berry lockfiles use: block maps by indentation, scalar sequences, quoted scalars, flow collections kept as text, several documents; capped and prototype-safe. | Anchors, aliases, tags, type coercion, evaluation. |
+| `parser/pnpm.ts` | `pnpm-lock.yaml` v9: project document only (pnpm 11+ adds the package manager's own), importers for direct/dev, snapshots for production reachability, packages for versions and integrity; peer suffixes and aliases handled. | Run pnpm, read v6-v8 lockfiles. |
+| `parser/yarn.ts` | `yarn.lock` Yarn 1 (own line format) and Berry (YAML): entries by spec, workspace and patch entries handled, root `package.json` for direct/dev, production by reachability. | Run Yarn, read Plug'n'Play data. |
+| `parser/js-lock.ts` | Shared result type, manifest reading and reachability for the pnpm and Yarn readers; both emit the same entries as `lockfile.ts`. | Anything format-specific. |
 | `parser/composer.ts` | Parse and validate Composer 2 `composer.lock` (+ optional `composer.json` for directness); normalize `vX.Y.Z`; classify `dev-*`, aliases and path/non-registry sources; keep commit, source URL, release time, autoload files and scripts per entry. | Run composer, resolve constraints. |
 | `intel/packagist.ts` | Read-only Packagist p2 metadata client (https, no token, timeout, memoised): expands the delta-encoded version list and answers which commit a version currently points at. | Write anything, query other hosts. |
 | `supplychain/snapshot.ts` | Ecosystem-neutral view of a lockfile (reference, host, install scripts, autoload files, release time, dev/direct). | Interpret. |
@@ -110,7 +114,7 @@ The engine is the published package at the pinned version; the web adds no rule,
 ## Trust boundaries
 
 1. **Project files → walker and rules.** Everything in the directory is attacker-controlled. Controls: symlinks skipped; containment check on every path; fixed directory exclusions; file-count and depth limits that abort with a typed error (exit 3) and a per-file size limit above which a file is skipped unread and listed in the limitations; binary detection by extension and NUL probe; lines over 5000 characters skipped by rules; regexes reviewed and timed against adversarial 1 MB inputs; snippets sanitized and secrets redacted; rule exceptions caught and reported as a `GSK-ENGINE-000` finding instead of crashing.
-2. **Lockfile → parser.** Byte limit before parsing, dependency-count limit, strict schema, no code execution.
+2. **Lockfile → parser.** Byte limit before parsing, dependency-count limit, strict schema, no code execution. YAML lockfiles go through a prototype-safe subset reader with depth and entry caps before the schema.
 3. **OSV → client.** Schema validation (malformed response is a failed query), timeout, pagination cap, summaries and references treated as untrusted text.
 4. **Registry metadata → scanner.** Packagist p2 responses are validated by schema; a failed or missing lookup never clears a dependency: the tag match falls back to the time check, is marked unverified, and the Packagist query is recorded as failed, which makes the verdict `incomplete`.
 5. **Baseline lockfile → structural rules.** The baseline is user-supplied and could itself be tampered with; the report prints both lockfile hashes and the diff summary so the comparison is auditable. Rules only compare fields; nothing is fetched or executed.

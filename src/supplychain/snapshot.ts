@@ -72,7 +72,7 @@ export function snapshotFromComposer(lock: ParsedComposerLock, path: string, con
   return { ecosystem: "Packagist", path, sha256: sha(content), packages };
 }
 
-export function snapshotFromNpm(lock: ParsedLockfile, path: string, content: string): LockSnapshot {
+export function snapshotFromNpm(lock: Pick<ParsedLockfile, "entries">, path: string, content: string): LockSnapshot {
   const packages = new Map<string, LockPackage[]>();
   for (const e of lock.entries) {
     add(packages, {

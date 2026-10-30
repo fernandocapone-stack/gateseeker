@@ -4,7 +4,7 @@ Security gate for AI-generated code. *(working description; branding and tagline
 
 Gateseeker points at a project directory, checks the code for the security mistakes most common in AI-generated apps, asks [OSV](https://osv.dev) which installed npm versions have known vulnerabilities, ranks every finding with deterministic and auditable rules, and returns a gate verdict with an exit code you can wire into CI.
 
-**Status after Sprint 4:** npm (`package-lock.json` v2/v3) and Composer (`composer.lock`) dependencies checked against OSV **and** a curated, human-approved advisory feed, with tag-rewrite verification against Packagist; structural supply-chain rules that compare a lockfile with a baseline; eight code-pattern rules for JavaScript/TypeScript projects. Runs as a CLI, as a GitHub Action, and in the browser. See [docs/PRODUCT.md](docs/PRODUCT.md) for direction and `docs/SPRINT_*.md` for the scope this code implements.
+**Status after Sprint 5:** npm (`package-lock.json` v2/v3, `pnpm-lock.yaml` v9, `yarn.lock` from Yarn 1 and Berry) and Composer (`composer.lock`) dependencies checked against OSV **and** a curated, human-approved advisory feed, with tag-rewrite verification against Packagist; structural supply-chain rules that compare a lockfile with a baseline; eight code-pattern rules for JavaScript/TypeScript projects. Runs as a CLI, as a GitHub Action, and in the browser. See [docs/PRODUCT.md](docs/PRODUCT.md) for direction and `docs/SPRINT_*.md` for the scope this code implements.
 
 ## Try it in the browser
 
@@ -160,7 +160,7 @@ Secrets are never printed: a matched credential is shown as its first four chara
 
 Each finding also carries plain-language fix guidance: `impact` (what could happen) and `manualSteps`, shown above, plus `aiPrompt` in the JSON report and on the web, a text to paste into Cursor, Lovable or Claude Code. The guidance is written per rule by the maintainers and is deterministic; no model generates it, and it is built only from the finding's location and names, never from the matched code.
 
-A project whose only lockfile is `pnpm-lock.yaml`, `yarn.lock` or `bun.lock` gets the verdict `incomplete` (exit code 2): those formats are not read yet, so the absence of dependency findings cannot be asserted.
+`pnpm-lock.yaml` (lockfileVersion 9, pnpm 9 and later) and `yarn.lock` (Yarn 1 and Berry) are read without running pnpm or Yarn. When a project has more than one npm lockfile, Gateseeker reads one, in the order `package-lock.json`, `pnpm-lock.yaml`, `yarn.lock`, and lists the others as not read. Yarn lockfiles do not mark dev dependencies, so the root `package.json` decides what is direct and what is dev; without it every package counts as production. A project whose only lockfile is Bun's (`bun.lock`, `bun.lockb`) gets the verdict `incomplete` (exit code 2), because that format is not read yet and the absence of dependency findings cannot be asserted.
 
 ## Supply-chain signals (Composer and npm)
 

@@ -27,7 +27,7 @@ Read `docs/SPRINT_0.md` (current scope) and `docs/PRODUCT.md` (direction) before
 ## Layout
 
 ```
-src/parser/    package-lock.json (lockfile.ts) and composer.lock (composer.ts) parsing and limits
+src/parser/    package-lock.json (lockfile.ts), pnpm-lock.yaml (pnpm.ts), yarn.lock (yarn.ts, Yarn 1 and Berry; YAML through yaml-subset.ts) and composer.lock (composer.ts) parsing and limits
 src/supplychain/ lockfile snapshot + structural rules GSK-SC-001..005 (baseline comparison)
 src/intel/     OSV client and schema
 src/rules/     CVSS scoring, severity tier, priority table, finding builder
