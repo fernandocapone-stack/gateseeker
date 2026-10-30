@@ -13,6 +13,7 @@ export type FileClass =
   | "sql" // database migrations and seeds
   | "env" // dotenv files
   | "rules" // Firebase security rules
+  | "agent" // AI coding-agent configuration and instruction files (.claude/, .mcp.json, CLAUDE.md, AGENTS.md …)
   | "test" // tests, fixtures, mocks
   | "other";
 

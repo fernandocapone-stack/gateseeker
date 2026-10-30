@@ -155,4 +155,5 @@ Residual: Gateseeker trusts TLS and OSV itself.
 - Priority does not account for reachability or for how the application is deployed.
 - Hosted: a determined abuser with many GitHub accounts can multiply the per-user quota; the anonymous GitHub API limit (60 requests per hour per server IP) is shared by every user until a read-only token is configured.
 - Hosted: whether the curated advisory set is bundled into the Vercel function is checked after each deploy (`docs/DEPLOY.md` §7); when missing, the report says so, but the page then consults OSV only.
+- Agent configuration rules (GSK-AGENT-*) see only what is committed: personal, gitignored settings (`.claude/settings.local.json`) and global agent configuration on a developer's machine are out of reach, and strict-JSON files (`.mcp.json`, `.claude/settings.json`) cannot carry an inline suppression.
 - Hosted: scan history and notifications live in the browser (`localStorage`) and are lost on another device; they hold no secrets, only repository names and counts.

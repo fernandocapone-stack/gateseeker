@@ -239,6 +239,13 @@ Rules are lexical and structural checks on text files. They never execute projec
 | `GSK-CORS-001` | `Access-Control-Allow-Origin: *` in headers or config, `cors({ origin: "*" })`, or default `cors()`. | LOW (HIGH when the same file enables credentials; without credentials a wildcard is informational, and the Supabase Edge Function template ships it by default) |
 | `GSK-ENV-001` | Root `.env*` file with non-public variables not covered by `.gitignore`. | MODERATE |
 | `GSK-BUILD-001` | `next.config` with `ignoreBuildErrors` or `ignoreDuringBuilds` set to true. | LOW |
+| `GSK-AGENT-001` | Committed AI-agent configuration that allows every shell command: Claude Code `Bash`, `Bash(*)`, `*` or `bypassPermissions`; Codex `approval_policy = "never"` with `danger-full-access`. | MODERATE |
+| `GSK-AGENT-002` | Agent hook (in settings or a script under an agent directory) that pipes a download into a shell or runs an unpinned package (`@latest`, `npx -y`). | HIGH |
+| `GSK-AGENT-003` | MCP server launched from an unpinned package, reached over plain `http://`, or with a literal secret in `env`/`headers` (value redacted). | MODERATE (HIGH for an inline secret) |
+| `GSK-AGENT-004` | Hidden text in files agents follow (`CLAUDE.md`, `AGENTS.md`, `.cursorrules`, agent commands and rules): invisible Unicode characters, an HTML comment with instructions, a long encoded run. | HIGH for invisible characters, MODERATE otherwise |
+| `GSK-AGENT-005` | `--no-verify`, `git commit -n` or `HUSKY=0` in agent instructions, `package.json` scripts or CI workflows. Lines that forbid it are skipped. | MODERATE |
+
+The `GSK-AGENT-*` rules (Track A1) are new and their precision on real repositories is still being measured; like every rule they run in warn mode. `.mcp.json` and `.claude/settings.json` are strict JSON with no comments, so findings in them cannot be suppressed inline; VS Code's `mcp.json` accepts comments and can.
 
 Code snippets in findings never carry hardcoded values: matched credentials are shown as their first four characters and length, dotenv values are hidden, and quoted string literals of eight or more characters next to a flagged variable are masked.
 

@@ -1,0 +1,10 @@
+{
+  // VS Code accepts comments in this file.
+  "servers": {
+    "mirror": {
+      "command": "npx",
+      // gateseeker-ignore GSK-AGENT-003 internal registry mirror, version pinned by the lockfile
+      "args": ["-y", "@example/mirror-mcp"]
+    }
+  }
+}

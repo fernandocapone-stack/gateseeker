@@ -55,7 +55,7 @@ The only runtime dependency is Zod. HTTP uses Node's global `fetch`; argument pa
 | `rules/findings.ts` | Build a dependency `Finding` from one OSV record; extract fixed versions for that exact package; pick the smallest fix above the installed version. | Rewrite source text. |
 | `patterns/walker.ts` | Walk a directory into a `ProjectSnapshot` under limits; skip symlinks, fixed directories, `.gitignore` matches, binaries; keep `.env*` and `.gitignore` even when gitignored. | Follow links, leave the root, run git. |
 | `patterns/gitignore.ts` | Minimal `.gitignore` matcher (no negation, root file only). | Full git semantics. |
-| `patterns/classify.ts` | Assign `client`/`server`/`config`/`sql`/`env`/`rules`/`test`/`other` by path and `"use client"` directive; detect Next vs Vite. | Parse code. |
+| `patterns/classify.ts` | Assign `client`/`server`/`config`/`sql`/`env`/`rules`/`agent`/`test`/`other` by path and `"use client"` directive; detect Next vs Vite. | Parse code. |
 | `patterns/rules/*.ts` | One file per rule: `appliesTo(file)` and `check(ctx)` returning line-level matches with redacted snippets. | Mutate state, read outside the snapshot. |
 | `patterns/engine.ts` | Run rules, apply `gateseeker-ignore` suppressions, convert matches to `Finding`s through the shared priority table, isolate rule errors. | Decide the verdict. |
 | `patterns/redact.ts` | Secret redaction (first 4 chars + length), dotenv value hiding, entropy, placeholder detection. | Store values. |
@@ -140,6 +140,7 @@ Applied in order; the first match wins.
 | Class | Rule |
 |---|---|
 | `test` | Any path segment in `__tests__`, `__mocks__`, `test`, `tests`, `spec`, `specs`, `e2e`, `fixtures`, `cypress`, `playwright`, `stories`; or basename matches `*.test.*`, `*.spec.*`, `*.stories.*`. |
+| `agent` | AI coding-agent files: top-level `.claude/`, `.cursor/`, `.codex/`, `.gemini/`, `.windsurf/`, `.roo/`, `.kiro/`; `CLAUDE.md`, `AGENTS.md`, `GEMINI.md`, `.cursorrules`, `.windsurfrules`, `.clinerules`, `.mcp.json` anywhere; `.github/copilot-instructions.md`, `.vscode/mcp.json`. |
 | `env` | Basename `.env` or `.env.*`. |
 | `sql` | Extension `.sql`. |
 | `rules` | `firestore.rules`, `storage.rules`, `database.rules.json`. |

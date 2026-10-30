@@ -1,0 +1,17 @@
+{
+  "mcpServers": {
+    "docs": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@example/docs-mcp@2.0.1"
+      ],
+      "env": {
+        "DOCS_TOKEN": "${DOCS_TOKEN}"
+      }
+    },
+    "remote": {
+      "url": "https://mcp.example.invalid/sse"
+    }
+  }
+}

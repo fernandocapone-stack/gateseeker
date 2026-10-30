@@ -9,6 +9,17 @@ import type { FileClass, ProjectKind } from "./types.js";
 const CODE_EXT = new Set([".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs", ".vue", ".svelte", ".astro"]);
 const TEST_SEGMENTS = new Set(["__tests__", "__mocks__", "test", "tests", "spec", "specs", "e2e", "fixtures", "cypress", "playwright", "stories"]);
 const SERVER_SEGMENTS = new Set(["api", "server", "backend", "functions", "scripts", "workers", "edge-functions", "netlify", "lambda", "jobs", "cron"]);
+/* AI coding-agent configuration and instructions (Track A1, docs/SPRINT_5.md 3.3). */
+const AGENT_DIRS = new Set([".claude", ".cursor", ".codex", ".gemini", ".windsurf", ".roo", ".kiro"]);
+const AGENT_FILES = new Set(["claude.md", "agents.md", "gemini.md", ".cursorrules", ".windsurfrules", ".clinerules", ".mcp.json"]);
+
+export function isAgentFile(path: string): boolean {
+  const lower = path.toLowerCase();
+  const base = lower.slice(lower.lastIndexOf("/") + 1);
+  const top = lower.split("/")[0] ?? "";
+  return AGENT_DIRS.has(top) || AGENT_FILES.has(base) || lower === ".github/copilot-instructions.md" || lower === ".vscode/mcp.json" || lower.startsWith(".clinerules/");
+}
+
 const CLIENT_SEGMENTS = new Set(["components", "hooks", "pages", "app", "views", "ui", "public", "layouts", "store", "stores", "features"]);
 
 export function extensionOf(path: string): string {
@@ -48,6 +59,7 @@ export function classifyFile(relPath: string, content: string, kind: ProjectKind
   if (dirs.some((d) => TEST_SEGMENTS.has(d.toLowerCase())) || /\.(test|spec)\.[cm]?[jt]sx?$/.test(lowerBase) || /\.stories\.[jt]sx?$/.test(lowerBase)) {
     return "test";
   }
+  if (isAgentFile(path)) return "agent";
   if (lowerBase === ".env" || lowerBase.startsWith(".env.")) return "env";
   if (ext === ".sql") return "sql";
   if (lowerBase === "firestore.rules" || lowerBase === "storage.rules" || lowerBase === "database.rules.json") return "rules";

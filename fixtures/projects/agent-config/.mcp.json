@@ -1,0 +1,43 @@
+{
+  "mcpServers": {
+    "fs": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-filesystem",
+        "."
+      ]
+    },
+    "pinned": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@example/mcp-tools@1.4.2"
+      ]
+    },
+    "remote": {
+      "url": "http://mcp.example.invalid/sse"
+    },
+    "localdev": {
+      "url": "http://localhost:3333/mcp"
+    },
+    "api": {
+      "command": "node",
+      "args": [
+        "server.js"
+      ],
+      "env": {
+        "API_TOKEN": "q7Zr2LmX9vB4kT8wN1pYc3Hd"
+      }
+    },
+    "ref": {
+      "command": "node",
+      "args": [
+        "server.js"
+      ],
+      "env": {
+        "API_TOKEN": "${API_TOKEN}"
+      }
+    }
+  }
+}

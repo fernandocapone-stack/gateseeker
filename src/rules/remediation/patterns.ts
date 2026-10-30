@@ -185,6 +185,79 @@ const RULES: Record<string, Builder> = {
       "The Next.js config tells the build to ignore TypeScript or ESLint errors. Remove that setting, run the build, and fix the reported errors in the code itself rather than silencing them with comments or a looser tsconfig.",
     ),
   }),
+
+  // Agent configuration (Track A1). GSK-AGENT-002 and 004 get no AI prompt on purpose: a malicious hook runs
+  // while an agent works in the repository, and an agent asked to clean a poisoned instruction file reads it.
+  "GSK-AGENT-001": ({ at, file }) => ({
+    impact: "Anyone who opens this repository with that AI agent lets it run any command on their machine without being asked, including commands a malicious file or web page talks it into.",
+    manualSteps: [
+      `In ${file}, remove the blanket permission (Bash, Bash(*), * or bypassPermissions).`,
+      "Allow only the commands the project needs, for example Bash(npm run test:*) and Bash(npm run lint).",
+      "Keep personal shortcuts in your local, gitignored settings instead of the shared file.",
+    ],
+    aiPrompt: prompt(
+      "GSK-AGENT-001",
+      at,
+      `The committed agent configuration ${file} lets the agent run any shell command without asking. Replace the blanket permission with a short allowlist of the exact commands this project needs (its test, lint, build and type-check scripts), and remove any setting that turns the permission prompt off. Show me the final list.`,
+    ),
+  }),
+
+  "GSK-AGENT-002": ({ file }) => ({
+    impact: "Every time the agent runs this hook, it downloads code from the internet and runs it on the developer's machine; whoever controls that address controls what runs.",
+    manualSteps: [
+      `Edit ${file} by hand, before opening the repository with an agent: the hook runs while the agent works.`,
+      "Copy the script into the repository and review it, or pin the package to an exact version.",
+      "Check where the hook came from (a pull request, a template) and whether it already ran on your machine.",
+    ],
+  }),
+
+  "GSK-AGENT-003": ({ at, d }) => {
+    const server = safeIdent(d.server, "the MCP server");
+    const secret = d.issue === "inline-secret";
+    return {
+      impact: secret
+        ? `A secret for the MCP server ${server} is written in a committed file, so everyone with access to the repository can read and use it.`
+        : d.issue === "plaintext"
+          ? `The agent talks to the MCP server ${server} over plain HTTP, so anyone on the network path can read or change what it sends and receives.`
+          : `The MCP server ${server} runs whatever version of its package is published next, with the same access as the agent.`,
+      manualSteps: secret
+        ? ["Rotate the secret now: it is already in the repository.", "Replace the value with a reference such as ${API_KEY} and set the variable outside the repository.", "If the repository is or was public, remove the value from the git history too."]
+        : d.issue === "plaintext"
+          ? ["Switch the server URL to https.", "If the server only offers http, run it locally or behind a TLS proxy."]
+          : ["Pin the package to an exact version (for example @1.4.2).", "Update it deliberately, after reading the changelog."],
+      aiPrompt: prompt(
+        "GSK-AGENT-003",
+        at,
+        secret
+          ? `The MCP server ${server} has a secret written directly in the committed configuration. Replace the literal value with a reference to an environment variable (for example \${API_KEY}), add the variable name without a value to .env.example or the README, and do not print the current value. I will rotate it myself.`
+          : d.issue === "plaintext"
+            ? `The MCP server ${server} is configured with an http:// URL. Change it to the https:// address of the same server and tell me if the server does not offer https.`
+            : `The MCP server ${server} is launched with an unpinned package. Pin it to the exact version that is currently published (look it up, do not guess) and keep the other arguments unchanged.`,
+      ),
+    };
+  },
+
+  "GSK-AGENT-004": ({ file, d }) => ({
+    impact:
+      d.kind === "invisible"
+        ? "The file contains characters that editors and code review do not show but AI agents read, a known way to slip instructions past a reviewer."
+        : "Part of this file gives the agent instructions that a person reading it would not notice.",
+    manualSteps: [
+      `Open ${file} in an editor that shows invisible characters (or run \`grep -nP '[\\x{200B}-\\x{200F}\\x{202A}-\\x{202E}\\x{2060}-\\x{2069}]' ${file}\`), by hand rather than through an agent.`,
+      "Remove anything you did not write on purpose.",
+      "Find out how it got there (a pull request, a copied template, a dependency) and review that source.",
+    ],
+  }),
+
+  "GSK-AGENT-005": ({ at, file }) => ({
+    impact: "Commits made this way skip the project's pre-commit checks (secret scanning, lint, tests), and an agent following this instruction skips them every time.",
+    manualSteps: [`Remove the bypass from ${file}.`, "If a hook is slow or flaky, fix or narrow the hook instead of skipping it."],
+    aiPrompt: prompt(
+      "GSK-AGENT-005",
+      at,
+      `${file} skips the repository's git hooks (--no-verify, git commit -n or HUSKY=0). Remove the bypass. If you find out why it was added (a slow or failing hook), tell me what the hook does and suggest a fix for the hook itself.`,
+    ),
+  }),
 };
 
 /** Guidance for a pattern finding, or null for rules without an entry (for example GSK-ENGINE-000). */
