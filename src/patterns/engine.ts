@@ -1,6 +1,8 @@
 import { sanitize } from "../report/text.js";
 import { decidePriority } from "../rules/priority.js";
+import { patternGuidance } from "../rules/remediation/patterns.js";
 import type { Finding } from "../types.js";
+import { SUPPRESS_RE } from "./suppression.js";
 import type { FileClass, PatternsSummary, ProjectSnapshot, Rule, RuleMatch, Suppression } from "./types.js";
 
 /**
@@ -9,8 +11,6 @@ import type { FileClass, PatternsSummary, ProjectSnapshot, Rule, RuleMatch, Supp
  */
 
 export const PATTERN_SOURCE_NAME = "gateseeker-rules";
-
-const SUPPRESS_RE = /gateseeker-ignore\s+(GSK-[A-Z]+-\d{3})(?:\s+(.*))?$/;
 
 interface SuppressionLookup {
   active: Map<string, Suppression>; // key: `${file}:${line}:${ruleId}`
@@ -83,6 +83,8 @@ export function runRules(project: ProjectSnapshot, rules: Rule[], now: () => Dat
       filesScanned: project.stats.filesScanned,
       filesSkippedIgnored: project.stats.filesSkippedIgnored,
       filesSkippedBinary: project.stats.filesSkippedBinary,
+      filesSkippedLarge: project.stats.filesSkippedLarge,
+      largeFiles: project.stats.largeFiles,
       bytesScanned: project.stats.bytesScanned,
       rulesRun: rules.map((r) => r.id),
       suppressions: [...used.values()],
@@ -116,7 +118,7 @@ function toFinding(rule: Rule, path: string, fileClass: FileClass, m: RuleMatch,
     severity: { tier: severity, declared: null, cvss: [] },
     priority: decision.priority,
     rationale: decision.rationale,
-    remediation: { fixedVersions: [], action: m.action ?? rule.action },
+    remediation: { fixedVersions: [], action: m.action ?? rule.action, ...patternGuidance(rule.id, { file: path, line: m.line, details: m.details ?? null }) },
     references: [],
     aiExplanation: null,
   };

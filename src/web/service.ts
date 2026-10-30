@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { z } from "zod";
 
+import { sanitize } from "../report/text.js";
 import { scanDirectory, type ScanCommonOptions } from "../scan.js";
 import type { Report } from "../types.js";
 import { parseGitHubRepoUrl, type GitHubRepoRef } from "./github-url.js";
@@ -82,9 +83,17 @@ export type ResolveResult = { ok: true; value: ResolvedRepository } | { ok: fals
 
 export interface ServiceSuccess {
   repository: ResolvedRepository;
-  archive: { files: number; bytes: number; skippedLarge: number; sha256: string };
+  /** skippedLinks: symbolic and hard links that were not created or read (absent in reports saved before 2026-10-30). */
+  archive: { files: number; bytes: number; skippedLarge: number; skippedLinks?: number; sha256: string };
   report: Report;
   timings: { downloadMs: number; extractMs: number; scanMs: number; totalMs: number };
+}
+
+/** The report line for links the archive reader skipped; paths are repository data, so they are sanitized and capped. */
+function linkLimitation(paths: string[], count: number): string[] {
+  if (count === 0) return [];
+  const shown = paths.slice(0, 5).map((p) => sanitize(p, 80)).join(", ");
+  return [`${String(count)} symbolic or hard link(s) were not read, because links are never created or followed: ${shown}${count > 5 ? ", …" : ""}. Whatever they point to inside the repository is still analyzed under its own path.`];
 }
 
 export type ServiceResult = { ok: true; value: ServiceSuccess } | { ok: false; error: ServiceError };
@@ -262,12 +271,13 @@ export async function scanGitHubRepository(options: ServiceOptions): Promise<Ser
           lockfilePath: result.report.project.lockfilePath ? relativeTo(work, result.report.project.lockfilePath) : null,
           lockfiles: result.report.project.lockfiles.map((l) => ({ ...l, path: relativeTo(work, l.path) })),
         },
+        limitations: [...result.report.limitations, ...linkLimitation(extracted.value.skippedLinks, extracted.value.skippedLinkCount)],
       };
       return {
         ok: true,
         value: {
           repository: resolved,
-          archive: { files: extracted.value.files, bytes: extracted.value.bytes, skippedLarge: extracted.value.skippedLarge, sha256: extracted.value.sha256 },
+          archive: { files: extracted.value.files, bytes: extracted.value.bytes, skippedLarge: extracted.value.skippedLarge, skippedLinks: extracted.value.skippedLinkCount, sha256: extracted.value.sha256 },
           report,
           timings: { downloadMs, extractMs, scanMs, totalMs: Date.now() - started },
         },

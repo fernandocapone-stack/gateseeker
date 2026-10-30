@@ -13,6 +13,7 @@ export type FileClass =
   | "sql" // database migrations and seeds
   | "env" // dotenv files
   | "rules" // Firebase security rules
+  | "agent" // AI coding-agent configuration and instruction files (.claude/, .mcp.json, CLAUDE.md, AGENTS.md …)
   | "test" // tests, fixtures, mocks
   | "other";
 
@@ -41,6 +42,9 @@ export interface WalkStats {
   filesScanned: number;
   filesSkippedIgnored: number;
   filesSkippedBinary: number;
+  /** Files above maxFileBytes, not read; the first 10 paths. */
+  filesSkippedLarge: number;
+  largeFiles: string[];
   bytesScanned: number;
   directoriesVisited: number;
 }
@@ -86,6 +90,8 @@ export interface PatternsSummary {
   filesScanned: number;
   filesSkippedIgnored: number;
   filesSkippedBinary: number;
+  filesSkippedLarge: number;
+  largeFiles: string[];
   bytesScanned: number;
   rulesRun: string[];
   suppressions: Suppression[];

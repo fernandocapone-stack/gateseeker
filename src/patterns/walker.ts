@@ -60,7 +60,7 @@ const BINARY_EXT = new Set([
   ".sqlite", ".db", ".psd", ".ai", ".sketch", ".fig",
 ]);
 
-export type WalkErrorCode = "root-not-directory" | "too-many-files" | "file-too-large" | "too-deep" | "unreadable";
+export type WalkErrorCode = "root-not-directory" | "too-many-files" | "too-deep" | "unreadable";
 
 export interface WalkError {
   code: WalkErrorCode;
@@ -100,7 +100,7 @@ export async function walkProject(rootInput: string, limits: WalkLimits = DEFAUL
   }
   const isGitignored = makeGitignoreMatcher(gitignoreText);
 
-  const stats: WalkStats = { filesScanned: 0, filesSkippedIgnored: 0, filesSkippedBinary: 0, bytesScanned: 0, directoriesVisited: 0 };
+  const stats: WalkStats = { filesScanned: 0, filesSkippedIgnored: 0, filesSkippedBinary: 0, filesSkippedLarge: 0, largeFiles: [], bytesScanned: 0, directoriesVisited: 0 };
   const rawFiles: { rel: string; abs: string; size: number }[] = [];
 
   // Iterative DFS to control depth without recursion surprises.
@@ -163,8 +163,12 @@ export async function walkProject(rootInput: string, limits: WalkLimits = DEFAUL
       } catch {
         continue;
       }
+      // Above the limit: skipped and listed, not fatal (PO decision 2026-10-30, docs/VALIDATION_SPRINT_5.md).
+      // These are generated files, bundles and binaries; the report says which ones were not read.
       if (st.size > limits.maxFileBytes) {
-        return { ok: false, error: { code: "file-too-large", message: `${rel} is ${st.size} bytes; limit is ${limits.maxFileBytes} bytes.` } };
+        stats.filesSkippedLarge++;
+        if (stats.largeFiles.length < 10) stats.largeFiles.push(rel);
+        continue;
       }
       rawFiles.push({ rel, abs, size: st.size });
       if (rawFiles.length > limits.maxFiles) {

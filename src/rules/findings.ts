@@ -2,6 +2,7 @@ import type { OsvVulnerability } from "../intel/osv-schema.js";
 import { compareSemver } from "../parser/lockfile.js";
 import type { Dependency, Finding } from "../types.js";
 import { decidePriority } from "./priority.js";
+import { dependencyGuidance } from "./remediation/dependencies.js";
 import { deriveSeverity } from "./severity.js";
 
 /**
@@ -23,14 +24,19 @@ export function extractFixedVersions(vuln: OsvVulnerability, dep: Dependency): s
   return [...fixed].sort(compareSemver);
 }
 
+/** Smallest fixed version above the installed one; otherwise the highest listed; null when none is published. */
+function targetVersion(dep: Dependency, fixedVersions: string[]): string | null {
+  if (fixedVersions.length === 0) return null;
+  const above = dep.version === null ? [] : fixedVersions.filter((v) => compareSemver(v, dep.version ?? "") > 0);
+  return above[0] ?? fixedVersions[fixedVersions.length - 1] ?? null;
+}
+
 function remediationAction(dep: Dependency, fixedVersions: string[]): string {
   const subject = `${dep.name}@${dep.version ?? "?"}`;
-  if (fixedVersions.length === 0) {
+  const target = targetVersion(dep, fixedVersions);
+  if (target === null) {
     return `No fixed version published for ${subject}. Check the references for mitigations or consider replacing the package.`;
   }
-  // Smallest fixed version above the installed one; otherwise the highest listed.
-  const above = dep.version === null ? [] : fixedVersions.filter((v) => compareSemver(v, dep.version ?? "") > 0);
-  const target = above[0] ?? fixedVersions[fixedVersions.length - 1] ?? "";
   const composer = dep.ecosystem === "Packagist";
   const manifest = composer ? "composer.json" : "package.json";
   const reinstall = composer ? "run composer update" : "reinstall";
@@ -73,7 +79,11 @@ export function buildFinding(
     severity,
     priority: decision.priority,
     rationale: decision.rationale,
-    remediation: { fixedVersions, action: remediationAction(dep, fixedVersions) },
+    remediation: {
+      fixedVersions,
+      action: remediationAction(dep, fixedVersions),
+      ...dependencyGuidance({ name: dep.name, version: dep.version, ecosystem: dep.ecosystem, direct: dep.exposure.direct, vulnerabilityId: vuln.id, target: targetVersion(dep, fixedVersions) }),
+    },
     references: (vuln.references ?? []).map((r) => ({ type: r.type, url: r.url })),
     aiExplanation: null,
   };

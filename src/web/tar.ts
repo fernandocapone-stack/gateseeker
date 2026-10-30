@@ -7,8 +7,11 @@ import { gunzipSync } from "node:zlib";
  * Minimal, dependency-free reader for the .tar.gz archives GitHub serves
  * for a repository. It is the most exposed piece of the hosted service, so
  * it is deliberately restrictive:
- *  - regular files and directories only; symbolic and hard links are rejected
- *    (an archive that contains one is refused as a whole);
+ *  - regular files and directories are written; symbolic and hard links are
+ *    never created or followed: they are skipped and listed, so the report
+ *    can say which paths were not read (decision of the PO, 2026-10-30, after
+ *    docs/VALIDATION_SPRINT_5.md showed 4 of 10 repositories refused because
+ *    of links such as CLAUDE.md -> AGENTS.md);
  *  - absolute paths, ".." segments, backslashes and control characters are rejected;
  *  - limits on entry count, per-file size and total uncompressed size abort
  *    the extraction with a typed error; nothing is left half-written outside
@@ -45,7 +48,6 @@ export type TarErrorCode =
   | "not-gzip"
   | "malformed"
   | "too-many-entries"
-  | "link-entry"
   | "unsafe-path"
   | "unsupported-entry";
 
@@ -60,6 +62,9 @@ export interface TarExtractResult {
   bytes: number;
   /** Regular files above maxFileBytes that were not written. */
   skippedLarge: number;
+  /** Symbolic and hard links skipped (never created); paths without the top-level directory, first 50. */
+  skippedLinks: string[];
+  skippedLinkCount: number;
   /** sha256 of the uncompressed archive, for the cache key and the report. */
   sha256: string;
   /** The stripped top-level directory name, e.g. "repo-abc123". */
@@ -157,6 +162,8 @@ export function extractTarGz(gz: Buffer, destDir: string, limits: TarLimits = DE
   let directories = 0;
   let bytes = 0;
   let skippedLarge = 0;
+  const skippedLinks: string[] = [];
+  let skippedLinkCount = 0;
   let prefix: string | null = null;
   let longName: string | null = null;
   let paxPath: string | null = null;
@@ -198,10 +205,10 @@ export function extractTarGz(gz: Buffer, destDir: string, limits: TarLimits = DE
     longName = null;
     paxPath = null;
 
-    if (type === "1" || type === "2") return { ok: false, error: { code: "link-entry", message: `Archive contains a ${type === "1" ? "hard" : "symbolic"} link (${effectiveName.slice(0, 200)}); links are not allowed.` } };
+    const isLink = type === "1" || type === "2";
     const isDir = type === "5" || (type === "0" && effectiveName.endsWith("/"));
     const isFile = type === "0" || type === "\0" || type === "7";
-    if (!isDir && !isFile) return { ok: false, error: { code: "unsupported-entry", message: `Archive contains an unsupported entry type '${type}' (${effectiveName.slice(0, 200)}).` } };
+    if (!isLink && !isDir && !isFile) return { ok: false, error: { code: "unsupported-entry", message: `Archive contains an unsupported entry type '${type}' (${effectiveName.slice(0, 200)}).` } };
 
     const segs = safeSegments(effectiveName);
     if (segs === null) return { ok: false, error: { code: "unsafe-path", message: `Archive contains an unsafe path (${effectiveName.slice(0, 200)}).` } };
@@ -220,6 +227,14 @@ export function extractTarGz(gz: Buffer, destDir: string, limits: TarLimits = DE
     }
     const target = resolve(root, join(...rel));
     if (!target.startsWith(rootWithSep)) return { ok: false, error: { code: "unsafe-path", message: `Archive entry resolves outside the destination (${effectiveName.slice(0, 200)}).` } };
+
+    // A link with a safe name is skipped: nothing is created and its target is never read.
+    if (isLink) {
+      skippedLinkCount++;
+      if (skippedLinks.length < 50) skippedLinks.push(rel.join("/"));
+      at = next;
+      continue;
+    }
 
     if (isDir) {
       mkdirSync(target, { recursive: true });
@@ -240,5 +255,5 @@ export function extractTarGz(gz: Buffer, destDir: string, limits: TarLimits = DE
   }
 
   const sha256 = createHash("sha256").update(tar).digest("hex");
-  return { ok: true, value: { files, directories, bytes, skippedLarge, sha256, prefix } };
+  return { ok: true, value: { files, directories, bytes, skippedLarge, skippedLinks, skippedLinkCount, sha256, prefix } };
 }

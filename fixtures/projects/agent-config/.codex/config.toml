@@ -1,0 +1,4 @@
+model = "o4"
+# gateseeker-ignore GSK-AGENT-001 throwaway sandbox VM, no credentials mounted
+approval_policy = "never"
+sandbox_mode = "danger-full-access"

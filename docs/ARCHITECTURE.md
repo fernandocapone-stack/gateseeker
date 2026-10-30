@@ -51,10 +51,11 @@ The only runtime dependency is Zod. HTTP uses Node's global `fetch`; argument pa
 | `rules/cvss.ts` | CVSS 3.0/3.1 base score from a vector string. | Score CVSS 2 or 4. |
 | `rules/severity.ts` | Severity tier: max CVSS 3.x score → tier; else declared rating; else UNKNOWN. | Guess from free text. |
 | `rules/priority.ts` | The priority table and modifiers, shared by both finding kinds. Returns priority plus rule ids applied. | Anything beyond the table. |
+| `rules/remediation/*.ts` | Fix guidance as rule conclusions: `impact`, `manualSteps` and `aiPrompt` per pattern rule (`patterns.ts`), for dependency updates and supply-chain findings (`dependencies.ts`); every interpolated value passes an allowlist (`safe.ts`). | Quote file contents, call a model, suggest suppressing the finding. |
 | `rules/findings.ts` | Build a dependency `Finding` from one OSV record; extract fixed versions for that exact package; pick the smallest fix above the installed version. | Rewrite source text. |
 | `patterns/walker.ts` | Walk a directory into a `ProjectSnapshot` under limits; skip symlinks, fixed directories, `.gitignore` matches, binaries; keep `.env*` and `.gitignore` even when gitignored. | Follow links, leave the root, run git. |
 | `patterns/gitignore.ts` | Minimal `.gitignore` matcher (no negation, root file only). | Full git semantics. |
-| `patterns/classify.ts` | Assign `client`/`server`/`config`/`sql`/`env`/`rules`/`test`/`other` by path and `"use client"` directive; detect Next vs Vite. | Parse code. |
+| `patterns/classify.ts` | Assign `client`/`server`/`config`/`sql`/`env`/`rules`/`agent`/`test`/`other` by path and `"use client"` directive; detect Next vs Vite. | Parse code. |
 | `patterns/rules/*.ts` | One file per rule: `appliesTo(file)` and `check(ctx)` returning line-level matches with redacted snippets. | Mutate state, read outside the snapshot. |
 | `patterns/engine.ts` | Run rules, apply `gateseeker-ignore` suppressions, convert matches to `Finding`s through the shared priority table, isolate rule errors. | Decide the verdict. |
 | `patterns/redact.ts` | Secret redaction (first 4 chars + length), dotenv value hiding, entropy, placeholder detection. | Store values. |
@@ -67,7 +68,7 @@ The only runtime dependency is Zod. HTTP uses Node's global `fetch`; argument pa
 | `action.yml` | Composite action: setup-node, pinned `npx --package=gateseeker@<version> gateseeker-action` (or a local build for this repository), base-branch fetch, SARIF upload. | Third-party actions beyond checkout/setup-node/codeql upload. |
 | `cli.ts` | Arguments, path type detection, report writing, exit code. | Business logic. |
 | `web/github-url.ts` | Strict grammar for `https://github.com/<owner>/<repo>[/tree/<ref>]`; rejects before any request. | Parse general URLs, accept other hosts. |
-| `web/tar.ts` | Dependency-free `.tar.gz` reader with limits; regular files and directories only; strips GitHub's top-level folder. | Follow links, write outside the destination. |
+| `web/tar.ts` | Dependency-free `.tar.gz` reader with limits; writes regular files and directories only, skips and lists links; strips GitHub's top-level folder. | Follow links, write outside the destination. |
 | `web/service.ts` | Resolve the repository and commit on the GitHub API, download the archive, extract, run `scanDirectory`, clean up; injected `fetch`. | git, child processes, tokens (optional read-only `GITHUB_TOKEN` only for the API limit). |
 | `web/auth.ts` | Verify the bearer token with Supabase Auth; static and stub verifiers for tests. | Pass the user to the engine. |
 | `web/store.ts` | Saved reports (30 days), per-user quota (`claim_scan`), per-commit cache; memory and Supabase (PostgREST, service key) implementations. | Interpret report content. |
@@ -108,7 +109,7 @@ The engine is the published package at the pinned version; the web adds no rule,
 
 ## Trust boundaries
 
-1. **Project files → walker and rules.** Everything in the directory is attacker-controlled. Controls: symlinks skipped; containment check on every path; fixed directory exclusions; file-count, file-size and depth limits that abort with a typed error (exit 3); binary detection by extension and NUL probe; lines over 5000 characters skipped by rules; regexes reviewed and timed against adversarial 1 MB inputs; snippets sanitized and secrets redacted; rule exceptions caught and reported as a `GSK-ENGINE-000` finding instead of crashing.
+1. **Project files → walker and rules.** Everything in the directory is attacker-controlled. Controls: symlinks skipped; containment check on every path; fixed directory exclusions; file-count and depth limits that abort with a typed error (exit 3) and a per-file size limit above which a file is skipped unread and listed in the limitations; binary detection by extension and NUL probe; lines over 5000 characters skipped by rules; regexes reviewed and timed against adversarial 1 MB inputs; snippets sanitized and secrets redacted; rule exceptions caught and reported as a `GSK-ENGINE-000` finding instead of crashing.
 2. **Lockfile → parser.** Byte limit before parsing, dependency-count limit, strict schema, no code execution.
 3. **OSV → client.** Schema validation (malformed response is a failed query), timeout, pagination cap, summaries and references treated as untrusted text.
 4. **Registry metadata → scanner.** Packagist p2 responses are validated by schema; a failed or missing lookup never clears a dependency: the tag match falls back to the time check, is marked unverified, and the Packagist query is recorded as failed, which makes the verdict `incomplete`.
@@ -139,6 +140,7 @@ Applied in order; the first match wins.
 | Class | Rule |
 |---|---|
 | `test` | Any path segment in `__tests__`, `__mocks__`, `test`, `tests`, `spec`, `specs`, `e2e`, `fixtures`, `cypress`, `playwright`, `stories`; or basename matches `*.test.*`, `*.spec.*`, `*.stories.*`. |
+| `agent` | AI coding-agent files: top-level `.claude/`, `.cursor/`, `.codex/`, `.gemini/`, `.windsurf/`, `.roo/`, `.kiro/`; `CLAUDE.md`, `AGENTS.md`, `GEMINI.md`, `.cursorrules`, `.windsurfrules`, `.clinerules`, `.mcp.json` anywhere; `.github/copilot-instructions.md`, `.vscode/mcp.json`. |
 | `env` | Basename `.env` or `.env.*`. |
 | `sql` | Extension `.sql`. |
 | `rules` | `firestore.rules`, `storage.rules`, `database.rules.json`. |

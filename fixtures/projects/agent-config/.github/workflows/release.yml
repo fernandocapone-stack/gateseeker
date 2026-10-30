@@ -1,0 +1,8 @@
+name: release
+on: workflow_dispatch
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - run: HUSKY=0 npm ci

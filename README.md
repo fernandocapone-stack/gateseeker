@@ -11,7 +11,7 @@ Gateseeker points at a project directory, checks the code for the security mista
 Sign in with GitHub at [gateseeker.vercel.app](https://gateseeker.vercel.app), paste the URL of a **public** GitHub repository and get the same report the CLI produces, usually in under a minute. Nothing to install.
 
 - Same engine, rules and wording as the CLI; pattern and supply-chain rules run in warn mode, and there is no baseline on the web.
-- The repository is downloaded as an archive and read as text: nothing is cloned, installed or executed. Archives over 50 MB compressed are refused (use the CLI for those).
+- The repository is downloaded as an archive and read as text: nothing is cloned, installed or executed. Symbolic links are never created or followed; the report lists them as not read. Archives over 50 MB compressed are refused (use the CLI for those).
 - Reports are saved for 30 days and open only for the account that produced them. Secrets are redacted before anything is saved.
 - 10 analyses per account per hour; the same commit within 24 hours reuses the saved report without counting.
 
@@ -146,6 +146,10 @@ Findings: 18  (P1 13, P2 3, P3 2, P4 0)  dependencies 0, code patterns 18
        code:     SUPABASE_SERVICE_ROLE_KEY=eyJh…[219 chars]
        severity: CRITICAL (env file)   why: rule:GSK-SECRET-001, base:critical/direct-prod=P1, fix-available
        action:   Revoke the credential at the provider, move it to a server-side environment variable or secret manager, and purge it from git history.
+       impact:   Anyone who can read this code (the repository, the published bundle or a leaked copy) can use this Supabase service_role key as you.
+       steps:    1. Revoke or rotate the Supabase service_role key at the provider now: assume it is already exposed.
+                 2. Replace the literal with an environment variable read only in server code.
+                 3. If the repository is or was public, remove the value from the git history too.
   ...
 
 GATE: PASS (fail-on P2, patterns warn)
@@ -153,6 +157,10 @@ GATE: PASS (fail-on P2, patterns warn)
 ```
 
 Secrets are never printed: a matched credential is shown as its first four characters and its length.
+
+Each finding also carries plain-language fix guidance: `impact` (what could happen) and `manualSteps`, shown above, plus `aiPrompt` in the JSON report and on the web, a text to paste into Cursor, Lovable or Claude Code. The guidance is written per rule by the maintainers and is deterministic; no model generates it, and it is built only from the finding's location and names, never from the matched code.
+
+A project whose only lockfile is `pnpm-lock.yaml`, `yarn.lock` or `bun.lock` gets the verdict `incomplete` (exit code 2): those formats are not read yet, so the absence of dependency findings cannot be asserted.
 
 ## Supply-chain signals (Composer and npm)
 
@@ -231,6 +239,13 @@ Rules are lexical and structural checks on text files. They never execute projec
 | `GSK-CORS-001` | `Access-Control-Allow-Origin: *` in headers or config, `cors({ origin: "*" })`, or default `cors()`. | LOW (HIGH when the same file enables credentials; without credentials a wildcard is informational, and the Supabase Edge Function template ships it by default) |
 | `GSK-ENV-001` | Root `.env*` file with non-public variables not covered by `.gitignore`. | MODERATE |
 | `GSK-BUILD-001` | `next.config` with `ignoreBuildErrors` or `ignoreDuringBuilds` set to true. | LOW |
+| `GSK-AGENT-001` | Committed AI-agent configuration that allows every shell command: Claude Code `Bash`, `Bash(*)`, `*` or `bypassPermissions`; Codex `approval_policy = "never"` with `danger-full-access`. | MODERATE |
+| `GSK-AGENT-002` | Agent hook (in settings, a script under an agent directory, or the install/start steps of `.cursor/environment.json`) that pipes a download into a shell or runs an unpinned package (`@latest`, `npx -y`). | HIGH |
+| `GSK-AGENT-003` | MCP server launched from an unpinned package, reached over plain `http://`, or with a literal secret in `env`/`headers` (value redacted). | MODERATE (HIGH for an inline secret) |
+| `GSK-AGENT-004` | Hidden text in files agents follow (`CLAUDE.md`, `AGENTS.md`, `.cursorrules`, agent commands and rules): invisible Unicode characters, an HTML comment with instructions, a long encoded run. | HIGH for invisible characters, MODERATE otherwise |
+| `GSK-AGENT-005` | `--no-verify`, `git commit -n` or `HUSKY=0` in agent instructions, `package.json` scripts or CI workflows. Lines that forbid it are skipped. | MODERATE |
+
+The `GSK-AGENT-*` rules (Track A1) were measured on 10 public repositories in `docs/VALIDATION_SPRINT_5.md` (3 of 3 final findings correct, after fixing two false positives and one false negative found there); the sample is small, so like every rule they run in warn mode. `.mcp.json` and `.claude/settings.json` are strict JSON with no comments, so findings in them cannot be suppressed inline; VS Code's `mcp.json` accepts comments and can.
 
 Code snippets in findings never carry hardcoded values: matched credentials are shown as their first four characters and length, dotenv values are hidden, and quoted string literals of eight or more characters next to a flagged variable are masked.
 
@@ -291,6 +306,7 @@ Unit tests never reach the network: the OSV client takes an injected `fetch`, an
 - [docs/ROADMAP.md](docs/ROADMAP.md): proposed Sprints 5 to 9, UX problems found, decisions for the PO.
 - [docs/SPRINT_4.md](docs/SPRINT_4.md), [docs/DEPLOY.md](docs/DEPLOY.md): the hosted service and how it is deployed.
 - [docs/VALIDATION_SPRINT_1.md](docs/VALIDATION_SPRINT_1.md): results of the pattern rules on five real projects.
+- [docs/VALIDATION_SPRINT_5.md](docs/VALIDATION_SPRINT_5.md): results of the agent-configuration rules on ten real repositories.
 - [docs/UPSTREAM.md](docs/UPSTREAM.md): how approved advisories are submitted to OSV/GHSA.
 - [advisories/README.md](advisories/README.md): the curated advisory feed, its lifecycle and format.
 

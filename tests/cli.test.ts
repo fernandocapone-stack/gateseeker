@@ -240,13 +240,18 @@ describe("gateseeker scan <directory> (CLI)", () => {
     expect(c.stdout()).toContain("No known vulnerabilities or insecure patterns were found in the sources consulted.");
   });
 
-  it("walker limits reject the input with exit 3", async () => {
+  it("the file-count limit rejects the input with exit 3; oversize files are skipped and listed", async () => {
     const c = capture();
     expect(await main(["scan", VIBE, "--only", "patterns", "--max-files", "2"], c.io)).toBe(EXIT.usage);
     expect(c.stderr()).toContain("Input rejected (too-many-files)");
     const d = capture();
-    expect(await main(["scan", VIBE, "--only", "patterns", "--max-file-size", "100"], d.io)).toBe(EXIT.usage);
-    expect(d.stderr()).toContain("Input rejected (file-too-large)");
+    expect(await main(["scan", VIBE, "--only", "patterns", "--max-file-size", "100"], d.io)).toBe(EXIT.pass);
+    expect(d.stdout()).toMatch(/\d+ too large;/);
+    const j = capture();
+    expect(await main(["scan", VIBE, "--only", "patterns", "--max-file-size", "100", "--format", "json"], j.io)).toBe(EXIT.pass);
+    const report = JSON.parse(j.stdout()) as { limitations: string[]; patterns: { filesSkippedLarge: number } };
+    expect(report.patterns.filesSkippedLarge).toBeGreaterThan(0);
+    expect(report.limitations.join(" ")).toMatch(/file\(s\) above the size limit were not scanned for code patterns/);
   });
 
   it("rejects --only on a lockfile path and bad --patterns values", async () => {

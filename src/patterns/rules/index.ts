@@ -1,4 +1,9 @@
 import type { Rule } from "../types.js";
+import { agentHiddenInstructionsRule } from "./agent-hidden-instructions.js";
+import { agentMcpRule } from "./agent-mcp.js";
+import { agentPermissionsRule } from "./agent-permissions.js";
+import { agentRemoteHookRule } from "./agent-remote-hook.js";
+import { agentSafetyNetsRule } from "./agent-safety-nets.js";
 import { corsWildcardRule } from "./cors-wildcard.js";
 import { envNotIgnoredRule } from "./env-not-ignored.js";
 import { firebaseOpenRulesRule } from "./firebase-open-rules.js";
@@ -18,6 +23,11 @@ export const RULES: Rule[] = [
   corsWildcardRule,
   envNotIgnoredRule,
   nextIgnoreBuildErrorsRule,
+  agentPermissionsRule,
+  agentRemoteHookRule,
+  agentMcpRule,
+  agentHiddenInstructionsRule,
+  agentSafetyNetsRule,
 ];
 
 export function ruleById(id: string): Rule | undefined {

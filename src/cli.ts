@@ -49,7 +49,7 @@ Options:
   --max-size <bytes>        Reject lockfiles larger than this (default: ${DEFAULT_PARSER_LIMITS.maxBytes})
   --max-deps <n>            Reject lockfiles with more packages than this (default: ${DEFAULT_PARSER_LIMITS.maxDependencies})
   --max-files <n>           Abort directory scans with more files (default: ${DEFAULT_WALK_LIMITS.maxFiles})
-  --max-file-size <bytes>   Abort directory scans on a larger text file (default: ${DEFAULT_WALK_LIMITS.maxFileBytes})
+  --max-file-size <bytes>   Skip (and list) larger files in directory scans (default: ${DEFAULT_WALK_LIMITS.maxFileBytes})
   --advisories <file>       Use this curated advisory set (JSON) instead of the bundled one
   --timeout <ms>            Per-request timeout for the OSV API (default: 10000)
   --concurrency <n>         Maximum simultaneous OSV requests (default: 5)

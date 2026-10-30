@@ -1,10 +1,12 @@
 import { Badge, Button, Card, Logo, MetricCard, Segmented, Table, Td, Th, cn } from "@gateseeker/ui-kit";
+import { PRIORITY_LABEL } from "gateseeker/dist/report/labels.js";
 import { renderPdf } from "gateseeker/dist/report/pdf.js";
 import { ArrowUpDown, Download, ExternalLink, Printer, ShieldAlert, ShieldCheck, ShieldQuestion } from "lucide-react";
 import { useEffect, useState } from "react";
 import { flushSync } from "react-dom";
 
 import type { Finding, ScanResponseOk } from "../api";
+import { FixGuidance } from "../components/FixGuidance";
 
 /**
  * The report as a page: verdict, one KPI card per priority and the Issues
@@ -20,7 +22,6 @@ import type { Finding, ScanResponseOk } from "../api";
  * the filter is ignored, so a printout always carries the whole report.
  */
 
-const PRIORITY_LABEL: Record<string, string> = { P1: "Fix now", P2: "Fix before release", P3: "Plan a fix", P4: "Keep an eye on it" };
 const PRIORITIES = ["P1", "P2", "P3", "P4"] as const;
 type Filter = "all" | (typeof PRIORITIES)[number];
 type Sort = "priority" | "severity";
@@ -141,11 +142,13 @@ export function ReportView({ response, elapsedMs }: { response: ScanResponseOk; 
         <p className="text-label text-muted-foreground">
           {report.analyses.dependencies === "analyzed"
             ? `Queried ${String(report.summary.queried)} dependency version(s): ${String(report.summary.byQueryState.vulnerable)} with known issues, ${String(report.summary.byQueryState["no-known-vulnerabilities"])} without, ${String(report.summary.byQueryState["query-failed"])} failed, ${String(report.summary.byQueryState["not-queried"])} not queried.`
-            : "Dependencies were not analyzed: no package-lock.json or composer.lock at the repository root."}{" "}
+            : report.analyses.dependencies === "not-supported"
+              ? `Dependencies were not analyzed: ${(report.project.unsupportedLockfiles ?? []).join(", ")} is not supported yet, so the result is incomplete.`
+              : "Dependencies were not analyzed: no package-lock.json or composer.lock at the repository root."}{" "}
           {report.analyses.patterns === "analyzed" && report.patterns ? `${String(report.patterns.filesScanned)} file(s) scanned for code patterns.` : ""}
         </p>
         <p className="text-caption text-muted-foreground">
-          Dependencies {k["dependency-vulnerability"]} · supply chain {k["supply-chain-anomaly"]} · code patterns {k["insecure-pattern"]} · gate: fail on {report.gate.failOn}, patterns {report.gate.patternsMode}, supply-chain rules {report.gate.supplyChainMode} · {archive.files} files read{archive.skippedLarge > 0 ? ` (${String(archive.skippedLarge)} large binary file(s) skipped)` : ""} · {(elapsedMs / 1000).toFixed(1)}s · Gateseeker {report.gateseekerVersion} · sources: {report.sources.map((s) => s.name).join(", ") || "none"}
+          Dependencies {k["dependency-vulnerability"]} · supply chain {k["supply-chain-anomaly"]} · code patterns {k["insecure-pattern"]} · gate: fail on {report.gate.failOn}, patterns {report.gate.patternsMode}, supply-chain rules {report.gate.supplyChainMode} · {archive.files} files read{archive.skippedLarge > 0 ? ` (${String(archive.skippedLarge)} large binary file(s) skipped)` : ""}{archive.skippedLinks ? ` · ${String(archive.skippedLinks)} link(s) not read` : ""} · {(elapsedMs / 1000).toFixed(1)}s · Gateseeker {report.gateseekerVersion} · sources: {report.sources.map((s) => s.name).join(", ") || "none"}
         </p>
       </Card>
 
@@ -299,6 +302,7 @@ function FindingRow({ finding: f, printing }: { finding: Finding; printing: bool
                 </p>
               </div>
             )}
+            <FixGuidance finding={f} />
             <p className="text-label text-muted-foreground">
               Why this priority: <span className="font-mono">{f.rationale.join(" → ")}</span>
             </p>

@@ -7,6 +7,7 @@ import type { Dependency, Finding } from "../types.js";
 import { validateAdvisory, type Advisory } from "./advisory-schema.js";
 import type { PackagistClient } from "./packagist.js";
 import { decidePriority } from "../rules/priority.js";
+import { supplyChainGuidance } from "../rules/remediation/dependencies.js";
 
 /**
  * Loading and matching of curated advisories.
@@ -220,7 +221,11 @@ export function buildAdvisoryFinding(dep: Dependency, advisory: Advisory, querie
     severity: { tier: advisory.severity, declared: advisory.severity, cvss: [] },
     priority: decision.priority,
     rationale: decision.rationale,
-    remediation: { fixedVersions, action: tag?.verification === "unverified" ? `${advisory.remediation} (Registry check unavailable: verify the pinned commit manually against the package's repository.)` : advisory.remediation },
+    remediation: {
+      fixedVersions,
+      action: tag?.verification === "unverified" ? `${advisory.remediation} (Registry check unavailable: verify the pinned commit manually against the package's repository.)` : advisory.remediation,
+      ...supplyChainGuidance("advisory", dep.name),
+    },
     references: advisory.sources.map((s) => ({ type: s.primary ? "PRIMARY" : "REPORT", url: s.url })),
     aiExplanation: null,
   };

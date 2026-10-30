@@ -201,8 +201,8 @@ describe("extractTarGz", () => {
     ["traversal after prefix", [{ name: "repo/a/../../../escape.txt", data: "x" }], "unsafe-path"],
     ["backslash", [{ name: "repo/a\\..\\b", data: "x" }], "unsafe-path"],
     ["second top-level dir", [{ name: "repo/a", data: "x" }, { name: "other/b", data: "y" }], "unsafe-path"],
-    ["symbolic link", [{ name: "repo/link", type: "2", linkname: "/etc/passwd" }], "link-entry"],
-    ["hard link", [{ name: "repo/link", type: "1", linkname: "repo/a" }], "link-entry"],
+    // Links are skipped (below), but a link whose own name is unsafe still refuses the archive.
+    ["link with a traversal name", [{ name: "repo/../../escape.txt", type: "2", linkname: "/etc/passwd" }], "unsafe-path"],
     ["fifo", [{ name: "repo/pipe", type: "6" }], "unsupported-entry"],
     ["pax path traversal", [{ name: "./PaxHeaders/0", type: "x", data: pax("repo/../../pwned") }, { name: "repo/x", data: "x" }], "unsafe-path"],
     ["long name traversal", [{ name: "././@LongLink", type: "L", data: "repo/../../pwned\0" }, { name: "repo/x", data: "x" }], "unsafe-path"],
@@ -217,6 +217,21 @@ describe("extractTarGz", () => {
       expect(existsSync(join(dest, "..", "pwned"))).toBe(false);
     });
   }
+
+  it("skips symbolic and hard links without creating anything, and lists them (PO decision 2026-10-30)", () => {
+    const dest = freshDir();
+    const gz = targz([
+      { name: "repo/AGENTS.md", data: "notes" },
+      { name: "repo/CLAUDE.md", type: "2", linkname: "AGENTS.md" },
+      { name: "repo/passwd", type: "2", linkname: "/etc/passwd" },
+      { name: "repo/hard", type: "1", linkname: "repo/AGENTS.md" },
+    ]);
+    const r = extractTarGz(gz, dest);
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.value).toMatchObject({ files: 1, skippedLinkCount: 3, skippedLinks: ["CLAUDE.md", "passwd", "hard"] });
+    expect(readdirSync(dest)).toEqual(["AGENTS.md"]);
+  });
 
   it("skips a file above the per-file limit without writing it, and says so", () => {
     const dest = freshDir();
@@ -334,8 +349,8 @@ describe("scanGitHubRepository", () => {
     const work = freshDir();
     const big = await scanGitHubRepository({ url: "https://github.com/o/r", fetch: fakeGitHub({ archive: targz([{ name: "r-a/x", data: Buffer.alloc(5000, 7) }]) }).fetch, workDir: work, limits: { maxDownloadBytes: 100 } });
     expect(big).toMatchObject({ ok: false, error: { code: "too-large" } });
-    const link = await scanGitHubRepository({ url: "https://github.com/o/r", fetch: fakeGitHub({ archive: targz([{ name: "r-a/l", type: "2", linkname: "/etc/passwd" }]) }).fetch, workDir: work });
-    expect(link).toMatchObject({ ok: false, error: { code: "archive-rejected" } });
+    const fifo = await scanGitHubRepository({ url: "https://github.com/o/r", fetch: fakeGitHub({ archive: targz([{ name: "r-a/p", type: "6" }]) }).fetch, workDir: work });
+    expect(fifo).toMatchObject({ ok: false, error: { code: "archive-rejected" } });
     expect(readdirSync(work)).toEqual([]);
   });
 
@@ -361,6 +376,17 @@ describe("scanGitHubRepository", () => {
     expect(r.value.report.analyses).toEqual({ dependencies: "analyzed", patterns: "analyzed" });
     expect(r.value.report.findings.some((f) => f.evidence.kind === "insecure-pattern" && f.evidence.ruleId === "GSK-CORS-001")).toBe(true);
     expect(JSON.stringify(r.value.report)).not.toContain(work.replace(/\\/g, "\\\\"));
+    expect(readdirSync(work)).toEqual([]);
+  });
+
+  it("analyzes a repository that contains links and says which ones were not read", async () => {
+    const work = freshDir();
+    const gh = fakeGitHub({ archive: targz([{ name: "r-aaaa/AGENTS.md", data: "notes\n" }, { name: "r-aaaa/CLAUDE.md", type: "2", linkname: "AGENTS.md" }]) });
+    const r = await scanGitHubRepository({ url: "https://github.com/o/r", fetch: gh.fetch, workDir: work, scan: { osv: { fetch: gh.fetch }, packagist: false } });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.value.archive).toMatchObject({ files: 1, skippedLinks: 1 });
+    expect(r.value.report.limitations.join(" ")).toContain("1 symbolic or hard link(s) were not read, because links are never created or followed: CLAUDE.md.");
     expect(readdirSync(work)).toEqual([]);
   });
 

@@ -1,4 +1,5 @@
 import type { Finding, Report } from "../types.js";
+import { PRIORITY_LABEL } from "./labels.js";
 
 /**
  * Human-readable terminal output. All strings coming from the lockfile, from
@@ -22,6 +23,16 @@ function line(label: string, value: string): string {
   return `${label.padEnd(14)} ${value}`;
 }
 
+/** The plain-language impact and manual steps (the AI prompt is long and stays in JSON and on the web). */
+function guidanceLines(f: Finding): string[] {
+  const out: string[] = [];
+  if (f.remediation.impact) out.push(`       impact:   ${sanitize(f.remediation.impact, 300)}`);
+  (f.remediation.manualSteps ?? []).slice(0, 4).forEach((step, i) => {
+    out.push(`       ${i === 0 ? "steps:   " : "         "} ${String(i + 1)}. ${sanitize(step, 240)}`);
+  });
+  return out;
+}
+
 function renderDependencyFinding(f: Finding): string[] {
   if (f.evidence.kind !== "dependency-vulnerability") return [];
   const e = f.evidence;
@@ -34,6 +45,7 @@ function renderDependencyFinding(f: Finding): string[] {
     `       ${sanitize(e.summary ?? "(no summary provided by source)")}`,
     `       severity: ${sev}   why: ${f.rationale.join(", ")}`,
     `       action:   ${sanitize(f.remediation.action, 300)}`,
+    ...guidanceLines(f),
   ];
   const ref = f.references.find((r) => r.type === "ADVISORY") ?? f.references[0];
   if (ref) out.push(`       ref:      ${sanitize(ref.url, 200)}`);
@@ -49,7 +61,7 @@ function renderPatternFinding(f: Finding): string[] {
   ];
   if (e.snippet.length > 0) out.push(`       code:     ${sanitize(e.snippet, 160)}`);
   out.push(`       severity: ${f.severity.tier} (${sanitize(e.fileClass, 20)} file)   why: ${f.rationale.join(", ")}`);
-  out.push(`       action:   ${sanitize(f.remediation.action, 300)}`);
+  out.push(`       action:   ${sanitize(f.remediation.action, 300)}`, ...guidanceLines(f));
   return out;
 }
 
@@ -62,6 +74,7 @@ function renderAdvisoryFinding(f: Finding): string[] {
     `       ${sanitize(e.summary, 400)}`,
     `       severity: ${f.severity.tier}   why: ${f.rationale.join(", ")}${e.verification === "unverified" ? "   (unverified: registry check unavailable)" : ""}`,
     `       action:   ${sanitize(f.remediation.action, 500)}`,
+    ...guidanceLines(f),
   ];
   if (e.indicators.length > 0) out.push(`       evidence: ${sanitize(e.indicators.join("; "), 300)}`);
   const ref = f.references[0];
@@ -101,11 +114,12 @@ export function renderText(report: Report): string {
       ),
     );
   } else {
-    out.push(line("dependencies", "not analyzed (no package-lock.json at root, or --only patterns)"));
+    const unread = report.project.unsupportedLockfiles ?? [];
+    out.push(line("dependencies", report.analyses.dependencies === "not-supported" ? `not analyzed: ${unread.map((n) => sanitize(n, 40)).join(", ")} not supported yet` : "not analyzed (no package-lock.json at root, or --only patterns)"));
   }
   if (report.patterns) {
     const p = report.patterns;
-    out.push(line("code", `${p.filesScanned} files scanned, ${p.filesSkippedIgnored} ignored, ${p.filesSkippedBinary} binary; ${p.rulesRun.length} rules; mode ${report.gate.patternsMode}`));
+    out.push(line("code", `${p.filesScanned} files scanned, ${p.filesSkippedIgnored} ignored, ${p.filesSkippedBinary} binary${p.filesSkippedLarge ? `, ${String(p.filesSkippedLarge)} too large` : ""}; ${p.rulesRun.length} rules; mode ${report.gate.patternsMode}`));
   } else {
     out.push(line("code", "not analyzed (lockfile-only scan, or --only deps)"));
   }
@@ -117,6 +131,7 @@ export function renderText(report: Report): string {
   } else {
     out.push(
       `Findings: ${report.findings.length}  (P1 ${s.byPriority.P1}, P2 ${s.byPriority.P2}, P3 ${s.byPriority.P3}, P4 ${s.byPriority.P4})  dependencies ${s.byKind["dependency-vulnerability"]}, supply-chain advisories ${s.byKind["supply-chain-anomaly"]}, code patterns ${s.byKind["insecure-pattern"]}`,
+      `  ${(["P1", "P2", "P3", "P4"] as const).map((p) => `${p} ${PRIORITY_LABEL[p].toLowerCase()}`).join(" · ")}`,
     );
     for (const f of report.findings) {
       out.push(...renderFinding(f));
