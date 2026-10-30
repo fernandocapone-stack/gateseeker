@@ -83,6 +83,8 @@ export function runRules(project: ProjectSnapshot, rules: Rule[], now: () => Dat
       filesScanned: project.stats.filesScanned,
       filesSkippedIgnored: project.stats.filesSkippedIgnored,
       filesSkippedBinary: project.stats.filesSkippedBinary,
+      filesSkippedLarge: project.stats.filesSkippedLarge,
+      largeFiles: project.stats.largeFiles,
       bytesScanned: project.stats.bytesScanned,
       rulesRun: rules.map((r) => r.id),
       suppressions: [...used.values()],

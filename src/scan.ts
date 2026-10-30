@@ -1,5 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
 import { access, readFile } from "node:fs/promises";
+import { sanitize } from "./report/text.js";
 import { basename, dirname, join, resolve } from "node:path";
 import { ADVISORY_SOURCE_NAME, advisoryMatches, advisoryTagMatch, buildAdvisoryFinding, loadAdvisories, type AdvisorySet } from "./intel/advisories.js";
 import { OSV_QUERY_ENDPOINT, OSV_SOURCE_NAME, OsvClient, type OsvClientOptions } from "./intel/osv.js";
@@ -393,6 +394,11 @@ function finishScan(args: { root: string; startedAt: string; locks: LockOutcome[
   if (npmUnread) limitations.push(`npm dependencies were not analyzed: ${unsupported.join(", ")} ${unsupported.length === 1 ? "is" : "are"} not supported yet, and there is no package-lock.json.`);
   else if (unsupported.length > 0) limitations.push(`${unsupported.join(", ")} ${unsupported.length === 1 ? "was" : "were"} not read; dependencies come from package-lock.json, which may differ.`);
   if (patterns) limitations.push(...PATTERN_LIMITATIONS);
+  const largeCount = patterns?.summary.filesSkippedLarge ?? 0;
+  if (largeCount > 0) {
+    const shown = patterns?.summary.largeFiles ?? [];
+    limitations.push(`${String(largeCount)} file(s) above the size limit were not scanned for code patterns: ${shown.map((f) => sanitize(f, 80)).join(", ")}${largeCount > shown.length ? ", …" : ""}.`);
+  }
   else limitations.push("Code patterns were not analyzed (lockfile-only scan or --only deps).");
 
   const sources: Report["sources"] = [];

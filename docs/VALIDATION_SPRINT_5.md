@@ -79,7 +79,7 @@ A medição tentou primeiro o mesmo caminho da página web (download do `.tar.gz
 - **3 acima de 50 MB comprimidos** (strapi/documentation, dramaclaw, lemma-platform), limite decidido na Sprint 4.
 - No caminho da CLI, **3 repositórios pararam no limite de 1 MB por arquivo** (um HTML de perfil, um `llms-full.txt`, um binário), que aborta a análise inteira com código de saída 3, em vez de pular o arquivo.
 
-Recomendação, para decisão do PO: (a) no leitor de tar, **pular** links em vez de recusar o arquivo inteiro, sem criar nada no disco e listando os links como "não lidos" nas limitações do relatório (a proteção continua a mesma: nenhum link é seguido nem criado); (b) no walker, **pular** arquivos acima do limite com uma linha nas limitações, em vez de abortar. As duas mudam uma decisão de segurança registrada e por isso não foram feitas nesta sprint.
+Recomendação, para decisão do PO: (a) no leitor de tar, **pular** links em vez de recusar o arquivo inteiro, sem criar nada no disco e listando os links como "não lidos" nas limitações do relatório (a proteção continua a mesma: nenhum link é seguido nem criado); (b) no walker, **pular** arquivos acima do limite com uma linha nas limitações, em vez de abortar. **Aprovado pelo PO em 2026-10-30 e implementado no mesmo dia**. Refeita a rodada pelo caminho da página depois da mudança: 7 de 10 repositórios analisados (os 4 recusados por links passaram; compass-calendar teve os mesmos 3 achados do caminho da CLI); os 3 restantes continuam acima de 50 MB, como previsto pelo limite da Sprint 4 (leitor de tar e walker); `docs/THREAT_MODEL.md` §1 e §11 atualizados.
 
 ## Reprodução
 

@@ -148,7 +148,7 @@ export function ReportView({ response, elapsedMs }: { response: ScanResponseOk; 
           {report.analyses.patterns === "analyzed" && report.patterns ? `${String(report.patterns.filesScanned)} file(s) scanned for code patterns.` : ""}
         </p>
         <p className="text-caption text-muted-foreground">
-          Dependencies {k["dependency-vulnerability"]} · supply chain {k["supply-chain-anomaly"]} · code patterns {k["insecure-pattern"]} · gate: fail on {report.gate.failOn}, patterns {report.gate.patternsMode}, supply-chain rules {report.gate.supplyChainMode} · {archive.files} files read{archive.skippedLarge > 0 ? ` (${String(archive.skippedLarge)} large binary file(s) skipped)` : ""} · {(elapsedMs / 1000).toFixed(1)}s · Gateseeker {report.gateseekerVersion} · sources: {report.sources.map((s) => s.name).join(", ") || "none"}
+          Dependencies {k["dependency-vulnerability"]} · supply chain {k["supply-chain-anomaly"]} · code patterns {k["insecure-pattern"]} · gate: fail on {report.gate.failOn}, patterns {report.gate.patternsMode}, supply-chain rules {report.gate.supplyChainMode} · {archive.files} files read{archive.skippedLarge > 0 ? ` (${String(archive.skippedLarge)} large binary file(s) skipped)` : ""}{archive.skippedLinks ? ` · ${String(archive.skippedLinks)} link(s) not read` : ""} · {(elapsedMs / 1000).toFixed(1)}s · Gateseeker {report.gateseekerVersion} · sources: {report.sources.map((s) => s.name).join(", ") || "none"}
         </p>
       </Card>
 

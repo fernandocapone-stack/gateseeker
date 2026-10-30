@@ -119,7 +119,7 @@ export function renderText(report: Report): string {
   }
   if (report.patterns) {
     const p = report.patterns;
-    out.push(line("code", `${p.filesScanned} files scanned, ${p.filesSkippedIgnored} ignored, ${p.filesSkippedBinary} binary; ${p.rulesRun.length} rules; mode ${report.gate.patternsMode}`));
+    out.push(line("code", `${p.filesScanned} files scanned, ${p.filesSkippedIgnored} ignored, ${p.filesSkippedBinary} binary${p.filesSkippedLarge ? `, ${String(p.filesSkippedLarge)} too large` : ""}; ${p.rulesRun.length} rules; mode ${report.gate.patternsMode}`));
   } else {
     out.push(line("code", "not analyzed (lockfile-only scan, or --only deps)"));
   }

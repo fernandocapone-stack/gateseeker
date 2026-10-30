@@ -167,6 +167,9 @@ export interface PatternsReport {
   filesScanned: number;
   filesSkippedIgnored: number;
   filesSkippedBinary: number;
+  /** Files above the size limit that were not read, and the first 10 paths. Absent in reports from before 2026-10-30. */
+  filesSkippedLarge?: number;
+  largeFiles?: string[];
   bytesScanned: number;
   rulesRun: string[];
   suppressions: { file: string; line: number; ruleId: string; reason: string }[];

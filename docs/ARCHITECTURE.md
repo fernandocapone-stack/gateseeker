@@ -68,7 +68,7 @@ The only runtime dependency is Zod. HTTP uses Node's global `fetch`; argument pa
 | `action.yml` | Composite action: setup-node, pinned `npx --package=gateseeker@<version> gateseeker-action` (or a local build for this repository), base-branch fetch, SARIF upload. | Third-party actions beyond checkout/setup-node/codeql upload. |
 | `cli.ts` | Arguments, path type detection, report writing, exit code. | Business logic. |
 | `web/github-url.ts` | Strict grammar for `https://github.com/<owner>/<repo>[/tree/<ref>]`; rejects before any request. | Parse general URLs, accept other hosts. |
-| `web/tar.ts` | Dependency-free `.tar.gz` reader with limits; regular files and directories only; strips GitHub's top-level folder. | Follow links, write outside the destination. |
+| `web/tar.ts` | Dependency-free `.tar.gz` reader with limits; writes regular files and directories only, skips and lists links; strips GitHub's top-level folder. | Follow links, write outside the destination. |
 | `web/service.ts` | Resolve the repository and commit on the GitHub API, download the archive, extract, run `scanDirectory`, clean up; injected `fetch`. | git, child processes, tokens (optional read-only `GITHUB_TOKEN` only for the API limit). |
 | `web/auth.ts` | Verify the bearer token with Supabase Auth; static and stub verifiers for tests. | Pass the user to the engine. |
 | `web/store.ts` | Saved reports (30 days), per-user quota (`claim_scan`), per-commit cache; memory and Supabase (PostgREST, service key) implementations. | Interpret report content. |
@@ -109,7 +109,7 @@ The engine is the published package at the pinned version; the web adds no rule,
 
 ## Trust boundaries
 
-1. **Project files → walker and rules.** Everything in the directory is attacker-controlled. Controls: symlinks skipped; containment check on every path; fixed directory exclusions; file-count, file-size and depth limits that abort with a typed error (exit 3); binary detection by extension and NUL probe; lines over 5000 characters skipped by rules; regexes reviewed and timed against adversarial 1 MB inputs; snippets sanitized and secrets redacted; rule exceptions caught and reported as a `GSK-ENGINE-000` finding instead of crashing.
+1. **Project files → walker and rules.** Everything in the directory is attacker-controlled. Controls: symlinks skipped; containment check on every path; fixed directory exclusions; file-count and depth limits that abort with a typed error (exit 3) and a per-file size limit above which a file is skipped unread and listed in the limitations; binary detection by extension and NUL probe; lines over 5000 characters skipped by rules; regexes reviewed and timed against adversarial 1 MB inputs; snippets sanitized and secrets redacted; rule exceptions caught and reported as a `GSK-ENGINE-000` finding instead of crashing.
 2. **Lockfile → parser.** Byte limit before parsing, dependency-count limit, strict schema, no code execution.
 3. **OSV → client.** Schema validation (malformed response is a failed query), timeout, pagination cap, summaries and references treated as untrusted text.
 4. **Registry metadata → scanner.** Packagist p2 responses are validated by schema; a failed or missing lookup never clears a dependency: the tag match falls back to the time check, is marked unverified, and the Packagist query is recorded as failed, which makes the verdict `incomplete`.

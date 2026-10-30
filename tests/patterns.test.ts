@@ -130,14 +130,19 @@ describe("walker", () => {
     if (!r.ok) expect(r.error.code).toBe("root-not-directory");
   });
 
-  it("aborts on too many files and on an oversize text file", async () => {
+  it("aborts on too many files, and skips and lists oversize files (PO decision 2026-10-30)", async () => {
     const many = await walkProject(VIBE, { ...DEFAULT_WALK_LIMITS, maxFiles: 3 });
     expect(many.ok).toBe(false);
     if (!many.ok) expect(many.error.code).toBe("too-many-files");
 
     const big = await walkProject(VIBE, { ...DEFAULT_WALK_LIMITS, maxFileBytes: 200 });
-    expect(big.ok).toBe(false);
-    if (!big.ok) expect(big.error.code).toBe("file-too-large");
+    expect(big.ok).toBe(true);
+    if (!big.ok) return;
+    expect(big.project.stats.filesSkippedLarge).toBeGreaterThan(0);
+    expect(big.project.stats.largeFiles.length).toBe(Math.min(10, big.project.stats.filesSkippedLarge));
+    // A skipped file is not read: nothing above the limit reaches the rules.
+    for (const f of big.project.files) expect(f.size, f.path).toBeLessThanOrEqual(200);
+    for (const p of big.project.stats.largeFiles) expect(big.project.byPath.has(p)).toBe(false);
   });
 
   it("aborts when nesting exceeds the depth limit", async () => {

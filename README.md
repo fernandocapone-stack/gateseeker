@@ -11,7 +11,7 @@ Gateseeker points at a project directory, checks the code for the security mista
 Sign in with GitHub at [gateseeker.vercel.app](https://gateseeker.vercel.app), paste the URL of a **public** GitHub repository and get the same report the CLI produces, usually in under a minute. Nothing to install.
 
 - Same engine, rules and wording as the CLI; pattern and supply-chain rules run in warn mode, and there is no baseline on the web.
-- The repository is downloaded as an archive and read as text: nothing is cloned, installed or executed. Archives over 50 MB compressed are refused (use the CLI for those).
+- The repository is downloaded as an archive and read as text: nothing is cloned, installed or executed. Symbolic links are never created or followed; the report lists them as not read. Archives over 50 MB compressed are refused (use the CLI for those).
 - Reports are saved for 30 days and open only for the account that produced them. Secrets are redacted before anything is saved.
 - 10 analyses per account per hour; the same commit within 24 hours reuses the saved report without counting.
 
