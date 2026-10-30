@@ -240,12 +240,12 @@ Rules are lexical and structural checks on text files. They never execute projec
 | `GSK-ENV-001` | Root `.env*` file with non-public variables not covered by `.gitignore`. | MODERATE |
 | `GSK-BUILD-001` | `next.config` with `ignoreBuildErrors` or `ignoreDuringBuilds` set to true. | LOW |
 | `GSK-AGENT-001` | Committed AI-agent configuration that allows every shell command: Claude Code `Bash`, `Bash(*)`, `*` or `bypassPermissions`; Codex `approval_policy = "never"` with `danger-full-access`. | MODERATE |
-| `GSK-AGENT-002` | Agent hook (in settings or a script under an agent directory) that pipes a download into a shell or runs an unpinned package (`@latest`, `npx -y`). | HIGH |
+| `GSK-AGENT-002` | Agent hook (in settings, a script under an agent directory, or the install/start steps of `.cursor/environment.json`) that pipes a download into a shell or runs an unpinned package (`@latest`, `npx -y`). | HIGH |
 | `GSK-AGENT-003` | MCP server launched from an unpinned package, reached over plain `http://`, or with a literal secret in `env`/`headers` (value redacted). | MODERATE (HIGH for an inline secret) |
 | `GSK-AGENT-004` | Hidden text in files agents follow (`CLAUDE.md`, `AGENTS.md`, `.cursorrules`, agent commands and rules): invisible Unicode characters, an HTML comment with instructions, a long encoded run. | HIGH for invisible characters, MODERATE otherwise |
 | `GSK-AGENT-005` | `--no-verify`, `git commit -n` or `HUSKY=0` in agent instructions, `package.json` scripts or CI workflows. Lines that forbid it are skipped. | MODERATE |
 
-The `GSK-AGENT-*` rules (Track A1) are new and their precision on real repositories is still being measured; like every rule they run in warn mode. `.mcp.json` and `.claude/settings.json` are strict JSON with no comments, so findings in them cannot be suppressed inline; VS Code's `mcp.json` accepts comments and can.
+The `GSK-AGENT-*` rules (Track A1) were measured on 10 public repositories in `docs/VALIDATION_SPRINT_5.md` (3 of 3 final findings correct, after fixing two false positives and one false negative found there); the sample is small, so like every rule they run in warn mode. `.mcp.json` and `.claude/settings.json` are strict JSON with no comments, so findings in them cannot be suppressed inline; VS Code's `mcp.json` accepts comments and can.
 
 Code snippets in findings never carry hardcoded values: matched credentials are shown as their first four characters and length, dotenv values are hidden, and quoted string literals of eight or more characters next to a flagged variable are masked.
 
@@ -306,6 +306,7 @@ Unit tests never reach the network: the OSV client takes an injected `fetch`, an
 - [docs/ROADMAP.md](docs/ROADMAP.md): proposed Sprints 5 to 9, UX problems found, decisions for the PO.
 - [docs/SPRINT_4.md](docs/SPRINT_4.md), [docs/DEPLOY.md](docs/DEPLOY.md): the hosted service and how it is deployed.
 - [docs/VALIDATION_SPRINT_1.md](docs/VALIDATION_SPRINT_1.md): results of the pattern rules on five real projects.
+- [docs/VALIDATION_SPRINT_5.md](docs/VALIDATION_SPRINT_5.md): results of the agent-configuration rules on ten real repositories.
 - [docs/UPSTREAM.md](docs/UPSTREAM.md): how approved advisories are submitted to OSV/GHSA.
 - [advisories/README.md](advisories/README.md): the curated advisory feed, its lifecycle and format.
 

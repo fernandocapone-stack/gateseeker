@@ -42,14 +42,18 @@ export const agentRemoteHookRule: Rule = {
     const matches: RuleMatch[] = [];
     if (file.path.toLowerCase().endsWith(".json")) {
       const json = parseJson(file);
-      if (!isRecord(json) || json.hooks === undefined) return matches;
+      if (!isRecord(json)) return matches;
+      // Cursor runs install/start/terminals of .cursor/environment.json on its own when it sets up a background agent.
+      const cursorEnv = file.path.toLowerCase() === ".cursor/environment.json";
+      const commands = cursorEnv ? stringsIn([json.install, json.start, json.terminals]) : json.hooks === undefined ? [] : stringsIn(json.hooks);
       const seen = new Set<string>();
-      for (const command of stringsIn(json.hooks)) {
+      for (const command of commands) {
         const what = firstHit(command);
         if (what === null || seen.has(command)) continue;
         seen.add(command);
-        const line = lineOf(file, command.slice(0, 60));
-        matches.push({ line, snippet: sanitize((file.lines[line - 1] ?? "").trim(), 160), message: `An agent hook ${what}.`, details: { where: "settings", pattern: what } });
+        // The file holds the JSON-escaped text: look the line up by the command's start, before any quote, backslash or newline.
+        const line = lineOf(file, command.split(/["\\\n]/)[0]?.slice(0, 50) ?? command);
+        matches.push({ line, snippet: sanitize((file.lines[line - 1] ?? "").trim(), 160), message: cursorEnv ? `The Cursor background-agent setup ${what}.` : `An agent hook ${what}.`, details: { where: cursorEnv ? "cursor-environment" : "settings", pattern: what } });
       }
       return matches;
     }

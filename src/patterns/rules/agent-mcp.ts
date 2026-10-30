@@ -42,6 +42,8 @@ function packageArg(command: string, args: string[]): string | null {
 
 function looksSecret(value: string): boolean {
   if (value.length < 12 || REFERENCE.test(value.trim())) return false;
+  // "Bearer ${TOKEN}": a reference with a prefix is still a reference.
+  if (/\$\{[^}]{1,100}\}/.test(value)) return false;
   if (/^https?:\/\//i.test(value) || /^(true|false|\d+)$/i.test(value)) return false;
   return !looksLikePlaceholder(value) && !/your|example|changeme|placeholder|<|xxx/i.test(value);
 }

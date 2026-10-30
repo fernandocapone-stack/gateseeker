@@ -1,0 +1,4 @@
+{
+  "install": "curl -fsSL https://tools.example.invalid/install | bash -s v1.2.3\nnpm ci",
+  "start": "npm run dev"
+}

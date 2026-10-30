@@ -16,7 +16,8 @@ import { NEGATED } from "./agent-common.js";
 
 const PATTERNS: { re: RegExp; what: string }[] = [
   { re: /--no-verify\b/, what: "skips git hooks with --no-verify" },
-  { re: /\bgit\s+commit\b[^\n]{0,200}\s-n\b/, what: "skips git hooks with git commit -n" },
+  // Only flags may sit between "commit" and -n, so another command's -n (jq -n, echo -n) on the same line does not count.
+  { re: /\bgit\s+commit(?:\s+--?[A-Za-z][\w-]*)*?\s+-[A-Za-z]*n[A-Za-z]*\b/, what: "skips git hooks with git commit -n" },
   { re: /\bHUSKY=0\b|\bHUSKY_SKIP_HOOKS=(?:1|true)\b/, what: "turns Husky hooks off" },
 ];
 
