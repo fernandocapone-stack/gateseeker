@@ -6,7 +6,7 @@
  * page never waits on or reacts to the answer.
  */
 
-export type FunnelEvent = "login_view" | "login_start" | "signin_complete";
+export type FunnelEvent = "login_view" | "login_start" | "signin_complete" | "email_click";
 
 const SENT = "gateseeker:funnel:";
 const PENDING = "gateseeker:funnel:pending";
@@ -43,6 +43,11 @@ export function countLoginStart(): void {
     /* the completion will not be counted */
   }
   once("login_start");
+}
+
+/** A report was opened from the link in an alert email (docs/SPRINT_6.md 3.7): the link's own parameter, no tracking pixel. */
+export function countEmailClick(): void {
+  once("email_click");
 }
 
 /** A session appeared after a sign-in this tab started (not a visit by someone already signed in). */

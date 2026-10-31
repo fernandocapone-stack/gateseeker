@@ -4,7 +4,7 @@ import { dirname, extname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { authConfigFromEnv, exampleRepoFromEnv, handlerOptionsFromEnv } from "./env.js";
-import { handleCleanupRequest, handleEventRequest, handleFeedPublishedRequest, handleFollowsRequest, handleMonitorRequest, handleReportRequest, handleScanRequest, handleScansRequest } from "./handler.js";
+import { handleCleanupRequest, handleEventRequest, handleFeedPublishedRequest, handleUnsubscribeRequest, handleFollowsRequest, handleMonitorRequest, handleReportRequest, handleScanRequest, handleScansRequest } from "./handler.js";
 
 /**
  * Development and end-to-end server for the public page: serves web/dist and
@@ -20,6 +20,8 @@ import { handleCleanupRequest, handleEventRequest, handleFeedPublishedRequest, h
  *   GET  /api/scans           the signed-in user's analysis history
  *   GET  /api/cron/cleanup    purge expired reports (bearer CRON_SECRET)
  *   POST /api/event           count a login-funnel event (anonymous, aggregate)
+ *   POST /api/unsubscribe     stop following from an email link (?f=&t= or JSON {f, t}; no session)
+ *   GET  /api/dev/outbox      emails kept in memory (stub sign-in only; nothing is sent)
  *
  * Environment: see env.ts, plus
  *   GATESEEKER_WEB_PORT      default 4320
@@ -150,6 +152,30 @@ const server = createServer((req, res) => {
       const out = await handleFeedPublishedRequest(body, options);
       json(res, out.status, out.body);
     })();
+    return;
+  }
+  if (url.pathname === "/api/unsubscribe") {
+    if (req.method !== "POST") {
+      json(res, 405, { ok: false, error: { code: "bad-request", message: "POST only." } });
+      return;
+    }
+    void (async () => {
+      const raw = await readBody(req);
+      let body: unknown = null;
+      try {
+        body = raw ? (JSON.parse(raw) as unknown) : null;
+      } catch {
+        /* the one-click header posts a form body; the id and token are in the query */
+      }
+      const input = body !== null && typeof body === "object" ? body : { f: url.searchParams.get("f"), t: url.searchParams.get("t") };
+      const out = await handleUnsubscribeRequest(input, options);
+      json(res, out.status, out.body);
+    })();
+    return;
+  }
+  if (url.pathname === "/api/dev/outbox" && authConfig.mode === "stub") {
+    const mailer = options.mail?.mailer as { sent?: unknown[] } | null | undefined;
+    json(res, 200, { ok: true, sent: mailer?.sent ?? [] });
     return;
   }
   if (url.pathname === "/api/cron/monitor") {

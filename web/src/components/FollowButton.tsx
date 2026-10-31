@@ -5,8 +5,8 @@ import { useState } from "react";
 import { useFollows } from "../follows";
 
 /**
- * Follow a repository: the daily monitor rescans it and, once alerts are on,
- * emails the account when a new P1 or P2 finding appears. A follow is the
+ * Follow a repository: the daily monitor rescans it and emails the account
+ * when a new P1 or P2 finding appears (at most once a day per repository). A follow is the
  * explicit, reversible consent docs/SPRINT_6.md 2.4 asks for.
  */
 export function FollowButton({ owner, repo, token }: { owner: string; repo: string; token: string }) {
@@ -21,7 +21,7 @@ export function FollowButton({ owner, repo, token }: { owner: string; repo: stri
         size="sm"
         aria-pressed={on}
         disabled={busy}
-        title={on ? "Stop the daily check of this repository" : "Check this repository every day"}
+        title={on ? "Stop the daily check and the emails about this repository" : "Check this repository every day and email me about new findings to fix soon"}
         onClick={() => {
           setBusy(true);
           void (on ? unfollow(owner, repo) : follow(owner, repo)).finally(() => { setBusy(false); });

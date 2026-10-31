@@ -17,6 +17,7 @@ import { Resources, WorkspaceResources } from "./pages/Resources";
 import { SavedReport } from "./pages/SavedReport";
 import { Scans } from "./pages/Scans";
 import { SettingsPage } from "./pages/Settings";
+import { Unsubscribe } from "./pages/Unsubscribe";
 import { Link, Router, navigate, usePath } from "./router";
 import { Workspace, type WorkspacePage } from "./Workspace";
 
@@ -41,6 +42,7 @@ const TITLES: Record<string, string> = {
   "/resources": "Resources · Gateseeker",
   "/get-started": "Get started · Gateseeker",
   "/login": "Log in · Gateseeker",
+  "/unsubscribe": "Stop following · Gateseeker",
   "/app": "Analyze a repository · Gateseeker",
   "/app/design-system": "Design system · Gateseeker",
   "/app/settings": "Settings · Gateseeker",
@@ -98,6 +100,7 @@ function Shell() {
   else if (path === "/resources") page = <Resources />;
   else if (path === "/get-started") page = <GetStarted />;
   else if (path === "/login") page = <Login />;
+  else if (path === "/unsubscribe") page = <Unsubscribe />;
   else if (path === "/app") page = <AnalyzePage />;
   else if (path === "/app/design-system") page = <DesignSystem />;
   else if (path === "/app/settings") page = <SettingsPage />;

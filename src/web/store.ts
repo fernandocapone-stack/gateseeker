@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import type { SignedFeed } from "../intel/feed-signature.js";
+import type { PendingAlert } from "./emails.js";
 
 /**
  * Persistence for the hosted service: saved reports (30-day retention), the
@@ -71,14 +72,21 @@ export interface FollowRecord {
   ecosystems: string[] | null;
   /** Set when a newly published advisory for one of its ecosystems put it in front of the daily order (docs/SPRINT_6.md 3.4). */
   queuedAt: string | null;
+  /** Alert waiting to be sent (one email per repository per day, under the daily cap). */
+  pendingAlert: PendingAlert | null;
+  lastAlertAt: string | null;
 }
 
-export type FollowPatch = Partial<Pick<FollowRecord, "lastScanAt" | "lastReportId" | "lastVerdict" | "lastNewUrgent" | "failures" | "pausedReason" | "ecosystems" | "queuedAt">>;
+export type FollowPatch = Partial<Pick<FollowRecord, "lastScanAt" | "lastReportId" | "lastVerdict" | "lastNewUrgent" | "failures" | "pausedReason" | "ecosystems" | "queuedAt" | "pendingAlert" | "lastAlertAt">>;
 
-export type FollowResult = { ok: true; follow: FollowRecord } | { ok: false; reason: "limit" };
+/** `created` is false when the account already followed the repository. */
+export type FollowResult = { ok: true; created: boolean; follow: FollowRecord } | { ok: false; reason: "limit" };
 
 /** Aggregate page events (login funnel): counted per UTC day, no user, IP or user agent. */
-export const EVENT_KINDS = ["login_view", "login_start", "signin_complete"] as const;
+/** Kinds the page may send to POST /api/event. */
+export const CLIENT_EVENT_KINDS = ["login_view", "login_start", "signin_complete", "email_click"] as const;
+/** All kinds, including the ones only the service counts (monitor and emails, docs/SPRINT_6.md 3.7). */
+export const EVENT_KINDS = [...CLIENT_EVENT_KINDS, "rescan_complete", "rescan_incomplete", "rescan_failed", "email_follow_confirm", "email_alert", "email_paused", "email_capped", "email_failed", "unsubscribe"] as const;
 export type EventKind = (typeof EVENT_KINDS)[number];
 
 export interface ReportStore {
@@ -103,6 +111,12 @@ export interface ReportStore {
   updateFollow(id: string, patch: FollowPatch): Promise<void>;
   /** Queues the follows (not paused) whose last rescan saw one of these ecosystems; returns how many. */
   queueFollows(ecosystems: string[], at: string): Promise<number>;
+  /** A follow by id (the unsubscribe link carries only the id and its token). */
+  getFollow(id: string): Promise<FollowRecord | null>;
+  /** Deletes a follow by id; true when there was one. */
+  deleteFollow(id: string): Promise<boolean>;
+  /** Takes one email from today's (UTC) allowance; false once `limit` emails were sent today. */
+  claimEmail(limit: number): Promise<boolean>;
   /** Stores a published advisory set as received (already verified by the handler). */
   saveFeed(feed: SignedFeed): Promise<void>;
   /** The most recently published advisory set, unverified: the caller checks the signature. */
@@ -129,6 +143,7 @@ export function createMemoryStore(clock: StoreClock = {}): ReportStore & { event
   const scans: ScanSummary[] = [];
   const follows: FollowRecord[] = [];
   const feeds: SignedFeed[] = [];
+  const emailDays = new Map<string, number>();
   const quota = new Map<string, { windowStart: number; used: number }>();
   const events = new Map<string, number>();
   let seq = 0;
@@ -201,12 +216,12 @@ export function createMemoryStore(clock: StoreClock = {}): ReportStore & { event
     async follow(userId, owner, repo, limit) {
       const mine = follows.filter((f) => f.userId === userId);
       const existing = mine.find((f) => f.owner.toLowerCase() === owner.toLowerCase() && f.repo.toLowerCase() === repo.toLowerCase());
-      if (existing) return { ok: true, follow: { ...existing } };
+      if (existing) return { ok: true, created: false, follow: { ...existing } };
       if (mine.length >= limit) return { ok: false, reason: "limit" };
       seq += 1;
-      const f: FollowRecord = { id: `follow-${seq.toString(36)}`, userId, owner, repo, createdAt: now().toISOString(), lastScanAt: null, lastReportId: null, lastVerdict: null, lastNewUrgent: 0, failures: 0, pausedReason: null, ecosystems: null, queuedAt: null };
+      const f: FollowRecord = { id: `follow-${seq.toString(36)}`, userId, owner, repo, createdAt: now().toISOString(), lastScanAt: null, lastReportId: null, lastVerdict: null, lastNewUrgent: 0, failures: 0, pausedReason: null, ecosystems: null, queuedAt: null, pendingAlert: null, lastAlertAt: null };
       follows.push(f);
-      return { ok: true, follow: { ...f } };
+      return { ok: true, created: true, follow: { ...f } };
     },
     // eslint-disable-next-line @typescript-eslint/require-await
     async unfollow(userId, owner, repo) {
@@ -240,6 +255,26 @@ export function createMemoryStore(clock: StoreClock = {}): ReportStore & { event
         n += 1;
       }
       return n;
+    },
+    // eslint-disable-next-line @typescript-eslint/require-await
+    async getFollow(id) {
+      const f = follows.find((x) => x.id === id);
+      return f ? { ...f } : null;
+    },
+    // eslint-disable-next-line @typescript-eslint/require-await
+    async deleteFollow(id) {
+      const i = follows.findIndex((x) => x.id === id);
+      if (i < 0) return false;
+      follows.splice(i, 1);
+      return true;
+    },
+    // eslint-disable-next-line @typescript-eslint/require-await
+    async claimEmail(limit) {
+      const day = now().toISOString().slice(0, 10);
+      const sent = emailDays.get(day) ?? 0;
+      if (sent >= limit) return false;
+      emailDays.set(day, sent + 1);
+      return true;
     },
     // eslint-disable-next-line @typescript-eslint/require-await
     async saveFeed(feed) {
@@ -406,10 +441,11 @@ export function createSupabaseStore(options: SupabaseStoreOptions): ReportStore 
     async follow(userId, owner, repo, limit) {
       // Atomic in the database: the count and the insert happen in one function, so two tabs cannot pass the limit together.
       const out = await call("/rest/v1/rpc/follow_repo", { method: "POST", body: JSON.stringify({ p_user: userId, p_owner: owner, p_repo: repo, p_limit: limit }) });
-      const parsed = z.looseObject({ ok: z.boolean(), follow: followRowSchema.nullable().optional() }).safeParse(out);
+      const parsed = z.looseObject({ ok: z.boolean(), created: z.boolean().optional(), follow: followRowSchema.nullable().optional() }).safeParse(out);
       if (!parsed.success) throw new StoreError("follow_repo returned an unexpected shape", 200);
       if (!parsed.data.ok || !parsed.data.follow) return { ok: false, reason: "limit" };
-      return { ok: true, follow: toFollow(parsed.data.follow) };
+      // Before 20261103000000_email.sql the function does not say; no confirmation email is sent then.
+      return { ok: true, created: parsed.data.created === true, follow: toFollow(parsed.data.follow) };
     },
     async unfollow(userId, owner, repo) {
       // The handler stores owner and repo in lower case (GitHub names are case-insensitive), so an exact match is enough.
@@ -434,6 +470,8 @@ export function createSupabaseStore(options: SupabaseStoreOptions): ReportStore 
       if (patch.pausedReason !== undefined) row.paused_reason = patch.pausedReason;
       if (patch.ecosystems !== undefined) row.ecosystems = patch.ecosystems;
       if (patch.queuedAt !== undefined) row.queued_at = patch.queuedAt;
+      if (patch.pendingAlert !== undefined) row.pending_alert = patch.pendingAlert;
+      if (patch.lastAlertAt !== undefined) row.last_alert_at = patch.lastAlertAt;
       await call(`/rest/v1/follows?${new URLSearchParams({ id: `eq.${id}` }).toString()}`, { method: "PATCH", body: JSON.stringify(row) });
     },
     async queueFollows(ecosystems, at) {
@@ -443,6 +481,18 @@ export function createSupabaseStore(options: SupabaseStoreOptions): ReportStore 
       const q = new URLSearchParams({ paused_reason: "is.null", ecosystems: `ov.{${names.join(",")}}`, select: "id" });
       const out = await call(`/rest/v1/follows?${q.toString()}`, { method: "PATCH", body: JSON.stringify({ queued_at: at }), prefer: "return=representation" });
       return Array.isArray(out) ? out.length : 0;
+    },
+    async getFollow(id) {
+      if (!ID.test(id)) return null;
+      return parseFollows(await call(`/rest/v1/follows?${new URLSearchParams({ id: `eq.${id}` }).toString()}`, { method: "GET" }))[0] ?? null;
+    },
+    async deleteFollow(id) {
+      if (!ID.test(id)) return false;
+      const out = await call(`/rest/v1/follows?${new URLSearchParams({ id: `eq.${id}`, select: "id" }).toString()}`, { method: "DELETE", prefer: "return=representation" });
+      return Array.isArray(out) && out.length > 0;
+    },
+    async claimEmail(limit) {
+      return (await call("/rest/v1/rpc/claim_email", { method: "POST", body: JSON.stringify({ p_limit: limit }) })) === true;
     },
     async saveFeed(feed) {
       await call("/rest/v1/feed_sets", { method: "POST", body: JSON.stringify({ published_at: feed.publishedAt, digest: feed.digest, payload: feed.payload, signature: feed.signature }) });
@@ -472,12 +522,15 @@ const followRowSchema = z.looseObject({
   // Added by 20261102000000_feed.sql; optional so the follow list keeps working before that migration.
   ecosystems: z.array(z.string()).nullable().optional(),
   queued_at: z.string().nullable().optional(),
+  // Added by 20261103000000_email.sql.
+  pending_alert: z.object({ reportId: z.string().max(64), count: z.number().int().min(0), items: z.array(z.object({ priority: z.enum(["P1", "P2"]), id: z.string().max(60), label: z.string().max(120) })).max(10) }).nullable().optional(),
+  last_alert_at: z.string().nullable().optional(),
 });
 
 const feedRowSchema = z.looseObject({ published_at: z.string(), digest: z.string(), payload: z.string(), signature: z.string() });
 
 function toFollow(r: z.infer<typeof followRowSchema>): FollowRecord {
-  return { id: r.id, userId: r.user_id, owner: r.owner, repo: r.repo, createdAt: r.created_at, lastScanAt: r.last_scan_at, lastReportId: r.last_report_id, lastVerdict: r.last_verdict, lastNewUrgent: r.last_new_urgent, failures: r.failures, pausedReason: r.paused_reason, ecosystems: r.ecosystems ?? null, queuedAt: r.queued_at ?? null };
+  return { id: r.id, userId: r.user_id, owner: r.owner, repo: r.repo, createdAt: r.created_at, lastScanAt: r.last_scan_at, lastReportId: r.last_report_id, lastVerdict: r.last_verdict, lastNewUrgent: r.last_new_urgent, failures: r.failures, pausedReason: r.paused_reason, ecosystems: r.ecosystems ?? null, queuedAt: r.queued_at ?? null, pendingAlert: r.pending_alert ?? null, lastAlertAt: r.last_alert_at ?? null };
 }
 
 function parseFollows(out: unknown): FollowRecord[] {

@@ -70,7 +70,7 @@ export function SettingsPage() {
         </div>
       </Section>
 
-      <Section title="Followed repositories" description="Checked every day. When alerts by email are turned on, you hear about new findings to fix soon. Up to 10 repositories.">
+      <Section title="Followed repositories" description="Checked every day. You get an email when a check finds new findings to fix soon (P1 or P2), at most one per repository per day. Up to 10 repositories.">
         <FollowedList token={auth.session.accessToken} />
       </Section>
 
