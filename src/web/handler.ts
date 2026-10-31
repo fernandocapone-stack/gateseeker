@@ -9,7 +9,9 @@ import { GATESEEKER_VERSION } from "../version.js";
 import { parseGitHubRepoUrl } from "./github-url.js";
 import { bearerToken, type AuthUser, type AuthVerifier } from "./auth.js";
 import { resolveGitHubRepository, scanGitHubRepository, type ServiceErrorCode, type ServiceOptions, type ServiceSuccess } from "./service.js";
-import { EVENT_KINDS, StoreError, type FollowRecord, type QuotaDecision, type ReportStore } from "./store.js";
+import { alertEmail, alertItem, followConfirmationEmail, mergeAlert, pausedEmail, verifyUnsubscribe, type AlertItem, type EmailContext, type PendingAlert } from "./emails.js";
+import type { EmailDirectory, EmailMessage, Mailer } from "./mail.js";
+import { CLIENT_EVENT_KINDS, StoreError, type EventKind, type FollowRecord, type QuotaDecision, type ReportStore } from "./store.js";
 
 /**
  * Framework-agnostic HTTP handlers for the hosted service, shared by the
@@ -49,7 +51,7 @@ export interface ScanResponseError {
 
 export interface HttpResponse {
   status: number;
-  body: ScanResponseOk | ScanResponseError | ReportResponseOk | CleanupResponse | EventResponse | ScansResponse | FollowsResponse | MonitorResponse | FeedPublishedResponse;
+  body: ScanResponseOk | ScanResponseError | ReportResponseOk | CleanupResponse | EventResponse | ScansResponse | FollowsResponse | MonitorResponse | FeedPublishedResponse | UnsubscribeResponse;
 }
 
 /** What is persisted per report: the scan answer minus id, quota and cache flag, which belong to the moment of the request. */
@@ -92,10 +94,24 @@ export interface HandlerOptions extends Omit<ServiceOptions, "url"> {
   closed?: boolean;
   /** HMAC key of published advisory sets (GATESEEKER_FEED_KEY); without it only the bundled set is used. */
   feedKey?: string;
+  /** Email alerts of the monitor; absent: no email is sent and unsubscribe links are refused. */
+  mail?: MailSettings;
+}
+
+export interface MailSettings {
+  /** null: the provider is not configured, nothing is sent (unsubscribe links still work). */
+  mailer: Mailer | null;
+  directory: EmailDirectory;
+  /** Key of the unsubscribe tokens (GATESEEKER_EMAIL_KEY). */
+  key: string;
+  /** Public address of the site, for the links in the emails. */
+  baseUrl: string;
+  /** Emails per UTC day, under the provider's limit. */
+  dailyCap: number;
 }
 
 const bodySchema = z.object({ url: z.string().max(400) });
-const eventSchema = z.object({ kind: z.enum(EVENT_KINDS) });
+const eventSchema = z.object({ kind: z.enum(CLIENT_EVENT_KINDS) });
 
 const STATUS: Record<HandlerErrorCode, number> = {
   "bad-request": 400,
@@ -370,7 +386,7 @@ export async function handleCleanupRequest(options: HandlerOptions, authorizatio
  */
 export async function handleEventRequest(body: unknown, options: HandlerOptions): Promise<HttpResponse> {
   const parsed = eventSchema.safeParse(body);
-  if (!parsed.success) return fail("bad-request", `Send a JSON body with a "kind" of ${EVENT_KINDS.join(", ")}.`);
+  if (!parsed.success) return fail("bad-request", `Send a JSON body with a "kind" of ${CLIENT_EVENT_KINDS.join(", ")}.`);
   if (!options.store) return { status: 200, body: { ok: true } };
   try {
     await options.store.countEvent(parsed.data.kind);
@@ -432,6 +448,7 @@ export async function handleFollowsRequest(method: string, body: unknown, option
     const limit = options.followLimit ?? FOLLOW_LIMIT;
     const r = await store.follow(who.id, owner, repo, limit);
     if (!r.ok) return fail("rate-limited", `You can follow up to ${String(limit)} repositories. Unfollow one first.`);
+    if (r.created) await sendEmail(options, store, r.follow, (c) => followConfirmationEmail(c));
     return { status: 200, body: { ok: true, follows: (await store.listFollows(who.id)).map(followView) } };
   } catch (e) {
     return storeFailure(e);
@@ -463,12 +480,70 @@ export interface MonitorOptions {
 /** Codes that mean the repository cannot be monitored any more, as opposed to a passing failure. */
 const PAUSING = new Set(["not-found", "private"]);
 
-async function monitorOne(f: FollowRecord, options: HandlerOptions, store: ReportStore, at: string): Promise<"ok" | "new-urgent" | "failed" | "paused"> {
+// --- email (docs/SPRINT_6.md 3.6) ------------------------------------------
+
+type SendOutcome = "sent" | "off" | "no-address" | "capped" | "failed";
+
+/** Counters are best effort: a lost count never stops a rescan or an email. */
+async function count(store: ReportStore, kind: EventKind): Promise<void> {
+  try {
+    await store.countEvent(kind);
+  } catch {
+    /* counter lost */
+  }
+}
+
+/**
+ * Sends one email to the owner of a follow. The address is read from the
+ * account at this moment and only used for this message; one send is taken
+ * from the daily cap first. Never throws: the outcome says what happened.
+ */
+async function sendEmail(options: HandlerOptions, store: ReportStore, f: FollowRecord, build: (c: EmailContext) => EmailMessage): Promise<SendOutcome> {
+  const mail = options.mail;
+  if (!mail?.mailer) return "off";
+  try {
+    const to = await mail.directory.emailOf(f.userId);
+    if (!to) return "no-address";
+    if (!(await store.claimEmail(mail.dailyCap))) {
+      await count(store, "email_capped");
+      return "capped";
+    }
+    const message = build({ to, owner: f.owner, repo: f.repo, followId: f.id, baseUrl: mail.baseUrl, key: mail.key });
+    await mail.mailer.send(message);
+    await count(store, `email_${message.kind}`);
+    return "sent";
+  } catch {
+    await count(store, "email_failed");
+    return "failed";
+  }
+}
+
+function sameUtcDay(a: string, b: Date): boolean {
+  return a.slice(0, 10) === b.toISOString().slice(0, 10);
+}
+
+/**
+ * Sends the pending alert of a follow unless one already went today. What
+ * stays pending (cap reached, provider down, already alerted today) waits for
+ * the next rescan; nothing to send (email off, no address) clears it.
+ */
+async function deliverAlert(options: HandlerOptions, store: ReportStore, f: FollowRecord, pending: PendingAlert, now: Date): Promise<Pick<FollowRecord, "pendingAlert" | "lastAlertAt">> {
+  if (f.lastAlertAt && sameUtcDay(f.lastAlertAt, now)) return { pendingAlert: pending, lastAlertAt: f.lastAlertAt };
+  const outcome = await sendEmail(options, store, f, (c) => alertEmail(c, pending));
+  if (outcome === "sent") return { pendingAlert: null, lastAlertAt: now.toISOString() };
+  if (outcome === "off" || outcome === "no-address") return { pendingAlert: null, lastAlertAt: f.lastAlertAt };
+  return { pendingAlert: pending, lastAlertAt: f.lastAlertAt };
+}
+
+async function monitorOne(f: FollowRecord, options: HandlerOptions, store: ReportStore, at: string): Promise<"ok" | "new-urgent" | "incomplete" | "failed" | "paused"> {
   const url = `https://github.com/${f.owner}/${f.repo}`;
   const resolved = await resolveGitHubRepository({ ...options, url });
   if (!resolved.ok) {
     if (PAUSING.has(resolved.error.code)) {
-      await store.updateFollow(f.id, { pausedReason: resolved.error.code === "private" ? "The repository is private now." : "The repository was not found on GitHub.", lastScanAt: at, queuedAt: null });
+      const pausedReason = resolved.error.code === "private" ? "The repository is private now." : "The repository was not found on GitHub.";
+      await store.updateFollow(f.id, { pausedReason, lastScanAt: at, queuedAt: null, pendingAlert: null });
+      // Paused follows are never rescanned again, so this notice goes once.
+      await sendEmail(options, store, f, (c) => pausedEmail(c, pausedReason));
       return "paused";
     }
     await store.updateFollow(f.id, { failures: f.failures + 1, lastScanAt: at, queuedAt: null });
@@ -495,18 +570,23 @@ async function monitorOne(f: FollowRecord, options: HandlerOptions, store: Repor
   await recordHistory(store, f.userId, saved, id);
 
   // New P1/P2 findings against the previous rescan; the first rescan of a follow is the baseline and reports none.
+  let urgent: AlertItem[] = [];
   let newUrgent = 0;
   if (f.lastReportId) {
     const previous = await store.get(f.lastReportId, f.userId);
     if (previous) {
-      const c = compareReports((previous.body as SavedScan).report, saved.report);
-      newUrgent = c.newFindings.filter((x) => x.priority === "P1" || x.priority === "P2").length;
+      const fresh = compareReports((previous.body as SavedScan).report, saved.report).newFindings.filter((x) => x.priority === "P1" || x.priority === "P2");
+      newUrgent = fresh.length;
+      urgent = fresh.map(alertItem).filter((x): x is AlertItem => x !== null);
     }
   }
   const incomplete = saved.report.gate.verdict === "incomplete";
+  // An incomplete rescan never starts an alert; one already pending is still delivered.
+  const pending = !incomplete && newUrgent > 0 ? mergeAlert(f.pendingAlert, { reportId: id, count: newUrgent, items: urgent }) : f.pendingAlert;
+  const alert = pending ? await deliverAlert(options, store, f, pending, now()) : { pendingAlert: null, lastAlertAt: f.lastAlertAt };
   const ecosystems = [...new Set(saved.report.project.lockfiles.map((l) => (l.kind === "composer.lock" ? "Packagist" : "npm")))].sort();
-  await store.updateFollow(f.id, { lastScanAt: at, lastReportId: id, lastVerdict: saved.report.gate.verdict, lastNewUrgent: newUrgent, failures: incomplete ? f.failures + 1 : 0, ecosystems, queuedAt: null });
-  if (incomplete) return "failed";
+  await store.updateFollow(f.id, { lastScanAt: at, lastReportId: id, lastVerdict: saved.report.gate.verdict, lastNewUrgent: newUrgent, failures: incomplete ? f.failures + 1 : 0, ecosystems, queuedAt: null, ...alert });
+  if (incomplete) return "incomplete";
   return newUrgent > 0 ? "new-urgent" : "ok";
 }
 
@@ -547,8 +627,9 @@ async function runMonitor(options: HandlerOptions & MonitorOptions, store: Repor
     const result = await monitorOne(f, options, store, now().toISOString());
     out.checked += 1;
     if (result === "new-urgent") out.withNewUrgent += 1;
-    if (result === "failed") out.failed += 1;
+    if (result === "failed" || result === "incomplete") out.failed += 1;
     if (result === "paused") out.paused += 1;
+    await count(store, result === "ok" || result === "new-urgent" ? "rescan_complete" : result === "incomplete" ? "rescan_incomplete" : "rescan_failed");
   }
   return out;
 }
@@ -610,6 +691,39 @@ export async function handleFeedPublishedRequest(body: unknown, options: Handler
     const queued = ecosystems.length > 0 ? await store.queueFollows(ecosystems, now().toISOString()) : 0;
     const monitor = await runMonitor({ ...options, scan: { ...options.scan, advisories: set } }, store);
     return { status: 200, body: { ok: true, digest: set.digest, changed: true, ecosystems, queued, monitor } };
+  } catch (e) {
+    return storeFailure(e);
+  }
+}
+
+// --- unsubscribe (docs/SPRINT_6.md 3.6) --------------------------------------
+
+const unsubscribeSchema = z.object({ f: z.string().max(64), t: z.string().max(64) });
+
+export interface UnsubscribeResponse {
+  ok: true;
+  /** "owner/repo" that stopped being followed; null when it was already gone. */
+  repository: string | null;
+}
+
+/**
+ * POST /api/unsubscribe with the follow id and its token, from the link in an
+ * email (a page with a button) or the one-click List-Unsubscribe header. No
+ * session: the token is the proof. It deletes only that follow, which stops
+ * both the daily check and its emails. A repeated click answers ok.
+ */
+export async function handleUnsubscribeRequest(input: unknown, options: HandlerOptions): Promise<HttpResponse> {
+  const key = options.mail?.key;
+  const store = options.store;
+  if (!key || !store) return fail("not-found", "Email alerts are not configured on this server.");
+  const parsed = unsubscribeSchema.safeParse(input);
+  if (!parsed.success || !verifyUnsubscribe(key, parsed.data.f, parsed.data.t)) return fail("bad-request", "This unsubscribe link is not valid. Unfollow the repository from Settings instead.");
+  try {
+    const f = await store.getFollow(parsed.data.f);
+    if (!f) return { status: 200, body: { ok: true, repository: null } };
+    await store.deleteFollow(f.id);
+    await count(store, "unsubscribe");
+    return { status: 200, body: { ok: true, repository: `${f.owner}/${f.repo}` } };
   } catch (e) {
     return storeFailure(e);
   }

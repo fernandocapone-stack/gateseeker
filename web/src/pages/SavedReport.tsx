@@ -1,6 +1,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@gateseeker/ui-kit";
 import { useEffect, useState } from "react";
 
+import { countEmailClick } from "../funnel";
 import { clearScanNote, readScanNote } from "../scan-note";
 
 import { fetchReport, type ReportOutcome } from "../api";
@@ -25,6 +26,15 @@ export function SavedReport({ id }: { id: string }) {
   // Left by the analyze view when it opened this report right after an analysis.
   const [note] = useState(() => readScanNote(id));
   useEffect(() => { clearScanNote(id); }, [id]);
+  // Opened from an alert email: count it once and drop the parameter from the address.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("from") !== "email") return;
+    countEmailClick();
+    params.delete("from");
+    const rest = params.toString();
+    window.history.replaceState(window.history.state, "", `${window.location.pathname}${rest ? `?${rest}` : ""}${window.location.hash}`);
+  }, []);
 
   useEffect(() => {
     if (auth.status !== "signed-in" || !auth.session) return;

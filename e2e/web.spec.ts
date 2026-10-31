@@ -340,6 +340,31 @@ test.describe("public page", () => {
     await expect(page.getByText("You are not following any repository.")).toBeVisible();
   });
 
+  test("emails a confirmation on follow whose link stops following without signing in", async ({ page, context }) => {
+    await signIn(page);
+    await analyze(page, "https://github.com/acme/vibe");
+    await expect(page).toHaveURL(/\/r\/mem-/, { timeout: 30_000 });
+    await page.getByRole("button", { name: "Follow" }).click();
+    await expect(page.getByRole("button", { name: "Following" })).toBeVisible();
+    // The stub server keeps emails in memory instead of sending them.
+    const outbox = (await (await page.request.get("/api/dev/outbox")).json()) as { sent: { kind: string; to: string; text: string }[] };
+    const confirm = outbox.sent.filter((m) => m.kind === "follow_confirm").at(-1);
+    expect(confirm?.to).toBe("e2e-user@example.test");
+    const link = new URL(/https?:\/\/\S+\/unsubscribe\?\S+/.exec(confirm?.text ?? "")?.[0] ?? "");
+    // Signed out, in a fresh page: the link alone is enough, and opening it changes nothing until the button.
+    await context.clearCookies();
+    await page.evaluate(() => { localStorage.clear(); });
+    await page.goto(`/unsubscribe${link.search}`);
+    await expect(page.getByRole("heading", { level: 1 })).toHaveText("Stop following this repository");
+    await page.getByRole("button", { name: "Stop following" }).click();
+    await expect(page.getByRole("heading", { level: 1 })).toHaveText("You stopped following");
+    await expect(page.getByText("no longer checks acme/vibe")).toBeVisible();
+    // A forged token is refused.
+    await page.goto(`/unsubscribe?f=${link.searchParams.get("f") ?? ""}&t=${"0".repeat(32)}`);
+    await page.getByRole("button", { name: "Stop following" }).click();
+    await expect(page.getByRole("alert")).toContainText("not valid");
+  });
+
   test("offers the GitHub Action workflow with the analyzed repository named", async ({ page }) => {
     await signIn(page);
     await analyze(page, "https://github.com/acme/vibe");

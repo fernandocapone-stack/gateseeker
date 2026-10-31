@@ -6,9 +6,10 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import { bearerToken, createStaticAuth, createSupabaseAuth } from "../src/web/auth.js";
 import { authConfigFromEnv, handlerOptionsFromEnv, STUB_TOKEN, STUB_USER } from "../src/web/env.js";
-import { currentAdvisories, handleCleanupRequest, handleEventRequest, handleFeedPublishedRequest, handleFollowsRequest, handleMonitorRequest, handleReportRequest, handleScanRequest, handleScansRequest, type HandlerOptions, type ScanResponseOk } from "../src/web/handler.js";
+import { currentAdvisories, handleCleanupRequest, handleEventRequest, handleFeedPublishedRequest, handleFollowsRequest, handleUnsubscribeRequest, type MailSettings, handleMonitorRequest, handleReportRequest, handleScanRequest, handleScansRequest, type HandlerOptions, type ScanResponseOk } from "../src/web/handler.js";
 import { advisorySetFromText } from "../src/intel/advisories.js";
 import { signFeed } from "../src/intel/feed-signature.js";
+import { createMemoryMailer, createStaticDirectory } from "../src/web/mail.js";
 import { createMemoryStore, createSupabaseStore, type ReportStore } from "../src/web/store.js";
 import { fixturePath, readJsonFixture } from "./helpers.js";
 
@@ -252,6 +253,32 @@ describe("createSupabaseStore", () => {
     expect(decodeURIComponent(calls[3]?.url ?? "")).toContain(`user_id=eq.${ALICE.id}&owner=eq.o&repo=eq.r`);
     const full = postgrest(() => new Response(JSON.stringify({ ok: false, reason: "limit" }))).store;
     expect(await full.follow(ALICE.id, "o", "x", 10)).toEqual({ ok: false, reason: "limit" });
+  });
+
+  it("claims emails through claim_email, reads and deletes a follow by id, and reports whether a follow is new", async () => {
+    const followRow = { id: "55555555-5555-4555-8555-555555555555", user_id: ALICE.id, owner: "o", repo: "r", created_at: "2026-10-28T09:00:00+00:00", last_scan_at: null, last_report_id: null, last_verdict: null, last_new_urgent: 0, failures: 0, paused_reason: null, pending_alert: { reportId: "r-1", count: 1, items: [{ priority: "P1", id: "GSK-X", label: "x" }] }, last_alert_at: null };
+    const { store, calls } = postgrest((c) => {
+      if (c.url.endsWith("/rpc/claim_email")) return new Response("true");
+      if (c.url.endsWith("/rpc/follow_repo")) return new Response(JSON.stringify({ ok: true, created: true, follow: followRow }));
+      return new Response(JSON.stringify([followRow]));
+    });
+    expect(await store.claimEmail(250)).toBe(true);
+    expect(calls[0]).toMatchObject({ method: "POST", url: "https://p.supabase.co/rest/v1/rpc/claim_email", body: JSON.stringify({ p_limit: 250 }) });
+    expect(await store.follow(ALICE.id, "o", "r", 10)).toMatchObject({ ok: true, created: true });
+    expect(await store.getFollow(followRow.id)).toMatchObject({ id: followRow.id, pendingAlert: { count: 1 } });
+    expect(await store.deleteFollow(followRow.id)).toBe(true);
+    expect(calls[3]).toMatchObject({ method: "DELETE" });
+    expect(calls[3]?.headers).toMatchObject({ prefer: "return=representation" });
+    expect(decodeURIComponent(calls[3]?.url ?? "")).toBe(`https://p.supabase.co/rest/v1/follows?id=eq.${followRow.id}&select=id`);
+    // Ids that are not UUIDs never reach the database.
+    expect(await store.getFollow("x")).toBeNull();
+    expect(await store.deleteFollow("x")).toBe(false);
+    expect(calls).toHaveLength(4);
+    const capped = postgrest(() => new Response("false")).store;
+    expect(await capped.claimEmail(250)).toBe(false);
+    // Before the email migration follow_repo does not say: no confirmation email.
+    const old = postgrest(() => new Response(JSON.stringify({ ok: true, follow: followRow }))).store;
+    expect(await old.follow(ALICE.id, "o", "r", 10)).toMatchObject({ ok: true, created: false });
   });
 
   it("queues follows by ecosystem overlap, stores feed sets and reads the latest one", async () => {
@@ -699,5 +726,224 @@ describe("published advisory feed", () => {
   it("reads the key from GATESEEKER_FEED_KEY only when it is long enough", () => {
     expect(handlerOptionsFromEnv({ env: { GATESEEKER_FEED_KEY: KEY } }).feedKey).toBe(KEY);
     expect(handlerOptionsFromEnv({ env: { GATESEEKER_FEED_KEY: "short" } }).feedKey).toBeUndefined();
+  });
+});
+
+// --- email alerts and unsubscribe (docs/SPRINT_6.md 3.6, 3.7, tests 2, 3, 4, 7) ---
+
+describe("email alerts", () => {
+  const MAIL_KEY = "m".repeat(32);
+  const SECRET = "cron-secret";
+  const CLEAN = targz({ "r-bbbb/package.json": '{"name":"r"}' });
+
+  function mailFor(extra: Partial<MailSettings> = {}) {
+    const mailer = createMemoryMailer();
+    const mail: MailSettings = { mailer, directory: createStaticDirectory({ [ALICE.id]: "alice@example.test" }), key: MAIL_KEY, baseUrl: "https://gateseeker.example", dailyCap: 50, ...extra };
+    return { mailer, mail };
+  }
+
+  /** A GitHub double whose archive and OSV answers can change between rescans. */
+  function switchable(initial: Buffer) {
+    const state = { archive: initial, osvDown: false };
+    const f = ((input: string | URL | Request, init?: RequestInit) => {
+      const url = input instanceof Request ? input.url : input.toString();
+      if (state.osvDown && url.includes("osv.dev")) return Promise.resolve(new Response("down", { status: 500 }));
+      return fakeGitHub(state.archive).fetch(input, init);
+    }) as typeof fetch;
+    return { state, gh: { fetch: f, calls: [] as string[] } };
+  }
+
+  async function monitor(opts: HandlerOptions) {
+    return handleMonitorRequest(opts, `Bearer ${SECRET}`, SECRET);
+  }
+
+  it("emails a confirmation only when the follow is new", async () => {
+    const store = createMemoryStore();
+    const { mailer, mail } = mailFor();
+    const opts = { auth, store, mail };
+    await handleFollowsRequest("POST", { owner: "o", repo: "r" }, opts, "Bearer tok-alice");
+    await handleFollowsRequest("POST", { owner: "O", repo: "R" }, opts, "Bearer tok-alice");
+    expect(mailer.sent.map((m) => [m.kind, m.to])).toEqual([["follow_confirm", "alice@example.test"]]);
+    expect(mailer.sent[0]?.subject).toBe("You follow o/r on Gateseeker");
+    expect(store.eventCounts()).toMatchObject({ [`${new Date().toISOString().slice(0, 10)}:email_follow_confirm`]: 1 });
+  });
+
+  it("alerts once per repository per day, only for new P1/P2 findings, and sends what waited the next day", async () => {
+    let t = Date.parse("2026-11-03T06:00:00Z");
+    const now = () => new Date(t);
+    const store = createMemoryStore({ now });
+    const { mailer, mail } = mailFor();
+    const { state, gh } = switchable(CLEAN);
+    const opts = { ...baseOptions(gh), auth, store, now, mail, cacheMs: 0 };
+    await handleFollowsRequest("POST", { owner: "o", repo: "r" }, opts, "Bearer tok-alice");
+
+    // Baseline: no alert.
+    await monitor(opts);
+    expect(mailer.sent.map((m) => m.kind)).toEqual(["follow_confirm"]);
+
+    // Next day: a wildcard CORS with credentials (P1) appears.
+    t += 21 * 3_600_000;
+    state.archive = ARCHIVE;
+    expect(await monitor(opts)).toMatchObject({ body: { checked: 1, withNewUrgent: 1 } });
+    const first = mailer.sent[1];
+    expect(first?.kind).toBe("alert");
+    expect(first?.subject).toBe("o/r: 1 new finding to fix soon");
+    expect(first?.text).toMatch(/P1 · GSK-[A-Z-]+\d+ · /);
+    expect((await store.listFollows(ALICE.id))[0]).toMatchObject({ pendingAlert: null, lastAlertAt: now().toISOString() });
+
+    // Same day, a queued rescan finds another one: it waits, no second email today.
+    t += 3_600_000;
+    state.archive = targz({ "r-bbbb/package.json": '{"name":"r"}', "r-bbbb/src/server.ts": 'app.use(cors({ origin: "*", credentials: true }));\n', "r-bbbb/src/admin.ts": 'app.use(cors({ origin: "*", credentials: true }));\n' });
+    const [f] = await store.listFollows(ALICE.id);
+    await store.updateFollow(f?.id ?? "", { queuedAt: now().toISOString() });
+    expect(await monitor(opts)).toMatchObject({ body: { checked: 1, withNewUrgent: 1 } });
+    expect(mailer.sent).toHaveLength(2);
+    expect((await store.listFollows(ALICE.id))[0]?.pendingAlert).toMatchObject({ count: 1 });
+
+    // Next day, nothing new, but the waiting alert goes out.
+    t += 21 * 3_600_000;
+    await monitor(opts);
+    expect(mailer.sent.map((m) => m.kind)).toEqual(["follow_confirm", "alert", "alert"]);
+    expect(mailer.sent[2]?.text).toContain("1 new finding to fix soon");
+    expect((await store.listFollows(ALICE.id))[0]?.pendingAlert).toBeNull();
+  });
+
+  it("never alerts from an incomplete rescan", async () => {
+    let t = Date.parse("2026-11-03T06:00:00Z");
+    const now = () => new Date(t);
+    const store = createMemoryStore({ now });
+    const { mailer, mail } = mailFor();
+    const lock = JSON.stringify({ name: "r", lockfileVersion: 3, packages: { "": { name: "r" }, "node_modules/left-pad": { version: "1.3.0" } } });
+    const { state, gh } = switchable(targz({ "r-bbbb/package.json": '{"name":"r"}', "r-bbbb/package-lock.json": lock }));
+    const opts = { ...baseOptions(gh), auth, store, now, mail, cacheMs: 0 };
+    await handleFollowsRequest("POST", { owner: "o", repo: "r" }, opts, "Bearer tok-alice");
+    await monitor(opts);
+    t += 21 * 3_600_000;
+    state.archive = targz({ "r-bbbb/package.json": '{"name":"r"}', "r-bbbb/package-lock.json": lock, "r-bbbb/src/server.ts": 'app.use(cors({ origin: "*", credentials: true }));\n' });
+    state.osvDown = true;
+    expect(await monitor(opts)).toMatchObject({ body: { checked: 1, failed: 1 } });
+    expect(mailer.sent.map((m) => m.kind)).toEqual(["follow_confirm"]);
+    expect((await store.listFollows(ALICE.id))[0]).toMatchObject({ lastVerdict: "incomplete", pendingAlert: null });
+    expect(store.eventCounts()).toMatchObject({ [`${now().toISOString().slice(0, 10)}:rescan_incomplete`]: 1 });
+  });
+
+  it("keeps the alert for later when the daily cap is reached, and counts it", async () => {
+    let t = Date.parse("2026-11-03T06:00:00Z");
+    const now = () => new Date(t);
+    const store = createMemoryStore({ now });
+    const { mailer, mail } = mailFor({ dailyCap: 0 });
+    const { state, gh } = switchable(CLEAN);
+    const opts = { ...baseOptions(gh), auth, store, now, mail, cacheMs: 0 };
+    await handleFollowsRequest("POST", { owner: "o", repo: "r" }, opts, "Bearer tok-alice");
+    await monitor(opts);
+    t += 21 * 3_600_000;
+    state.archive = ARCHIVE;
+    await monitor(opts);
+    expect(mailer.sent).toEqual([]);
+    expect((await store.listFollows(ALICE.id))[0]?.pendingAlert).toMatchObject({ count: 1 });
+    expect(store.eventCounts()[`${now().toISOString().slice(0, 10)}:email_capped`]).toBe(1);
+  });
+
+  it("sends one notice when monitoring pauses", async () => {
+    const store = createMemoryStore();
+    const { mailer, mail } = mailFor();
+    await handleFollowsRequest("POST", { owner: "o", repo: "r" }, { auth, store, mail }, "Bearer tok-alice");
+    const gone = (() => Promise.resolve(new Response("{}", { status: 404 }))) as typeof fetch;
+    const opts = { ...baseOptions({ fetch: gone, calls: [] }), store, mail };
+    await monitor(opts);
+    await monitor(opts);
+    expect(mailer.sent.map((m) => m.kind)).toEqual(["follow_confirm", "paused"]);
+    expect(mailer.sent[1]?.text).toContain("The repository was not found on GitHub.");
+  });
+
+  it("sends nothing when email is off or the account has no address, and drops the alert", async () => {
+    for (const mail of [mailFor({ mailer: null }).mail, mailFor({ directory: createStaticDirectory({}) }).mail]) {
+      let t = Date.parse("2026-11-03T06:00:00Z");
+      const now = () => new Date(t);
+      const store = createMemoryStore({ now });
+      const { state, gh } = switchable(CLEAN);
+      const opts = { ...baseOptions(gh), auth, store, now, mail, cacheMs: 0 };
+      await handleFollowsRequest("POST", { owner: "o", repo: "r" }, opts, "Bearer tok-alice");
+      await monitor(opts);
+      t += 21 * 3_600_000;
+      state.archive = ARCHIVE;
+      await monitor(opts);
+      expect((await store.listFollows(ALICE.id))[0]).toMatchObject({ lastNewUrgent: 1, pendingAlert: null, lastAlertAt: null });
+    }
+  });
+
+  it("puts no credential and no code from the scanned project in the alert", async () => {
+    const root = fixturePath("projects/vibe-next-supabase");
+    const files: Record<string, string> = {};
+    const walk = (dir: string): void => {
+      for (const e of readdirSync(dir, { withFileTypes: true })) {
+        const full = join(dir, e.name);
+        if (e.isDirectory()) walk(full);
+        else files[`r-bbbb/${relative(root, full).replace(/\\/g, "/")}`] = readFileSync(full, "utf8");
+      }
+    };
+    walk(root);
+    let t = Date.parse("2026-11-03T06:00:00Z");
+    const now = () => new Date(t);
+    const store = createMemoryStore({ now });
+    const { mailer, mail } = mailFor();
+    const { state, gh } = switchable(CLEAN);
+    const opts = { ...baseOptions(gh), auth, store, now, mail, cacheMs: 0 };
+    await handleFollowsRequest("POST", { owner: "o", repo: "r" }, opts, "Bearer tok-alice");
+    await monitor(opts);
+    t += 21 * 3_600_000;
+    state.archive = targz(files);
+    await monitor(opts);
+    const alertMessage = mailer.sent.find((m) => m.kind === "alert");
+    expect(alertMessage).toBeDefined();
+    const content = `${alertMessage?.subject ?? ""}\n${alertMessage?.text ?? ""}\n${alertMessage?.html ?? ""}`;
+    expect(content).toContain("GSK-SECRET-001");
+    for (const [name, value] of Object.entries(readJsonFixture("projects/secrets.json") as Record<string, string>)) {
+      expect(content, `secret ${name} reached the email`).not.toContain(value);
+    }
+    const report = await store.get((await store.listFollows(ALICE.id))[0]?.lastReportId ?? "", ALICE.id);
+    const snippets = (report?.body as ScanResponseOk).report.findings.flatMap((f) => (f.evidence.kind === "insecure-pattern" ? [f.evidence.snippet, f.evidence.file] : []));
+    expect(snippets.length).toBeGreaterThan(0);
+    for (const s of snippets) if (s.length >= 8) expect(content, `code or path "${s}" reached the email`).not.toContain(s);
+  });
+});
+
+describe("unsubscribe", () => {
+  const MAIL_KEY = "m".repeat(32);
+
+  it("stops only the follow in the link, without a session; a repeat is fine; a tampered token is refused", async () => {
+    const store = createMemoryStore();
+    const mailer = createMemoryMailer();
+    const mail: MailSettings = { mailer, directory: createStaticDirectory({ [ALICE.id]: "alice@example.test" }), key: MAIL_KEY, baseUrl: "https://gateseeker.example", dailyCap: 50 };
+    await handleFollowsRequest("POST", { owner: "o", repo: "one" }, { auth, store, mail }, "Bearer tok-alice");
+    await handleFollowsRequest("POST", { owner: "o", repo: "two" }, { auth, store, mail }, "Bearer tok-alice");
+    // The link of the first confirmation email.
+    const link = new URL(/https:\/\/gateseeker\.example\/unsubscribe\?\S+/.exec(mailer.sent[0]?.text ?? "")?.[0] ?? "");
+    const input = { f: link.searchParams.get("f"), t: link.searchParams.get("t") };
+    expect(await handleUnsubscribeRequest({ ...input, t: "0".repeat(32) }, { store, mail })).toMatchObject({ status: 400 });
+    expect(await handleUnsubscribeRequest({ f: input.f }, { store, mail })).toMatchObject({ status: 400 });
+    expect(await handleUnsubscribeRequest(input, { store, mail })).toMatchObject({ status: 200, body: { ok: true, repository: "o/one" } });
+    expect((await store.listFollows(ALICE.id)).map((f) => f.repo)).toEqual(["two"]);
+    expect(await handleUnsubscribeRequest(input, { store, mail })).toMatchObject({ status: 200, body: { repository: null } });
+    expect(await handleUnsubscribeRequest(input, { store })).toMatchObject({ status: 404 });
+    expect(store.eventCounts()[`${new Date().toISOString().slice(0, 10)}:unsubscribe`]).toBe(1);
+  });
+
+  it("accepts the email click from the page and refuses the counters only the service keeps", async () => {
+    const store = createMemoryStore();
+    expect(await handleEventRequest({ kind: "email_click" }, { store })).toMatchObject({ status: 200 });
+    expect(await handleEventRequest({ kind: "email_alert" }, { store })).toMatchObject({ status: 400 });
+    expect(await handleEventRequest({ kind: "unsubscribe" }, { store })).toMatchObject({ status: 400 });
+  });
+
+  it("reads the email settings from the environment", () => {
+    const supa = { SUPABASE_URL: "https://p.supabase.co", SUPABASE_ANON_KEY: "anon", SUPABASE_SERVICE_ROLE_KEY: "sb_secret_x" };
+    expect(handlerOptionsFromEnv({ env: { ...supa, GATESEEKER_EMAIL_KEY: "short" } }).mail).toBeUndefined();
+    expect(handlerOptionsFromEnv({ env: { ...supa, GATESEEKER_EMAIL_KEY: MAIL_KEY } }).mail).toMatchObject({ mailer: null, key: MAIL_KEY, baseUrl: "https://gateseeker.vercel.app", dailyCap: 250 });
+    const full = handlerOptionsFromEnv({ env: { ...supa, GATESEEKER_EMAIL_KEY: MAIL_KEY, BREVO_API_KEY: "xkeysib", GATESEEKER_EMAIL_FROM: "alerts@gateseeker.example", GATESEEKER_PUBLIC_URL: "https://gateseeker.example/path", GATESEEKER_EMAIL_DAILY_CAP: "100" } }).mail;
+    expect(full?.mailer).not.toBeNull();
+    expect(full).toMatchObject({ baseUrl: "https://gateseeker.example", dailyCap: 100 });
+    expect(handlerOptionsFromEnv({ env: { ...supa, GATESEEKER_EMAIL_KEY: MAIL_KEY, BREVO_API_KEY: "xkeysib", GATESEEKER_EMAIL_FROM: "not an address", GATESEEKER_PUBLIC_URL: "http://evil.example", GATESEEKER_EMAIL_DAILY_CAP: "5000" } }).mail).toMatchObject({ mailer: null, baseUrl: "https://gateseeker.vercel.app", dailyCap: 250 });
+    expect(handlerOptionsFromEnv({ env: { GATESEEKER_AUTH_STUB: "1" } }).mail).toMatchObject({ baseUrl: "http://localhost:4320" });
   });
 });
