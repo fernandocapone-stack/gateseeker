@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { classifyFile, detectProjectKind } from "../src/patterns/classify.js";
+import { blankMentions, isJsLike } from "../src/patterns/code-text.js";
 import { runRules } from "../src/patterns/engine.js";
 import { makeGitignoreMatcher } from "../src/patterns/gitignore.js";
 import { entropyBitsPerChar, looksLikePlaceholder, maskQuotedLiterals, redactEnvLine, redactInLine, redactSecret } from "../src/patterns/redact.js";
@@ -124,6 +125,25 @@ describe("walker", () => {
     expect(walked.project.isGitignored(".env")).toBe(false);
   });
 
+  it("skips what .git/info/exclude excludes, without counting it as gitignored for the rules", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "gsk-exclude-"));
+    try {
+      await mkdir(join(dir, ".git", "info"), { recursive: true });
+      await writeFile(join(dir, ".git", "info", "exclude"), "# local only\n.claude/worktrees/\nscratch.ts\n");
+      await mkdir(join(dir, ".claude", "worktrees", "old", "src"), { recursive: true });
+      await writeFile(join(dir, ".claude", "worktrees", "old", "src", "a.ts"), "export const a = 1;\n");
+      await writeFile(join(dir, "scratch.ts"), "export const b = 2;\n");
+      await writeFile(join(dir, "index.ts"), "export const c = 3;\n");
+      const walked = await walkProject(dir);
+      expect(walked.ok).toBe(true);
+      if (!walked.ok) return;
+      expect(walked.project.files.map((f) => f.path)).toEqual(["index.ts"]);
+      expect(walked.project.isGitignored("scratch.ts")).toBe(false);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
   it("rejects a non-directory root", async () => {
     const r = await walkProject(fixturePath("lockfiles/v1.package-lock.json"));
     expect(r.ok).toBe(false);
@@ -190,7 +210,8 @@ describe("rules on the vibe-next-supabase fixture", () => {
   it("GSK-SECRET-002 flags secret-named public vars and allows public ones", async () => {
     const { findings } = await patternFindings(VIBE);
     const f = byRule(findings, "GSK-SECRET-002");
-    expect(subjects(f)).toEqual([".env:6", "lib/mailer.ts:3"]);
+    // HelpText.tsx: the reads in a template literal (9) and in JSX (13) count; the sentence and regex mentions (4-6) do not.
+    expect(subjects(f)).toEqual([".env:6", "components/HelpText.tsx:13", "components/HelpText.tsx:9", "lib/mailer.ts:3"]);
     const snippets = Object.fromEntries(f.map((x) => [x.subject, x.evidence.kind === "insecure-pattern" ? x.evidence.snippet : ""]));
     expect(snippets[".env:6"]).toBe("NEXT_PUBLIC_STRIPE_SECRET_KEY=<redacted 36 chars>");
     // A hardcoded fallback value next to the variable is masked, the variable name stays visible.
@@ -220,8 +241,27 @@ describe("rules on the vibe-next-supabase fixture", () => {
   it("GSK-SUPABASE-002 flags service_role in client code only", async () => {
     const { findings } = await patternFindings(VIBE);
     const f = byRule(findings, "GSK-SUPABASE-002");
+    // Not HelpText.tsx:4, a sentence that mentions the key.
     expect(subjects(f)).toEqual(["components/AdminPanel.tsx:6"]);
     expect(f[0]?.priority).toBe("P1");
+  });
+
+  it("tells mentions of a variable from uses (blankMentions)", () => {
+    // Sentences and regular expressions are emptied.
+    expect(blankMentions('const tip = "Never put SERVICE_ROLE in the browser";')).toBe('const tip = "";');
+    expect(blankMentions("const re = /(ANON|PUBLIC_TOKEN)/gi;")).toBe("const re = //;");
+    expect(blankMentions("if (x) return /VITE_SECRET/.test(s);")).toBe("if (x) return //.test(s);");
+    // Uses stay: quoted names without spaces, interpolated templates, reads, JSX with closing tags, comments, division.
+    expect(blankMentions('getEnv("SUPABASE_SERVICE_ROLE_KEY")')).toBe('getEnv("SUPABASE_SERVICE_ROLE_KEY")');
+    expect(blankMentions("`Bearer ${process.env.NEXT_PUBLIC_API_TOKEN} now`")).toBe("`Bearer ${process.env.NEXT_PUBLIC_API_TOKEN} now`");
+    expect(blankMentions("<p>a</p><b>{import.meta.env.VITE_ADMIN_PASSWORD}</b>")).toBe("<p>a</p><b>{import.meta.env.VITE_ADMIN_PASSWORD}</b>");
+    expect(blankMentions("<p>Don't show {process.env.NEXT_PUBLIC_SECRET}, it's</p>")).toContain("process.env.NEXT_PUBLIC_SECRET");
+    expect(blankMentions("const half = total / 2 / VITE_COUNT;")).toBe("const half = total / 2 / VITE_COUNT;");
+    expect(blankMentions("x = 1; // NEXT_PUBLIC_SECRET is read below")).toBe("x = 1; // NEXT_PUBLIC_SECRET is read below");
+    // Unterminated pieces are kept, which errs on the side of reporting.
+    expect(blankMentions("const s = 'NEXT_PUBLIC_SECRET is")).toBe("const s = 'NEXT_PUBLIC_SECRET is");
+    expect(isJsLike("app/page.tsx")).toBe(true);
+    expect(isJsLike("deploy.yml")).toBe(false);
   });
 
   it("GSK-FIREBASE-001 flags open Firestore and RTDB rules with write-aware severity", async () => {
@@ -372,6 +412,15 @@ describe("regex safety (ReDoS budget)", () => {
     "github_pat_".repeat(90_000),
     "_".repeat(1_000_000),
   ];
+  it("blankMentions stays linear on 200 KB adversarial lines", () => {
+    // The rules never pass lines over 5,000 characters. At 200 KB a quadratic pass took 3.7 s here; the linear one takes about 0.1 s.
+    for (const input of ["/".repeat(200_000), "=/[".repeat(66_000), "'".repeat(200_000), "\\".repeat(200_000), "a = /b/ ".repeat(25_000), "return".repeat(32_000) + "/", '"a b"'.repeat(40_000), `x${" ".repeat(200_000)}/a/`, "'' ".repeat(66_000) + "/a/"]) {
+      const start = performance.now();
+      blankMentions(input);
+      expect(performance.now() - start).toBeLessThan(400);
+    }
+  });
+
   for (const p of SECRET_PATTERNS) {
     it(`${p.name} stays under budget on 1 MB adversarial input`, () => {
       for (const input of adversarial) {

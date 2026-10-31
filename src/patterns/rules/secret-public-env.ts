@@ -1,4 +1,5 @@
 import { sanitize } from "../../report/text.js";
+import { blankMentions, isJsLike } from "../code-text.js";
 import { maskQuotedLiterals, redactEnvLine } from "../redact.js";
 import type { Rule, RuleMatch } from "../types.js";
 
@@ -40,11 +41,14 @@ export const secretPublicEnvRule: Rule = {
   check: ({ file }) => {
     const matches: RuleMatch[] = [];
     const seen = new Set<string>();
+    const js = file.fileClass !== "env" && isJsLike(file.path);
     for (let i = 0; i < file.lines.length; i++) {
       const line = file.lines[i] ?? "";
       if (line.length > 5000) continue;
+      // In JavaScript/TypeScript, a name inside a sentence or a regular expression is a mention, not a use.
+      const code = js ? blankMentions(line) : line;
       VAR_RE.lastIndex = 0;
-      for (const m of line.matchAll(VAR_RE)) {
+      for (const m of code.matchAll(VAR_RE)) {
         const name = m[0];
         if (!isSuspiciousPublicVar(name) || seen.has(name)) continue;
         // In dotenv files, a Mapbox-style public token (pk.) is not a secret.

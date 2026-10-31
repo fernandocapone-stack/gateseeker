@@ -1,4 +1,5 @@
 import { sanitize } from "../../report/text.js";
+import { blankMentions, isJsLike } from "../code-text.js";
 import { maskQuotedLiterals } from "../redact.js";
 import type { Rule, RuleMatch } from "../types.js";
 
@@ -21,12 +22,15 @@ export const supabaseServiceRoleClientRule: Rule = {
   check: ({ file }) => {
     const matches: RuleMatch[] = [];
     const seen = new Set<number>();
+    const js = isJsLike(file.path);
     for (let i = 0; i < file.lines.length; i++) {
       const line = file.lines[i] ?? "";
       if (line.length > 5000) continue;
+      // A sentence that mentions SERVICE_ROLE (help text, an error message) is not a reference to the key.
+      const code = js ? blankMentions(line) : line;
       SERVICE_ROLE_REF.lastIndex = 0;
       BARE_NAME.lastIndex = 0;
-      const hit = SERVICE_ROLE_REF.exec(line) ?? BARE_NAME.exec(line);
+      const hit = SERVICE_ROLE_REF.exec(code) ?? BARE_NAME.exec(code);
       if (!hit || seen.has(i)) continue;
       seen.add(i);
       matches.push({

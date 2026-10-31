@@ -27,6 +27,7 @@ export const corsWildcardRule: Rule = {
   id: "GSK-CORS-001",
   title: "CORS allows any origin",
   severity: "LOW",
+  // gateseeker-ignore GSK-CORS-001 the rule's own description text, not a CORS setting
   description: "A response header or CORS middleware sets Access-Control-Allow-Origin to *, or uses the default cors() which does the same. HIGH when the same file also enables credentials.",
   action: "Restrict the origin to the exact domains that need access. Never combine a wildcard or reflected origin with credentials.",
   appliesTo: (file) => APPLICABLE.has(file.fileClass) && /\.(ts|tsx|js|jsx|mjs|cjs|json|toml)$/i.test(file.path),
@@ -41,7 +42,9 @@ export const corsWildcardRule: Rule = {
       let message: string | null = null;
       if (HEADER_WILDCARD.test(line)) message = "Access-Control-Allow-Origin is set to *.";
       else if (HEADER_KEY_ONLY.test(line) && VALUE_WILDCARD.test(next) && !HEADER_KEY_ONLY.test(next)) message = "Access-Control-Allow-Origin is set to * (value on the next line).";
+      // gateseeker-ignore GSK-CORS-001 the rule's own message text, not a CORS setting
       else if (CORS_CALL_WILDCARD.test(line)) message = "cors() is configured with origin: *.";
+      // gateseeker-ignore GSK-CORS-001 the rule's own message text, not a CORS setting
       else if (CORS_CALL_DEFAULT.test(line) && !/^\s*(import|const|let|var)\b/.test(line)) message = "cors() without options allows any origin.";
       if (message === null) continue;
       matches.push({
