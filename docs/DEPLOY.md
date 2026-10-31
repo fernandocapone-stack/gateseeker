@@ -16,6 +16,7 @@ Estado: projeto Vercel `gateseeker` criado em 2026-10-28 (conta pessoal, plano H
 3. Conferência: menu Table Editor deve mostrar `reports`, `scan_quota` e `waitlist`, cada uma com o cadeado de RLS ligado.
 4. Repita os passos 1 e 2 com `supabase/migrations/20261029000000_events.sql` (contadores do funil de login, 2026-10-29). Conferência: a tabela `events` aparece com o cadeado de RLS. **Até esta migração ser aplicada, a página continua funcionando, mas os contadores não são gravados** (o envio falha em silêncio).
 5. Repita os passos 1 e 2 com `supabase/migrations/20261031000000_scans.sql` (histórico de análises no servidor, Sprint 6). Conferência: a tabela `scans` aparece com o cadeado de RLS. **Até esta migração ser aplicada, as análises continuam funcionando e o Dashboard mostra a cópia do navegador**, com um aviso de que o histórico da conta não pôde ser carregado.
+6. Repita os passos 1 e 2 com `supabase/migrations/20261101000000_follows.sql` (repositórios seguidos e reanálise diária, Sprint 6). Conferência: a tabela `follows` aparece com o cadeado de RLS e a função `follow_repo` existe em Database → Functions. **Até esta migração ser aplicada, o botão Follow mostra um erro e o cron diário de monitoramento não faz nada**; o resto do serviço continua funcionando.
 
 Como ler o funil: Table Editor → `events`. Cada linha é um dia (UTC) e um tipo: `login_view` (página de login aberta por quem não está logado), `login_start` (clique em "Continue with GitHub") e `signin_complete` (voltou do GitHub logado). Abandono no login = 1 − `signin_complete` ÷ `login_view`, somando os dias. A regra da decisão 1 do `docs/ROADMAP.md`: acima de 40% em 2 semanas ou 100 visitas, reabrir análises anônimas com limite.
 
@@ -51,7 +52,7 @@ Projeto `gateseeker` → Settings → Environment Variables → Add. Para cada l
 | `SUPABASE_URL` | Project URL | |
 | `SUPABASE_ANON_KEY` | anon key | |
 | `SUPABASE_SERVICE_ROLE_KEY` | service_role key | marque "Sensitive" |
-| `CRON_SECRET` | 32+ caracteres aleatórios (o botão "Generate" do próprio Vercel serve) | marque "Sensitive"; o cron diário de limpeza se autentica com ele |
+| `CRON_SECRET` | 32+ caracteres aleatórios (o botão "Generate" do próprio Vercel serve) | marque "Sensitive"; os crons diários de limpeza e de monitoramento se autenticam com ele |
 | `GATESEEKER_EXAMPLE_REPO` | opcional: URL de um repositório público do GitHub | o botão "Try an example" da tela de análise usa este repositório; sem a variável, usa `https://github.com/gateseeker-dev/gateseeker`. Um repositório de demonstração com achados reais mostra melhor o produto |
 | `GATESEEKER_SCAN_LIMIT` | `10` | análises por usuário por hora; opcional |
 | `GITHUB_TOKEN` | vazio por enquanto | decisão à parte: um token de leitura mínimo sobe o limite da API do GitHub de 60 para 5000 chamadas por hora |
@@ -68,7 +69,7 @@ Enquanto a área autenticada não existir, Settings → Deployment Protection �
 - Entrar com GitHub em `/login`, analisar um repositório público em `/app`, abrir o relatório salvo pelo link `/r/<id>`.
 - No relatório, a linha de fontes mostra `gateseeker-advisories: bundled (N approved, digest …)`. Se aparecer `none` ou a limitação "No curated advisory set was available", o `dist/advisories.json` não entrou no pacote da função: a página está consultando só o OSV.
 - Supabase → Table Editor → `reports` mostra a linha; `scan_quota` mostra o contador.
-- Vercel → Settings → Cron Jobs lista `/api/cron/cleanup` às 03:00 UTC.
+- Vercel → Settings → Cron Jobs lista `/api/cron/cleanup` às 03:00 UTC e `/api/cron/monitor` às 06:00 UTC (no plano gratuito o horário é aproximado).
 
 ## Custos e limites que importam
 

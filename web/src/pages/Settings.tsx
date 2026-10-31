@@ -3,6 +3,7 @@ import { LogOut } from "lucide-react";
 import { useEffect, type ReactNode } from "react";
 
 import { useAuth } from "../auth-context";
+import { FollowedList } from "../components/FollowedList";
 import { PageSkeleton } from "../components/Skeletons";
 import { useNotifications } from "../notifications";
 import { navigate } from "../router";
@@ -69,6 +70,10 @@ export function SettingsPage() {
         </div>
       </Section>
 
+      <Section title="Followed repositories" description="Checked every day. When alerts by email are turned on, you hear about new findings to fix soon. Up to 10 repositories.">
+        <FollowedList token={auth.session.accessToken} />
+      </Section>
+
       <Section title="Notifications" description="Shown in the bell at the top of the workspace. Kept in this browser only, for this account.">
         <Switch label="Notify me when an analysis ends" description="Finished, incomplete or refused analyses, with a link to the saved report." checked={prefs.enabled} onChange={(v) => { setPrefs({ ...prefs, enabled: v }); }} />
         <Switch
@@ -87,6 +92,7 @@ export function SettingsPage() {
       <Section title="Reports and limits" description="What the service keeps and how much you can analyze.">
         <dl className="grid gap-3">
           <Row label="Saved reports" value="Kept for 30 days, opened only by your account" />
+          <Row label="History" value="One line per analysis, kept for 180 days" />
           <Row label="Repositories" value="Public GitHub repositories, up to 50MB compressed" />
           <Row label="What runs" value="Nothing: files are read as text, never installed or executed" />
           <Row label="Analyses" value="Limited per hour; the count shows after each analysis" />

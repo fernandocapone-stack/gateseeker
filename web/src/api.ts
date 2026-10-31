@@ -1,6 +1,6 @@
-import type { ReportResponseOk, ScanResponseError, ScanResponseOk, ScansResponse } from "gateseeker/dist/web/handler.js";
+import type { FollowsResponse, ReportResponseOk, ScanResponseError, ScanResponseOk, ScansResponse } from "gateseeker/dist/web/handler.js";
 
-export type { PublicReport, ReportResponseOk, SavedScan, ScanHistoryEntry, ScanResponseError, ScanResponseOk, ScansResponse } from "gateseeker/dist/web/handler.js";
+export type { FollowView, FollowsResponse, PublicReport, ReportResponseOk, SavedScan, ScanHistoryEntry, ScanResponseError, ScanResponseOk, ScansResponse } from "gateseeker/dist/web/handler.js";
 export type { Finding } from "gateseeker/dist/types.js";
 
 export type ScanOutcome = ScanResponseOk | ScanResponseError;
@@ -30,6 +30,11 @@ export function scanRepository(url: string, token: string | null, signal?: Abort
 /** The signed-in account's analysis history, newest first. */
 export function fetchScans(token: string): Promise<ScansResponse | ScanResponseError> {
   return call<ScansResponse>("/api/scans", { method: "GET" }, token);
+}
+
+/** Followed repositories of the signed-in account; POST follows and DELETE unfollows {owner, repo}. */
+export function callFollows(method: "GET" | "POST" | "DELETE", token: string, target?: { owner: string; repo: string }): Promise<FollowsResponse | ScanResponseError> {
+  return call<FollowsResponse>("/api/follows", { method, ...(target ? { headers: { "content-type": "application/json" }, body: JSON.stringify(target) } : {}) }, token);
 }
 
 /** A saved report of the signed-in account. */
