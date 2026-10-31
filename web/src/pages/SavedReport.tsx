@@ -6,6 +6,7 @@ import { clearScanNote, readScanNote } from "../scan-note";
 import { fetchReport, type ReportOutcome } from "../api";
 import { useAuth } from "../auth-context";
 import { CiSnippet } from "../components/CiSnippet";
+import { ComparisonBand, useComparison } from "../components/Comparison";
 import { ReportSkeleton } from "../components/Skeletons";
 import { Link } from "../router";
 import { ReportView } from "../views/Report";
@@ -35,6 +36,7 @@ export function SavedReport({ id }: { id: string }) {
     return () => { cancelled = true; };
   }, [auth.status, auth.session, id]);
 
+  const comparison = useComparison(outcome?.ok ? outcome : null, auth.session?.user.id ?? null, auth.session?.accessToken ?? null);
   const name = outcome?.ok ? `${outcome.saved.repository.owner}/${outcome.saved.repository.repo}` : null;
   useWorkspaceTitle(name);
   useEffect(() => {
@@ -84,7 +86,12 @@ export function SavedReport({ id }: { id: string }) {
           </p>
         )}
       </div>
-      <ReportView response={response} elapsedMs={outcome.saved.timings.totalMs} />
+      {comparison && (
+        <div className="mb-4">
+          <ComparisonBand data={comparison} />
+        </div>
+      )}
+      <ReportView response={response} elapsedMs={outcome.saved.timings.totalMs} newIds={comparison ? new Set(comparison.comparison.newFindings.map((f) => f.id)) : undefined} />
       <div className="mt-6 print:hidden">
         <CiSnippet repository={outcome.saved.repository} />
       </div>

@@ -32,6 +32,23 @@ export interface StoredReport {
 
 export type NewReport = Omit<StoredReport, "id" | "createdAt">;
 
+/** History line: what the Dashboard and Scans show, without the report body (which expires sooner). */
+export interface ScanSummary {
+  id: string;
+  userId: string;
+  owner: string;
+  repo: string;
+  sha: string;
+  verdict: "pass" | "fail" | "incomplete";
+  byPriority: { P1: number; P2: number; P3: number; P4: number };
+  reportId: string | null;
+  createdAt: string;
+}
+
+export type NewScanSummary = Omit<ScanSummary, "id" | "createdAt">;
+
+export const SCAN_HISTORY_DAYS = 180;
+
 /** Aggregate page events (login funnel): counted per UTC day, no user, IP or user agent. */
 export const EVENT_KINDS = ["login_view", "login_start", "signin_complete"] as const;
 export type EventKind = (typeof EVENT_KINDS)[number];
@@ -45,6 +62,10 @@ export interface ReportStore {
   get(id: string, userId: string): Promise<StoredReport | null>;
   /** Deletes reports past their `expiresAt`; returns how many. */
   purgeExpired(): Promise<number>;
+  /** One line of history per finished analysis (docs/SPRINT_6.md 3.1); kept SCAN_HISTORY_DAYS. */
+  recordScan(scan: NewScanSummary): Promise<void>;
+  /** The account's history, newest first. */
+  listScans(userId: string, limit: number): Promise<ScanSummary[]>;
   /** Adds one to today's counter for this kind. */
   countEvent(kind: EventKind): Promise<void>;
 }
@@ -56,6 +77,7 @@ export interface StoreClock {
 export function createMemoryStore(clock: StoreClock = {}): ReportStore & { eventCounts(): Record<string, number> } {
   const now = clock.now ?? (() => new Date());
   const reports = new Map<string, StoredReport>();
+  const scans: ScanSummary[] = [];
   const quota = new Map<string, { windowStart: number; used: number }>();
   const events = new Map<string, number>();
   let seq = 0;
@@ -108,7 +130,21 @@ export function createMemoryStore(clock: StoreClock = {}): ReportStore & { event
           n += 1;
         }
       }
+      // History outlives the reports; a line older than SCAN_HISTORY_DAYS goes too.
+      for (let i = scans.length - 1; i >= 0; i--) {
+        const s = scans[i];
+        if (s && t - Date.parse(s.createdAt) > SCAN_HISTORY_DAYS * 86_400_000) scans.splice(i, 1);
+      }
       return n;
+    },
+    // eslint-disable-next-line @typescript-eslint/require-await
+    async recordScan(scan) {
+      seq += 1;
+      scans.unshift({ ...scan, id: `scan-${seq.toString(36)}`, createdAt: now().toISOString() });
+    },
+    // eslint-disable-next-line @typescript-eslint/require-await
+    async listScans(userId, limit) {
+      return scans.filter((s) => s.userId === userId).slice(0, limit);
     },
     // eslint-disable-next-line @typescript-eslint/require-await
     async countEvent(kind) {
@@ -141,6 +177,21 @@ const rowSchema = z.looseObject({
   body: z.unknown(),
   created_at: z.string(),
   expires_at: z.string(),
+});
+
+const scanRowSchema = z.looseObject({
+  id: z.string(),
+  user_id: z.string(),
+  owner: z.string(),
+  repo: z.string(),
+  sha: z.string(),
+  verdict: z.enum(["pass", "fail", "incomplete"]),
+  p1: z.number().int(),
+  p2: z.number().int(),
+  p3: z.number().int(),
+  p4: z.number().int(),
+  report_id: z.string().nullable(),
+  created_at: z.string(),
 });
 
 const quotaSchema = z.looseObject({ allowed: z.boolean(), used: z.number(), limit: z.number(), reset_at: z.string() });
@@ -230,7 +281,20 @@ export function createSupabaseStore(options: SupabaseStoreOptions): ReportStore 
       const q = new URLSearchParams({ expires_at: `lt.${now().toISOString()}`, select: "id" });
       const out = await call(`/rest/v1/reports?${q.toString()}`, { method: "DELETE", prefer: "return=representation" });
       const parsed = z.array(z.unknown()).safeParse(out);
+      const oldest = new Date(now().getTime() - SCAN_HISTORY_DAYS * 86_400_000).toISOString();
+      await call(`/rest/v1/scans?${new URLSearchParams({ created_at: `lt.${oldest}` }).toString()}`, { method: "DELETE" });
       return parsed.success ? parsed.data.length : 0;
+    },
+    async recordScan(scan) {
+      const row = { user_id: scan.userId, owner: scan.owner, repo: scan.repo, sha: scan.sha, verdict: scan.verdict, p1: scan.byPriority.P1, p2: scan.byPriority.P2, p3: scan.byPriority.P3, p4: scan.byPriority.P4, report_id: scan.reportId };
+      await call("/rest/v1/scans", { method: "POST", body: JSON.stringify(row) });
+    },
+    async listScans(userId, limit) {
+      const q = new URLSearchParams({ user_id: `eq.${userId}`, order: "created_at.desc", limit: String(limit) });
+      const out = await call(`/rest/v1/scans?${q.toString()}`, { method: "GET" });
+      const parsed = z.array(scanRowSchema).safeParse(out);
+      if (!parsed.success) throw new StoreError("scans query returned an unexpected shape", 200);
+      return parsed.data.map((r) => ({ id: r.id, userId: r.user_id, owner: r.owner, repo: r.repo, sha: r.sha, verdict: r.verdict, byPriority: { P1: r.p1, P2: r.p2, P3: r.p3, P4: r.p4 }, reportId: r.report_id, createdAt: r.created_at }));
     },
     async countEvent(kind) {
       await call("/rest/v1/rpc/count_event", { method: "POST", body: JSON.stringify({ p_kind: kind }) });

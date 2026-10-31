@@ -6,7 +6,7 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import { bearerToken, createStaticAuth, createSupabaseAuth } from "../src/web/auth.js";
 import { authConfigFromEnv, handlerOptionsFromEnv, STUB_TOKEN, STUB_USER } from "../src/web/env.js";
-import { handleCleanupRequest, handleEventRequest, handleReportRequest, handleScanRequest, type HandlerOptions, type ScanResponseOk } from "../src/web/handler.js";
+import { handleCleanupRequest, handleEventRequest, handleReportRequest, handleScanRequest, handleScansRequest, type HandlerOptions, type ScanResponseOk } from "../src/web/handler.js";
 import { createMemoryStore, createSupabaseStore, type ReportStore } from "../src/web/store.js";
 import { fixturePath, readJsonFixture } from "./helpers.js";
 
@@ -221,6 +221,20 @@ describe("createSupabaseStore", () => {
     expect(calls).toHaveLength(3);
   });
 
+  it("writes and reads scan history through PostgREST, scoped to the user, and purges lines older than 180 days", async () => {
+    const histRow = { id: "44444444-4444-4444-8444-444444444444", user_id: ALICE.id, owner: "o", repo: "r", sha: SHA, verdict: "fail", p1: 2, p2: 1, p3: 0, p4: 0, report_id: row.id, created_at: "2026-10-28T09:00:00+00:00" };
+    const { store, calls } = postgrest((c) => new Response(c.method === "GET" ? JSON.stringify([histRow]) : ""));
+    await store.recordScan({ userId: ALICE.id, owner: "o", repo: "r", sha: SHA, verdict: "fail", byPriority: { P1: 2, P2: 1, P3: 0, P4: 0 }, reportId: row.id });
+    expect(calls[0]).toMatchObject({ method: "POST", url: "https://p.supabase.co/rest/v1/scans" });
+    expect(JSON.parse(calls[0]?.body ?? "{}")).toEqual({ user_id: ALICE.id, owner: "o", repo: "r", sha: SHA, verdict: "fail", p1: 2, p2: 1, p3: 0, p4: 0, report_id: row.id });
+    expect(await store.listScans(ALICE.id, 100)).toEqual([{ id: histRow.id, userId: ALICE.id, owner: "o", repo: "r", sha: SHA, verdict: "fail", byPriority: { P1: 2, P2: 1, P3: 0, P4: 0 }, reportId: row.id, createdAt: histRow.created_at }]);
+    expect(decodeURIComponent(calls[1]?.url ?? "")).toContain(`user_id=eq.${ALICE.id}`);
+    await store.purgeExpired();
+    expect(decodeURIComponent(calls[3]?.url ?? "")).toContain("/rest/v1/scans?created_at=lt.2026-05-01T10:00:00.000Z");
+    const bad = postgrest(() => new Response(JSON.stringify([{ id: "x" }]))).store;
+    await expect(bad.listScans(ALICE.id, 10)).rejects.toMatchObject({ name: "StoreError" });
+  });
+
   it("deletes expired rows and counts them; surfaces HTTP and network failures as StoreError", async () => {
     const { store, calls } = postgrest(() => new Response(JSON.stringify([{ id: "a" }, { id: "b" }])));
     expect(await store.purgeExpired()).toBe(2);
@@ -301,6 +315,35 @@ describe("handleScanRequest with auth and store", () => {
       // The anon key is public by design and never reported; every other value must not survive redaction.
       if (name !== "anon") expect(json, `secret ${name} reached the store`).not.toContain(value);
     }
+  });
+
+  it("keeps a history line per analysis, cached ones included, and serves it only to its owner", async () => {
+    let t = Date.parse("2026-10-31T10:00:00Z");
+    const store = createMemoryStore({ now: () => new Date(t) });
+    const opts = baseOptions(fakeGitHub(), { auth, store });
+    const first = await handleScanRequest({ url: "https://github.com/o/r" }, opts, "Bearer tok-alice");
+    t += 60_000;
+    const again = await handleScanRequest({ url: "https://github.com/o/r" }, opts, "Bearer tok-alice");
+    expect((again.body as ScanResponseOk).cached).toBe(true);
+    const hist = await handleScansRequest(opts, "Bearer tok-alice");
+    expect(hist.status).toBe(200);
+    const scans = (hist.body as { scans: { reportId: string | null; owner: string; repo: string; verdict: string; at: string }[] }).scans;
+    expect(scans.map((s) => s.reportId)).toEqual([(again.body as ScanResponseOk).id, (first.body as ScanResponseOk).id]);
+    expect(scans[0]).toMatchObject({ owner: "o", repo: "r" });
+    expect(await handleScansRequest(opts, "Bearer tok-bob")).toMatchObject({ status: 200, body: { ok: true, scans: [] } });
+    expect(await handleScansRequest(opts, null)).toMatchObject({ status: 401 });
+    // History lines outlive the 30-day reports and go after 180 days.
+    t += 181 * 86_400_000;
+    await store.purgeExpired();
+    expect(await store.listScans(ALICE.id, 10)).toEqual([]);
+  });
+
+  it("returns the report even when the history line cannot be written", async () => {
+    const broken: ReportStore = { ...createMemoryStore(), recordScan: () => Promise.reject(new Error("db down")) };
+    const r = await handleScanRequest({ url: "https://github.com/o/r" }, baseOptions(fakeGitHub(), { auth, store: broken }), "Bearer tok-alice");
+    expect(r.status).toBe(200);
+    const listing: ReportStore = { ...createMemoryStore(), listScans: () => Promise.reject(new Error("db down")) };
+    expect(await handleScansRequest({ auth, store: listing }, "Bearer tok-alice")).toMatchObject({ status: 503, body: { error: { code: "store-unavailable" } } });
   });
 
   it("answers 429 with the quota when the window is exhausted, before any download", async () => {

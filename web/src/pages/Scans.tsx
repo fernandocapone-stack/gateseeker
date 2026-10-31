@@ -5,7 +5,7 @@ import { useEffect } from "react";
 import { useAuth } from "../auth-context";
 import { ScanTable } from "../components/ScanTable";
 import { PageSkeleton } from "../components/Skeletons";
-import { useHistory } from "../history";
+import { useScanHistory } from "../history";
 import { Link, navigate } from "../router";
 
 /**
@@ -15,7 +15,7 @@ import { Link, navigate } from "../router";
  */
 export function Scans() {
   const auth = useAuth();
-  const history = useHistory(auth.session?.user.id ?? null);
+  const { records: history, source } = useScanHistory(auth.session?.user.id ?? null, auth.session?.accessToken ?? null);
 
   useEffect(() => {
     if (auth.status === "signed-out") navigate("/login?next=/app/scans");
@@ -27,7 +27,7 @@ export function Scans() {
     <div className="grid gap-4">
       <div>
         <h1 className="text-display font-medium">Your scans</h1>
-        <p className="text-label text-muted-foreground">Every analysis you ran in this browser, newest first. Open one to see its findings.</p>
+        <p className="text-label text-muted-foreground">Every analysis you ran, newest first. Open one to see its findings.</p>
       </div>
 
       {history.length === 0 ? (
@@ -43,7 +43,7 @@ export function Scans() {
       ) : (
         <>
           <ScanTable rows={history} label="Scans" />
-          <p className="text-caption text-muted-foreground">Kept in this browser for this account, last 100 analyses. Saved reports open for 30 days.</p>
+          <p className="text-caption text-muted-foreground">{source === "server" ? "Kept on your account for 180 days, on any device. Saved reports open for 30 days." : "Showing this browser's copy (your account history could not be loaded). Saved reports open for 30 days."}</p>
         </>
       )}
     </div>

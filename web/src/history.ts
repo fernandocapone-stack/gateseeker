@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 
+import { fetchScans } from "./api";
+
 /**
  * Analyses this account completed in this browser, newest first: the data
  * behind the Dashboard. Recorded for every report the service returns,
@@ -83,4 +85,31 @@ export function latestPerRepository(items: AnalysisRecord[]): AnalysisRecord[] {
     seen.add(k);
     return true;
   });
+}
+
+/**
+ * The account's history from the server (docs/SPRINT_6.md 3.1), with the
+ * browser's copy shown first and kept as the fallback when the server cannot
+ * answer. Refreshes after every analysis this tab records.
+ */
+export function useScanHistory(user: string | null, token: string | null): { records: AnalysisRecord[]; source: "server" | "browser" } {
+  const local = useHistory(user);
+  const [server, setServer] = useState<AnalysisRecord[] | null>(null);
+  useEffect(() => {
+    if (!user || !token) return;
+    let cancelled = false;
+    const load = () => {
+      void fetchScans(token).then((r) => {
+        if (cancelled || !r.ok) return;
+        setServer(r.scans.map((s) => ({ owner: s.owner, repo: s.repo, sha: s.sha.slice(0, 7), verdict: s.verdict, byPriority: s.byPriority, reportId: s.reportId, at: s.at })).filter(isRecord));
+      });
+    };
+    load();
+    window.addEventListener(EVENT, load);
+    return () => {
+      cancelled = true;
+      window.removeEventListener(EVENT, load);
+    };
+  }, [user, token]);
+  return server ? { records: server, source: "server" } : { records: local, source: "browser" };
 }

@@ -4,7 +4,7 @@ import { dirname, extname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { authConfigFromEnv, exampleRepoFromEnv, handlerOptionsFromEnv } from "./env.js";
-import { handleCleanupRequest, handleEventRequest, handleReportRequest, handleScanRequest } from "./handler.js";
+import { handleCleanupRequest, handleEventRequest, handleReportRequest, handleScanRequest, handleScansRequest } from "./handler.js";
 
 /**
  * Development and end-to-end server for the public page: serves web/dist and
@@ -14,6 +14,7 @@ import { handleCleanupRequest, handleEventRequest, handleReportRequest, handleSc
  *   GET  /api/config          auth mode for the page
  *   POST /api/scan            analyze (bearer token when auth is configured)
  *   GET  /api/reports/<id>    a saved report of the signed-in user
+ *   GET  /api/scans           the signed-in user's analysis history
  *   GET  /api/cron/cleanup    purge expired reports (bearer CRON_SECRET)
  *   POST /api/event           count a login-funnel event (anonymous, aggregate)
  *
@@ -114,6 +115,10 @@ const server = createServer((req, res) => {
       const out = await handleScanRequest(body, options, authorization);
       json(res, out.status, out.body);
     })();
+    return;
+  }
+  if (url.pathname === "/api/scans") {
+    void handleScansRequest(options, authorization).then((out) => { json(res, out.status, out.body); });
     return;
   }
   const reportMatch = /^\/api\/reports\/([A-Za-z0-9-]{1,64})$/.exec(url.pathname);

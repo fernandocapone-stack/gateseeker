@@ -17,6 +17,9 @@ import { gzipSync } from "node:zlib";
 const ROOT = process.cwd();
 const FIXTURE = join(ROOT, "fixtures", "projects", "vibe-next-supabase");
 const SHA = "0123456789abcdef0123456789abcdef01234567";
+// A later commit on the "fixed" branch: the clean fixture, so a comparison shows the vibe findings as fixed.
+const FIXED = join(ROOT, "fixtures", "projects", "clean-vite");
+const SHA_FIXED = "fedcba9876543210fedcba9876543210fedcba98";
 
 function header(name, size, type) {
   const h = Buffer.alloc(512, 0);
@@ -61,6 +64,7 @@ function tarDirectory(dir, prefix) {
 }
 
 const archive = tarDirectory(FIXTURE, `vibe-${SHA.slice(0, 7)}`);
+const archiveFixed = tarDirectory(FIXED, `vibe-${SHA_FIXED.slice(0, 7)}`);
 
 const stub = createServer((req, res) => {
   const url = new URL(req.url ?? "/", "http://stub");
@@ -71,7 +75,12 @@ const stub = createServer((req, res) => {
   if (req.method === "POST" && url.pathname === "/v1/query") return json(200, { vulns: [] });
   if (url.pathname === "/repos/acme/vibe") return json(200, { full_name: "acme/vibe", private: false, size: 300, default_branch: "main", html_url: "https://github.com/acme/vibe" });
   if (url.pathname === "/repos/acme/huge") return json(200, { full_name: "acme/huge", private: false, size: 900_000, default_branch: "main", html_url: "https://github.com/acme/huge" });
+  if (url.pathname === "/repos/acme/vibe/commits/fixed") return json(200, { sha: SHA_FIXED });
   if (url.pathname.startsWith("/repos/acme/vibe/commits/")) return json(200, { sha: SHA });
+  if (url.pathname === `/acme/vibe/tar.gz/${SHA_FIXED}`) {
+    res.writeHead(200, { "content-type": "application/x-gzip", "content-length": archiveFixed.length });
+    return res.end(archiveFixed);
+  }
   if (url.pathname === `/acme/vibe/tar.gz/${SHA}`) {
     res.writeHead(200, { "content-type": "application/x-gzip", "content-length": archive.length });
     return res.end(archive);

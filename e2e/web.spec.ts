@@ -166,8 +166,9 @@ test.describe("public page", () => {
     await page.getByRole("navigation", { name: "Workspace", exact: true }).getByRole("link", { name: "Scans" }).click();
     await expect(page.getByRole("heading", { level: 1 })).toHaveText("Your scans");
     const scans = page.getByRole("table", { name: "Scans" });
-    await expect(scans.getByRole("row")).toHaveCount(2);
-    await scans.getByRole("link", { name: "View scan" }).click();
+    // The history comes from the account (shared by every test of this run), newest first: at least this test's analysis.
+    await expect(scans.getByRole("row").nth(1)).toContainText("acme/vibe");
+    await scans.getByRole("link", { name: "View scan" }).first().click();
     await expect(page.getByRole("region", { name: "Report" })).toBeVisible();
     const header = page.getByRole("banner");
     await expect(header).toContainText("acme/vibe");
@@ -302,6 +303,26 @@ test.describe("public page", () => {
     await expect(page.getByRole("region", { name: "Report" })).toBeVisible({ timeout: 30_000 });
     const overflow = await page.evaluate("document.documentElement.scrollWidth - document.documentElement.clientWidth");
     expect(overflow).toBeLessThanOrEqual(0);
+  });
+
+  test("compares a scan with the previous one of the same repository, from the account history", async ({ page }) => {
+    await signIn(page);
+    await analyze(page, "https://github.com/acme/vibe");
+    await expect(page).toHaveURL(/\/r\/mem-/, { timeout: 30_000 });
+    // A later commit where the problems were fixed.
+    await page.getByRole("banner").getByRole("link", { name: "Analyze a repository" }).click();
+    await analyze(page, "https://github.com/acme/vibe/tree/fixed");
+    await expect(page).toHaveURL(/\/r\/mem-/, { timeout: 30_000 });
+    const band = page.getByTestId("comparison");
+    await expect(band).toBeVisible();
+    await expect(band).toContainText("Since the scan of");
+    await expect(band).toContainText("0 new");
+    await expect(band).toContainText(/[1-9]\d* fixed/);
+    await band.getByText("What was fixed").click();
+    await expect(band).toContainText("GSK-SECRET-001");
+    // The history now comes from the account, not only this browser.
+    await page.getByRole("navigation", { name: "Workspace", exact: true }).getByRole("link", { name: "Scans" }).click();
+    await expect(page.getByText(/Kept on your account for 180 days/)).toBeVisible();
   });
 
   test("offers the GitHub Action workflow with the analyzed repository named", async ({ page }) => {

@@ -43,7 +43,7 @@ export interface ScanResponseError {
 
 export interface HttpResponse {
   status: number;
-  body: ScanResponseOk | ScanResponseError | ReportResponseOk | CleanupResponse | EventResponse;
+  body: ScanResponseOk | ScanResponseError | ReportResponseOk | CleanupResponse | EventResponse | ScansResponse;
 }
 
 /** What is persisted per report: the scan answer minus id, quota and cache flag, which belong to the moment of the request. */
@@ -165,6 +165,7 @@ export async function handleScanRequest(body: unknown, options: HandlerOptions, 
     if (hit) {
       const id = await store.save({ userId: who.id, owner: repository.owner, repo: repository.repo, ref: repository.ref, sha: repository.sha, cachedFrom: hit.id, body: hit.body, expiresAt: expiresAt() });
       const saved = hit.body as SavedScan;
+      await recordHistory(store, who.id, saved, id);
       return { status: 200, body: { ...saved, id, cached: true, quota: null } };
     }
   } catch (e) {
@@ -186,7 +187,51 @@ export async function handleScanRequest(body: unknown, options: HandlerOptions, 
   const fresh: SavedScan = { ok: true, repository: result.value.repository, archive, timings, report: toPublicReport(report) };
   try {
     const id = await store.save({ userId: who.id, owner: repository.owner, repo: repository.repo, ref: repository.ref, sha: repository.sha, cachedFrom: null, body: fresh, expiresAt: expiresAt() });
+    await recordHistory(store, who.id, fresh, id);
     return { status: 200, body: { ...fresh, id, cached: false, quota } };
+  } catch (e) {
+    return storeFailure(e);
+  }
+}
+
+/**
+ * The history line of a saved analysis. History is secondary to the report the
+ * person is waiting for: a failure here is swallowed (the report was saved and
+ * is returned), and the Dashboard falls back to the browser's copy.
+ */
+async function recordHistory(store: ReportStore, userId: string, saved: SavedScan, reportId: string): Promise<void> {
+  try {
+    const { repository, report } = saved;
+    await store.recordScan({ userId, owner: repository.owner, repo: repository.repo, sha: repository.sha, verdict: report.gate.verdict, byPriority: { ...report.summary.byPriority }, reportId });
+  } catch {
+    /* history line lost; the report itself is safe */
+  }
+}
+
+export interface ScanHistoryEntry {
+  owner: string;
+  repo: string;
+  sha: string;
+  verdict: "pass" | "fail" | "incomplete";
+  byPriority: { P1: number; P2: number; P3: number; P4: number };
+  reportId: string | null;
+  at: string;
+}
+
+export interface ScansResponse {
+  ok: true;
+  scans: ScanHistoryEntry[];
+}
+
+/** GET /api/scans: the signed-in account's analyses, newest first (docs/SPRINT_6.md 3.1). */
+export async function handleScansRequest(options: HandlerOptions, authorization?: string | null): Promise<HttpResponse> {
+  const store = options.store;
+  if (!store) return fail("not-found", "History is not available on this server.");
+  const who = await authenticate(options, authorization);
+  if (isResponse(who)) return who;
+  try {
+    const rows = await store.listScans(who.id, 100);
+    return { status: 200, body: { ok: true, scans: rows.map((r) => ({ owner: r.owner, repo: r.repo, sha: r.sha, verdict: r.verdict, byPriority: r.byPriority, reportId: r.reportId, at: r.createdAt })) } };
   } catch (e) {
     return storeFailure(e);
   }
