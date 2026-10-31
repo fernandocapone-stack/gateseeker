@@ -6,7 +6,9 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import { bearerToken, createStaticAuth, createSupabaseAuth } from "../src/web/auth.js";
 import { authConfigFromEnv, handlerOptionsFromEnv, STUB_TOKEN, STUB_USER } from "../src/web/env.js";
-import { handleCleanupRequest, handleEventRequest, handleFollowsRequest, handleMonitorRequest, handleReportRequest, handleScanRequest, handleScansRequest, type HandlerOptions, type ScanResponseOk } from "../src/web/handler.js";
+import { currentAdvisories, handleCleanupRequest, handleEventRequest, handleFeedPublishedRequest, handleFollowsRequest, handleMonitorRequest, handleReportRequest, handleScanRequest, handleScansRequest, type HandlerOptions, type ScanResponseOk } from "../src/web/handler.js";
+import { advisorySetFromText } from "../src/intel/advisories.js";
+import { signFeed } from "../src/intel/feed-signature.js";
 import { createMemoryStore, createSupabaseStore, type ReportStore } from "../src/web/store.js";
 import { fixturePath, readJsonFixture } from "./helpers.js";
 
@@ -241,7 +243,7 @@ describe("createSupabaseStore", () => {
     expect(await store.follow(ALICE.id, "o", "r", 10)).toMatchObject({ ok: true, follow: { id: followRow.id, owner: "o", lastScanAt: null } });
     expect(calls[0]).toMatchObject({ method: "POST", url: "https://p.supabase.co/rest/v1/rpc/follow_repo", body: JSON.stringify({ p_user: ALICE.id, p_owner: "o", p_repo: "r", p_limit: 10 }) });
     expect(await store.dueFollows("2026-10-27T14:00:00.000Z", 200)).toHaveLength(1);
-    expect(decodeURIComponent(calls[1]?.url ?? "")).toBe("https://p.supabase.co/rest/v1/follows?paused_reason=is.null&or=(last_scan_at.is.null,last_scan_at.lt.2026-10-27T14:00:00.000Z)&order=last_scan_at.asc.nullsfirst&limit=200");
+    expect(decodeURIComponent(calls[1]?.url ?? "")).toBe("https://p.supabase.co/rest/v1/follows?paused_reason=is.null&or=(queued_at.not.is.null,last_scan_at.is.null,last_scan_at.lt.2026-10-27T14:00:00.000Z)&order=queued_at.asc.nullslast,last_scan_at.asc.nullsfirst&limit=200");
     await store.updateFollow(followRow.id, { failures: 2, lastScanAt: "2026-10-28T10:00:00.000Z" });
     expect(calls[2]).toMatchObject({ method: "PATCH" });
     expect(JSON.parse(calls[2]?.body ?? "{}")).toEqual({ last_scan_at: "2026-10-28T10:00:00.000Z", failures: 2 });
@@ -250,6 +252,26 @@ describe("createSupabaseStore", () => {
     expect(decodeURIComponent(calls[3]?.url ?? "")).toContain(`user_id=eq.${ALICE.id}&owner=eq.o&repo=eq.r`);
     const full = postgrest(() => new Response(JSON.stringify({ ok: false, reason: "limit" }))).store;
     expect(await full.follow(ALICE.id, "o", "x", 10)).toEqual({ ok: false, reason: "limit" });
+  });
+
+  it("queues follows by ecosystem overlap, stores feed sets and reads the latest one", async () => {
+    const feedRow = { published_at: "2026-11-02T12:00:00+00:00", digest: "0123456789abcdef", payload: "[]", signature: "a".repeat(64) };
+    const { store, calls } = postgrest((c) => (c.method === "PATCH" ? new Response(JSON.stringify([{ id: "a" }, { id: "b" }])) : new Response(c.method === "GET" ? JSON.stringify([feedRow]) : "", { status: c.method === "POST" ? 201 : 200 })));
+    expect(await store.queueFollows(["Packagist", "npm", "bad}name"], "2026-11-02T12:00:00.000Z")).toBe(2);
+    expect(decodeURIComponent(calls[0]?.url ?? "")).toBe("https://p.supabase.co/rest/v1/follows?paused_reason=is.null&ecosystems=ov.{Packagist,npm}&select=id");
+    expect(JSON.parse(calls[0]?.body ?? "{}")).toEqual({ queued_at: "2026-11-02T12:00:00.000Z" });
+    expect(calls[0]?.headers).toMatchObject({ prefer: "return=representation" });
+    expect(await store.queueFollows(["bad}"], "x")).toBe(0);
+    expect(calls).toHaveLength(1);
+    await store.saveFeed({ publishedAt: "2026-11-02T12:00:00.000Z", digest: feedRow.digest, payload: "[]", signature: feedRow.signature });
+    expect(calls[1]).toMatchObject({ method: "POST", url: "https://p.supabase.co/rest/v1/feed_sets" });
+    expect(JSON.parse(calls[1]?.body ?? "{}")).toEqual({ published_at: "2026-11-02T12:00:00.000Z", digest: feedRow.digest, payload: "[]", signature: feedRow.signature });
+    expect(await store.latestFeed()).toEqual({ publishedAt: feedRow.published_at, digest: feedRow.digest, payload: "[]", signature: feedRow.signature });
+    expect(decodeURIComponent(calls[2]?.url ?? "")).toBe("https://p.supabase.co/rest/v1/feed_sets?select=published_at,digest,payload,signature&order=published_at.desc&limit=1");
+    const empty = postgrest(() => new Response("[]")).store;
+    expect(await empty.latestFeed()).toBeNull();
+    const bad = postgrest(() => new Response(JSON.stringify([{ digest: 1 }]))).store;
+    await expect(bad.latestFeed()).rejects.toMatchObject({ name: "StoreError" });
   });
 
   it("deletes expired rows and counts them; surfaces HTTP and network failures as StoreError", async () => {
@@ -473,6 +495,22 @@ describe("follows", () => {
   });
 });
 
+describe("follow queue (memory store)", () => {
+  it("puts queued follows first, then never-scanned, then oldest, and skips paused ones", async () => {
+    const store = createMemoryStore();
+    for (const repo of ["a", "b", "c", "d"]) await store.follow(ALICE.id, "o", repo, 10);
+    const [a, b, c, d] = await store.listFollows(ALICE.id);
+    await store.updateFollow(a?.id ?? "", { lastScanAt: "2026-11-01T00:00:00.000Z", ecosystems: ["npm"] });
+    await store.updateFollow(b?.id ?? "", { lastScanAt: "2026-11-02T00:00:00.000Z", ecosystems: ["Packagist"] });
+    await store.updateFollow(d?.id ?? "", { lastScanAt: "2026-11-02T00:00:00.000Z", ecosystems: ["Packagist"], pausedReason: "gone" });
+    expect(await store.queueFollows(["Packagist"], "2026-11-02T12:00:00.000Z")).toBe(1);
+    const due = await store.dueFollows("2026-11-01T12:00:00.000Z", 10);
+    expect(due.map((f) => f.repo)).toEqual(["b", "c", "a"]);
+    expect(due.map((f) => f.id)).not.toContain(d?.id);
+    expect(c?.ecosystems).toBeNull();
+  });
+});
+
 describe("daily monitor", () => {
   const CLEAN = targz({ "r-bbbb/package.json": '{"name":"r"}' });
   const secret = "cron-secret";
@@ -541,5 +579,125 @@ describe("daily monitor", () => {
     const slow = { fetch: ((input: string | URL | Request, init?: RequestInit) => { clock += 25_000; return gh.fetch(input, init); }) as typeof fetch, calls: [] };
     const r = await handleMonitorRequest({ ...baseOptions(slow), store, budgetMs: 100_000, reserveMs: 60_000, clock: () => clock }, `Bearer ${secret}`, secret);
     expect(r).toMatchObject({ status: 200, body: { checked: 1, remaining: 1 } });
+  });
+});
+
+// --- curated feed without a redeploy (docs/SPRINT_6.md 3.5, test 5) ---------
+
+describe("published advisory feed", () => {
+  const KEY = "k".repeat(32);
+  const T0 = Date.parse("2026-11-02T12:00:00Z");
+  // The real approved records (never invented ones): the first set leaves the Packagist record out, the second adds it.
+  const approved = readdirSync(join(process.cwd(), "advisories", "approved"))
+    .filter((n) => n.endsWith(".json"))
+    .map((n) => JSON.parse(readFileSync(join(process.cwd(), "advisories", "approved", n), "utf8")) as { id: string; ecosystem: string });
+  const withoutPackagist = JSON.stringify(approved.filter((a) => a.ecosystem !== "Packagist"));
+  const everything = JSON.stringify(approved);
+
+  function signed(payload: string, at: number, key = KEY) {
+    const publishedAt = new Date(at).toISOString();
+    const digest = advisorySetFromText(payload, "test").digest;
+    return { publishedAt, digest, payload, signature: signFeed(key, publishedAt, digest, payload) };
+  }
+
+  it("has a Packagist record and another one to work with", () => {
+    expect(approved.some((a) => a.ecosystem === "Packagist")).toBe(true);
+    expect(approved.some((a) => a.ecosystem !== "Packagist")).toBe(true);
+  });
+
+  it("refuses a set without the key, with a wrong signature, stale, replayed, with invalid records or a wrong digest", async () => {
+    const store = createMemoryStore();
+    const now = () => new Date(T0);
+    const opts = { store, now, feedKey: KEY };
+    const good = signed(withoutPackagist, T0);
+    expect(await handleFeedPublishedRequest(good, { store, now })).toMatchObject({ status: 401 });
+    expect(await handleFeedPublishedRequest({ ...good, signature: signed(withoutPackagist, T0, "x".repeat(32)).signature }, opts)).toMatchObject({ status: 401, body: { error: { message: "Signature missing or wrong." } } });
+    expect(await handleFeedPublishedRequest(signed(withoutPackagist, T0 - 11 * 60_000), opts)).toMatchObject({ status: 401, body: { error: { message: expect.stringContaining("too old") as string } } });
+    expect(await handleFeedPublishedRequest({ publishedAt: good.publishedAt }, opts)).toMatchObject({ status: 400 });
+    const invalid = JSON.stringify([{ id: "not-a-record" }]);
+    expect(await handleFeedPublishedRequest(signed(invalid, T0), opts)).toMatchObject({ status: 400, body: { error: { message: expect.stringContaining("invalid records") as string } } });
+    const lying = { ...good, digest: "0".repeat(16) };
+    expect(await handleFeedPublishedRequest({ ...lying, signature: signFeed(KEY, lying.publishedAt, lying.digest, lying.payload) }, opts)).toMatchObject({ status: 400, body: { error: { message: expect.stringContaining("digest") as string } } });
+    expect(await store.latestFeed()).toBeNull();
+    expect(await handleFeedPublishedRequest(good, opts)).toMatchObject({ status: 200, body: { changed: true } });
+    // The same signed body sent again cannot roll the feed back or repeat the queue.
+    expect(await handleFeedPublishedRequest(good, opts)).toMatchObject({ status: 400, body: { error: { message: expect.stringContaining("already stored") as string } } });
+  });
+
+  it("stores the set, queues only the follows of the ecosystems that changed and rescans them right away", async () => {
+    let t = T0;
+    const now = () => new Date(t);
+    const store = createMemoryStore({ now });
+    await handleFollowsRequest("POST", { owner: "o", repo: "r" }, { auth, store }, "Bearer tok-alice");
+    await handleFollowsRequest("POST", { owner: "o", repo: "npm-only" }, { auth, store }, "Bearer tok-alice");
+    const [php, js] = await store.listFollows(ALICE.id);
+    await store.updateFollow(php?.id ?? "", { lastScanAt: now().toISOString(), ecosystems: ["Packagist"] });
+    await store.updateFollow(js?.id ?? "", { lastScanAt: now().toISOString(), ecosystems: ["npm"] });
+    const opts = { ...baseOptions(fakeGitHub(targz({ "r-bbbb/package.json": '{"name":"r"}' }))), store, now, feedKey: KEY };
+
+    // First set: nothing to compare with, so its ecosystems count as changed; no follow uses them.
+    const first = await handleFeedPublishedRequest(signed(withoutPackagist, t), opts);
+    expect(first).toMatchObject({ status: 200, body: { changed: true, queued: 0, monitor: { checked: 0 } } });
+
+    // Same records again, signed later (a re-run of the workflow): nothing stored, nothing queued.
+    t += 60_000;
+    expect(await handleFeedPublishedRequest(signed(withoutPackagist, t), opts)).toMatchObject({ status: 200, body: { changed: false, queued: 0 } });
+
+    // A new Packagist record: only the Packagist follow is queued and rescanned now, though it was checked minutes ago.
+    t += 60_000;
+    const second = await handleFeedPublishedRequest(signed(everything, t), opts);
+    expect(second).toMatchObject({ status: 200, body: { changed: true, ecosystems: ["Packagist"], queued: 1, monitor: { checked: 1 } } });
+    const after = await store.listFollows(ALICE.id);
+    expect(after.find((f) => f.repo === "r")).toMatchObject({ queuedAt: null, lastScanAt: now().toISOString() });
+    expect(after.find((f) => f.repo === "npm-only")?.lastScanAt).toBe(new Date(T0).toISOString());
+    expect((await store.latestFeed())?.digest).toBe(advisorySetFromText(everything, "x").digest);
+  });
+
+  it("scans with the published set, says so in the report, and does not reuse a report made with another set", async () => {
+    let t = T0;
+    const now = () => new Date(t);
+    const store = createMemoryStore({ now });
+    const lock = JSON.stringify({ name: "r", lockfileVersion: 3, packages: { "": { name: "r" } } });
+    const gh = fakeGitHub(targz({ "r-bbbb/package.json": '{"name":"r"}', "r-bbbb/package-lock.json": lock }));
+    const opts = { ...baseOptions(gh), auth, store, now, feedKey: KEY };
+    const sourceOf = (r: Awaited<ReturnType<typeof handleScanRequest>>) => (r.body as ScanResponseOk).report.sources.find((s) => s.name === "gateseeker-advisories")?.endpoint ?? "";
+
+    const before = await handleScanRequest({ url: "https://github.com/o/r" }, opts, "Bearer tok-alice");
+    expect(sourceOf(before)).toMatch(/^(bundled|checkout:advisories\/approved) /);
+
+    await handleFeedPublishedRequest(signed(withoutPackagist, t), opts);
+    t += 60_000;
+    const after = await handleScanRequest({ url: "https://github.com/o/r" }, opts, "Bearer tok-alice");
+    expect(after.body).toMatchObject({ cached: false });
+    expect(sourceOf(after)).toContain(`published ${new Date(T0).toISOString()}`);
+
+    // Same commit, same set: reused.
+    expect((await handleScanRequest({ url: "https://github.com/o/r" }, opts, "Bearer tok-alice")).body).toMatchObject({ cached: true });
+  });
+
+  it("falls back to the bundled set and says why when the stored set was tampered with or the database fails", async () => {
+    const now = () => new Date(T0);
+    const store = createMemoryStore({ now });
+    const good = signed(withoutPackagist, T0);
+    await store.saveFeed({ ...good, payload: everything });
+    const tampered = await currentAdvisories({ store, now, feedKey: KEY });
+    expect(tampered.origin).not.toMatch(/^published/);
+    expect(tampered.problems.join(" ")).toContain("failed signature verification");
+
+    const down: ReportStore = { ...createMemoryStore(), latestFeed: () => Promise.reject(new Error("db down")) };
+    const fallback = await currentAdvisories({ store: down, now, feedKey: KEY });
+    expect(fallback.origin).not.toMatch(/^published/);
+    expect(fallback.problems.join(" ")).toContain("could not be read");
+
+    // Without the key the service never reads the database.
+    let read = false;
+    const spy: ReportStore = { ...createMemoryStore(), latestFeed: () => { read = true; return Promise.resolve(null); } };
+    await currentAdvisories({ store: spy, now });
+    expect(read).toBe(false);
+  });
+
+  it("reads the key from GATESEEKER_FEED_KEY only when it is long enough", () => {
+    expect(handlerOptionsFromEnv({ env: { GATESEEKER_FEED_KEY: KEY } }).feedKey).toBe(KEY);
+    expect(handlerOptionsFromEnv({ env: { GATESEEKER_FEED_KEY: "short" } }).feedKey).toBeUndefined();
   });
 });

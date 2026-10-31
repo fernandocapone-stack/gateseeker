@@ -4,7 +4,8 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { main as intelMain } from "../src/intel-cli.js";
 import { validateAdvisory, type Advisory } from "../src/intel/advisory-schema.js";
-import { advisoryMatches, buildAdvisoryFinding, loadAdvisories, parseAdvisoryJson } from "../src/intel/advisories.js";
+import { advisoryMatches, advisorySetFromText, buildAdvisoryFinding, loadAdvisories, parseAdvisoryJson } from "../src/intel/advisories.js";
+import { signFeed, verifyFeed } from "../src/intel/feed-signature.js";
 import { canonicalUrl, collect, extractCandidates, isRelevant, runCollect, sourcesSchema, titleHash, type CollectorState } from "../src/intel/feed/collect.js";
 import { decodeEntities, parseFeed, stripTags } from "../src/intel/feed/rss.js";
 import { scan } from "../src/scan.js";
@@ -436,5 +437,68 @@ describe("gateseeker-intel CLI", () => {
     expect(await intelMain(["frobnicate", "--root", fixturePath("..")], b.io)).toBe(3);
     const c = capture();
     expect(await intelMain(["validate", "--root", fixturePath("lockfiles")], c.io)).toBe(3);
+  });
+});
+
+describe("publish-feed and the feed signature (docs/SPRINT_6.md 3.5)", () => {
+  const KEY = "k".repeat(32);
+  function capture() {
+    const out: string[] = [];
+    const err: string[] = [];
+    return { out, err, io: { stdout: (s: string) => out.push(s), stderr: (s: string) => err.push(s) } };
+  }
+
+  it("signs the publication time, digest and exact payload, and rejects any change", () => {
+    const feed = { publishedAt: "2026-11-02T12:00:00.000Z", digest: "0123456789abcdef", payload: "[]" };
+    const signature = signFeed(KEY, feed.publishedAt, feed.digest, feed.payload);
+    expect(signature).toMatch(/^[0-9a-f]{64}$/);
+    expect(verifyFeed(KEY, { ...feed, signature })).toBe(true);
+    expect(verifyFeed("x".repeat(32), { ...feed, signature })).toBe(false);
+    expect(verifyFeed(KEY, { ...feed, payload: "[ ]", signature })).toBe(false);
+    expect(verifyFeed(KEY, { ...feed, publishedAt: "2026-11-02T12:00:01.000Z", signature })).toBe(false);
+    expect(verifyFeed(KEY, { ...feed, signature: "zz" })).toBe(false);
+  });
+
+  it("sends the built set signed to /api/feed/published and reports the answer", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "gateseeker-intel-publish-"));
+    try {
+      await mkdir(join(dir, "advisories", "approved"), { recursive: true });
+      const file = join(dir, "advisories.json");
+      const payload = `${JSON.stringify([APPROVED], null, 2)}\n`;
+      await writeFile(file, payload);
+      const sent: { url: string; body: string }[] = [];
+      // eslint-disable-next-line @typescript-eslint/require-await
+      const fakeFetch = (async (input: string | URL | Request, init?: RequestInit) => {
+        sent.push({ url: input instanceof Request ? input.url : input.toString(), body: typeof init?.body === "string" ? init.body : "" });
+        return new Response(JSON.stringify({ ok: true, changed: true, queued: 2 }), { status: 200 });
+      }) as typeof fetch;
+      const c = capture();
+      const io = { ...c.io, env: { GATESEEKER_FEED_KEY: KEY }, fetch: fakeFetch, now: fixedNow };
+      expect(await intelMain(["publish-feed", "--root", dir, "--file", file, "--url", "https://gateseeker.example"], io)).toBe(0);
+      expect(sent[0]?.url).toBe("https://gateseeker.example/api/feed/published");
+      const body = JSON.parse(sent[0]?.body ?? "{}") as { publishedAt: string; digest: string; payload: string; signature: string };
+      expect(body.publishedAt).toBe(fixedNow().toISOString());
+      expect(body.payload).toBe(payload);
+      expect(body.digest).toBe(advisorySetFromText(payload, "x").digest);
+      expect(verifyFeed(KEY, body)).toBe(true);
+      expect(c.out.join("")).toContain("Published 1 approved record(s)");
+
+      // Refusals and usage errors.
+      const refused = (() => Promise.resolve(new Response('{"ok":false}', { status: 401 }))) as typeof fetch;
+      const r = capture();
+      expect(await intelMain(["publish-feed", "--root", dir, "--file", file, "--url", "https://gateseeker.example"], { ...r.io, env: { GATESEEKER_FEED_KEY: KEY }, fetch: refused })).toBe(1);
+      expect(r.err.join("")).toContain("HTTP 401");
+      const short = capture();
+      expect(await intelMain(["publish-feed", "--root", dir, "--file", file, "--url", "https://gateseeker.example"], { ...short.io, env: { GATESEEKER_FEED_KEY: "short" }, fetch: fakeFetch })).toBe(3);
+      const http = capture();
+      expect(await intelMain(["publish-feed", "--root", dir, "--file", file, "--url", "http://gateseeker.example"], { ...http.io, env: { GATESEEKER_FEED_KEY: KEY }, fetch: fakeFetch })).toBe(3);
+      expect(http.err.join("")).toContain("https");
+      await writeFile(file, JSON.stringify([{ id: "broken" }]));
+      const invalid = capture();
+      expect(await intelMain(["publish-feed", "--root", dir, "--file", file, "--url", "https://gateseeker.example"], { ...invalid.io, env: { GATESEEKER_FEED_KEY: KEY }, fetch: fakeFetch })).toBe(1);
+      expect(sent).toHaveLength(1);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
   });
 });
