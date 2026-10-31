@@ -7,6 +7,7 @@ import { fetchReport, type ReportOutcome } from "../api";
 import { useAuth } from "../auth-context";
 import { CiSnippet } from "../components/CiSnippet";
 import { ComparisonBand, useComparison } from "../components/Comparison";
+import { FollowButton } from "../components/FollowButton";
 import { ReportSkeleton } from "../components/Skeletons";
 import { Link } from "../router";
 import { ReportView } from "../views/Report";
@@ -77,9 +78,12 @@ export function SavedReport({ id }: { id: string }) {
     <>
       <div className="mb-4 print:hidden">
         <h1 className="sr-only">{name}</h1>
-        <p className="text-label text-muted-foreground">
-          Commit <span className="font-mono">{outcome.saved.repository.sha.slice(0, 7)}</span> · in your Scans until {new Date(outcome.expiresAt).toLocaleDateString()}.
-        </p>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className="text-label text-muted-foreground">
+            Commit <span className="font-mono">{outcome.saved.repository.sha.slice(0, 7)}</span> · in your Scans until {new Date(outcome.expiresAt).toLocaleDateString()}.
+          </p>
+          {auth.session && <FollowButton owner={outcome.saved.repository.owner} repo={outcome.saved.repository.repo} token={auth.session.accessToken} />}
+        </div>
         {note && (
           <p className="mt-1 text-label text-muted-foreground" data-testid="saved-note">
             {note.cached ? "Reused a report of this commit from the last 24 hours, so it did not count toward your limit." : note.used !== null && note.limit !== null ? `${String(note.used)} of ${String(note.limit)} analyses used this hour.` : ""}

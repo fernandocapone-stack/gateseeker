@@ -4,7 +4,7 @@ import { dirname, extname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { authConfigFromEnv, exampleRepoFromEnv, handlerOptionsFromEnv } from "./env.js";
-import { handleCleanupRequest, handleEventRequest, handleReportRequest, handleScanRequest, handleScansRequest } from "./handler.js";
+import { handleCleanupRequest, handleEventRequest, handleFollowsRequest, handleMonitorRequest, handleReportRequest, handleScanRequest, handleScansRequest } from "./handler.js";
 
 /**
  * Development and end-to-end server for the public page: serves web/dist and
@@ -14,6 +14,8 @@ import { handleCleanupRequest, handleEventRequest, handleReportRequest, handleSc
  *   GET  /api/config          auth mode for the page
  *   POST /api/scan            analyze (bearer token when auth is configured)
  *   GET  /api/reports/<id>    a saved report of the signed-in user
+ *   GET/POST/DELETE /api/follows  followed repositories of the signed-in user
+ *   GET  /api/cron/monitor    rescan due followed repositories (bearer CRON_SECRET)
  *   GET  /api/scans           the signed-in user's analysis history
  *   GET  /api/cron/cleanup    purge expired reports (bearer CRON_SECRET)
  *   POST /api/event           count a login-funnel event (anonymous, aggregate)
@@ -115,6 +117,24 @@ const server = createServer((req, res) => {
       const out = await handleScanRequest(body, options, authorization);
       json(res, out.status, out.body);
     })();
+    return;
+  }
+  if (url.pathname === "/api/follows") {
+    void (async () => {
+      const raw = req.method === "GET" ? null : await readBody(req);
+      let body: unknown;
+      try {
+        body = raw === null ? null : (JSON.parse(raw) as unknown);
+      } catch {
+        body = null;
+      }
+      const out = await handleFollowsRequest(req.method ?? "GET", body, options, authorization);
+      json(res, out.status, out.body);
+    })();
+    return;
+  }
+  if (url.pathname === "/api/cron/monitor") {
+    void handleMonitorRequest(options, authorization, process.env.CRON_SECRET).then((out) => { json(res, out.status, out.body); });
     return;
   }
   if (url.pathname === "/api/scans") {

@@ -6,7 +6,7 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import { bearerToken, createStaticAuth, createSupabaseAuth } from "../src/web/auth.js";
 import { authConfigFromEnv, handlerOptionsFromEnv, STUB_TOKEN, STUB_USER } from "../src/web/env.js";
-import { handleCleanupRequest, handleEventRequest, handleReportRequest, handleScanRequest, handleScansRequest, type HandlerOptions, type ScanResponseOk } from "../src/web/handler.js";
+import { handleCleanupRequest, handleEventRequest, handleFollowsRequest, handleMonitorRequest, handleReportRequest, handleScanRequest, handleScansRequest, type HandlerOptions, type ScanResponseOk } from "../src/web/handler.js";
 import { createMemoryStore, createSupabaseStore, type ReportStore } from "../src/web/store.js";
 import { fixturePath, readJsonFixture } from "./helpers.js";
 
@@ -235,6 +235,23 @@ describe("createSupabaseStore", () => {
     await expect(bad.listScans(ALICE.id, 10)).rejects.toMatchObject({ name: "StoreError" });
   });
 
+  it("follows through the follow_repo function, lists due follows oldest first and patches only the given fields", async () => {
+    const followRow = { id: "55555555-5555-4555-8555-555555555555", user_id: ALICE.id, owner: "o", repo: "r", created_at: "2026-10-28T09:00:00+00:00", last_scan_at: null, last_report_id: null, last_verdict: null, last_new_urgent: 0, failures: 0, paused_reason: null };
+    const { store, calls } = postgrest((c) => (c.url.includes("/rpc/") ? new Response(JSON.stringify({ ok: true, follow: followRow })) : new Response(c.method === "GET" ? JSON.stringify([followRow]) : "")));
+    expect(await store.follow(ALICE.id, "o", "r", 10)).toMatchObject({ ok: true, follow: { id: followRow.id, owner: "o", lastScanAt: null } });
+    expect(calls[0]).toMatchObject({ method: "POST", url: "https://p.supabase.co/rest/v1/rpc/follow_repo", body: JSON.stringify({ p_user: ALICE.id, p_owner: "o", p_repo: "r", p_limit: 10 }) });
+    expect(await store.dueFollows("2026-10-27T14:00:00.000Z", 200)).toHaveLength(1);
+    expect(decodeURIComponent(calls[1]?.url ?? "")).toBe("https://p.supabase.co/rest/v1/follows?paused_reason=is.null&or=(last_scan_at.is.null,last_scan_at.lt.2026-10-27T14:00:00.000Z)&order=last_scan_at.asc.nullsfirst&limit=200");
+    await store.updateFollow(followRow.id, { failures: 2, lastScanAt: "2026-10-28T10:00:00.000Z" });
+    expect(calls[2]).toMatchObject({ method: "PATCH" });
+    expect(JSON.parse(calls[2]?.body ?? "{}")).toEqual({ last_scan_at: "2026-10-28T10:00:00.000Z", failures: 2 });
+    await store.unfollow(ALICE.id, "o", "r");
+    expect(calls[3]).toMatchObject({ method: "DELETE" });
+    expect(decodeURIComponent(calls[3]?.url ?? "")).toContain(`user_id=eq.${ALICE.id}&owner=eq.o&repo=eq.r`);
+    const full = postgrest(() => new Response(JSON.stringify({ ok: false, reason: "limit" }))).store;
+    expect(await full.follow(ALICE.id, "o", "x", 10)).toEqual({ ok: false, reason: "limit" });
+  });
+
   it("deletes expired rows and counts them; surfaces HTTP and network failures as StoreError", async () => {
     const { store, calls } = postgrest(() => new Response(JSON.stringify([{ id: "a" }, { id: "b" }])));
     expect(await store.purgeExpired()).toBe(2);
@@ -434,5 +451,95 @@ describe("handlerOptionsFromEnv", () => {
     const stub = handlerOptionsFromEnv({ env: { GATESEEKER_AUTH_STUB: "1" } });
     expect(await stub.auth?.verify(STUB_TOKEN)).toEqual(STUB_USER);
     expect(await stub.auth?.verify("other")).toBeNull();
+  });
+});
+
+// --- following and the daily monitor (docs/SPRINT_6.md 3.3, 3.4, tests 6 and 7) ---
+
+describe("follows", () => {
+  it("follows in lower case, validates names, enforces the limit and serves each account its own list", async () => {
+    const store = createMemoryStore();
+    const opts = { auth, store, followLimit: 2 };
+    expect(await handleFollowsRequest("POST", { owner: "Acme", repo: "Vibe" }, opts, "Bearer tok-alice")).toMatchObject({ status: 200, body: { ok: true, follows: [{ owner: "acme", repo: "vibe", lastScanAt: null }] } });
+    // Idempotent, case-insensitive.
+    expect(await handleFollowsRequest("POST", { owner: "acme", repo: "vibe" }, opts, "Bearer tok-alice")).toMatchObject({ status: 200, body: { follows: [{ owner: "acme" }] } });
+    expect(await handleFollowsRequest("POST", { owner: "-bad-", repo: "x" }, opts, "Bearer tok-alice")).toMatchObject({ status: 400, body: { error: { code: "invalid-url" } } });
+    expect(await handleFollowsRequest("POST", { owner: "o" }, opts, "Bearer tok-alice")).toMatchObject({ status: 400, body: { error: { code: "bad-request" } } });
+    await handleFollowsRequest("POST", { owner: "o", repo: "two" }, opts, "Bearer tok-alice");
+    expect(await handleFollowsRequest("POST", { owner: "o", repo: "three" }, opts, "Bearer tok-alice")).toMatchObject({ status: 429, body: { error: { message: expect.stringContaining("up to 2") as string } } });
+    expect(await handleFollowsRequest("GET", null, opts, "Bearer tok-bob")).toMatchObject({ status: 200, body: { follows: [] } });
+    expect(await handleFollowsRequest("GET", null, opts, null)).toMatchObject({ status: 401 });
+    expect(await handleFollowsRequest("DELETE", { owner: "ACME", repo: "vibe" }, opts, "Bearer tok-alice")).toMatchObject({ status: 200, body: { follows: [{ owner: "o", repo: "two" }] } });
+  });
+});
+
+describe("daily monitor", () => {
+  const CLEAN = targz({ "r-bbbb/package.json": '{"name":"r"}' });
+  const secret = "cron-secret";
+
+  async function followed(store: ReturnType<typeof createMemoryStore>) {
+    await handleFollowsRequest("POST", { owner: "o", repo: "r" }, { auth, store }, "Bearer tok-alice");
+  }
+
+  it("needs the cron secret", async () => {
+    expect(await handleMonitorRequest({ store: createMemoryStore() }, "Bearer nope", secret)).toMatchObject({ status: 401 });
+    expect(await handleMonitorRequest({ store: createMemoryStore() }, `Bearer ${secret}`, undefined)).toMatchObject({ status: 401 });
+  });
+
+  it("takes a baseline first, waits a day, then reports new urgent findings against the previous rescan", async () => {
+    let t = Date.parse("2026-11-01T06:00:00Z");
+    const now = () => new Date(t);
+    const store = createMemoryStore({ now });
+    await followed(store);
+    let archive = CLEAN;
+    const gh = { fetch: ((input: string | URL | Request, init?: RequestInit) => fakeGitHub(archive).fetch(input, init)) as typeof fetch };
+    const opts = { ...baseOptions(gh as ReturnType<typeof fakeGitHub>), store, now, cacheMs: 0 };
+
+    const first = await handleMonitorRequest(opts, `Bearer ${secret}`, secret);
+    expect(first).toMatchObject({ status: 200, body: { checked: 1, withNewUrgent: 0, failed: 0 } });
+    const [baseline] = await store.listFollows(ALICE.id);
+    expect(baseline).toMatchObject({ lastNewUrgent: 0, failures: 0, lastVerdict: "pass" });
+    const baselineId = baseline?.lastReportId;
+    expect(baselineId).toBeTruthy();
+    expect(await store.listScans(ALICE.id, 10)).toHaveLength(1);
+
+    // Same day: nothing is due.
+    expect(await handleMonitorRequest(opts, `Bearer ${secret}`, secret)).toMatchObject({ body: { checked: 0 } });
+
+    // Next day the repository gained a wildcard CORS with credentials (P1).
+    t += 21 * 3_600_000;
+    archive = ARCHIVE;
+    expect(await handleMonitorRequest(opts, `Bearer ${secret}`, secret)).toMatchObject({ status: 200, body: { checked: 1, withNewUrgent: 1 } });
+    const [after] = await store.listFollows(ALICE.id);
+    expect(after?.lastNewUrgent).toBe(1);
+    expect(after?.lastReportId).not.toBe(baselineId);
+  });
+
+  it("pauses a repository that disappeared and counts passing failures", async () => {
+    const store = createMemoryStore();
+    await followed(store);
+    // eslint-disable-next-line @typescript-eslint/require-await
+    const gone = (async () => new Response("{}", { status: 404 })) as typeof fetch;
+    expect(await handleMonitorRequest({ ...baseOptions({ fetch: gone, calls: [] }), store }, `Bearer ${secret}`, secret)).toMatchObject({ body: { checked: 1, paused: 1 } });
+    expect((await store.listFollows(ALICE.id))[0]?.pausedReason).toContain("not found");
+    // Paused follows are not due any more.
+    expect(await store.dueFollows("2999-01-01T00:00:00.000Z", 10)).toEqual([]);
+
+    const store2 = createMemoryStore();
+    await followed(store2);
+    const broken = fakeGitHub(Buffer.from("not a tarball"));
+    expect(await handleMonitorRequest({ ...baseOptions(broken), store: store2 }, `Bearer ${secret}`, secret)).toMatchObject({ body: { checked: 1, failed: 1 } });
+    expect((await store2.listFollows(ALICE.id))[0]).toMatchObject({ failures: 1, pausedReason: null });
+  });
+
+  it("stops before the time budget runs out and leaves the rest for the next call", async () => {
+    const store = createMemoryStore();
+    await handleFollowsRequest("POST", { owner: "o", repo: "one" }, { auth, store }, "Bearer tok-alice");
+    await handleFollowsRequest("POST", { owner: "o", repo: "two" }, { auth, store }, "Bearer tok-alice");
+    let clock = 0;
+    const gh = fakeGitHub(CLEAN);
+    const slow = { fetch: ((input: string | URL | Request, init?: RequestInit) => { clock += 25_000; return gh.fetch(input, init); }) as typeof fetch, calls: [] };
+    const r = await handleMonitorRequest({ ...baseOptions(slow), store, budgetMs: 100_000, reserveMs: 60_000, clock: () => clock }, `Bearer ${secret}`, secret);
+    expect(r).toMatchObject({ status: 200, body: { checked: 1, remaining: 1 } });
   });
 });

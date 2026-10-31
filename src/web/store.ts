@@ -49,6 +49,28 @@ export type NewScanSummary = Omit<ScanSummary, "id" | "createdAt">;
 
 export const SCAN_HISTORY_DAYS = 180;
 
+/** A repository an account follows (docs/SPRINT_6.md 3.3): what the daily monitor checks and what it found last. */
+export interface FollowRecord {
+  id: string;
+  userId: string;
+  owner: string;
+  repo: string;
+  createdAt: string;
+  lastScanAt: string | null;
+  lastReportId: string | null;
+  lastVerdict: "pass" | "fail" | "incomplete" | null;
+  /** New P1/P2 findings in the last rescan compared with the one before (what an alert email would report). */
+  lastNewUrgent: number;
+  /** Rescans in a row that could not complete. */
+  failures: number;
+  /** Set when monitoring stopped (the repository became private or was deleted). */
+  pausedReason: string | null;
+}
+
+export type FollowPatch = Partial<Pick<FollowRecord, "lastScanAt" | "lastReportId" | "lastVerdict" | "lastNewUrgent" | "failures" | "pausedReason">>;
+
+export type FollowResult = { ok: true; follow: FollowRecord } | { ok: false; reason: "limit" };
+
 /** Aggregate page events (login funnel): counted per UTC day, no user, IP or user agent. */
 export const EVENT_KINDS = ["login_view", "login_start", "signin_complete"] as const;
 export type EventKind = (typeof EVENT_KINDS)[number];
@@ -66,6 +88,13 @@ export interface ReportStore {
   recordScan(scan: NewScanSummary): Promise<void>;
   /** The account's history, newest first. */
   listScans(userId: string, limit: number): Promise<ScanSummary[]>;
+  /** Follows a repository; idempotent; refuses past `limit` repositories per account. */
+  follow(userId: string, owner: string, repo: string, limit: number): Promise<FollowResult>;
+  unfollow(userId: string, owner: string, repo: string): Promise<void>;
+  listFollows(userId: string): Promise<FollowRecord[]>;
+  /** Follows not paused and not rescanned since `before`, never-scanned first, then oldest. */
+  dueFollows(before: string, limit: number): Promise<FollowRecord[]>;
+  updateFollow(id: string, patch: FollowPatch): Promise<void>;
   /** Adds one to today's counter for this kind. */
   countEvent(kind: EventKind): Promise<void>;
 }
@@ -78,6 +107,7 @@ export function createMemoryStore(clock: StoreClock = {}): ReportStore & { event
   const now = clock.now ?? (() => new Date());
   const reports = new Map<string, StoredReport>();
   const scans: ScanSummary[] = [];
+  const follows: FollowRecord[] = [];
   const quota = new Map<string, { windowStart: number; used: number }>();
   const events = new Map<string, number>();
   let seq = 0;
@@ -145,6 +175,40 @@ export function createMemoryStore(clock: StoreClock = {}): ReportStore & { event
     // eslint-disable-next-line @typescript-eslint/require-await
     async listScans(userId, limit) {
       return scans.filter((s) => s.userId === userId).slice(0, limit);
+    },
+    // eslint-disable-next-line @typescript-eslint/require-await
+    async follow(userId, owner, repo, limit) {
+      const mine = follows.filter((f) => f.userId === userId);
+      const existing = mine.find((f) => f.owner.toLowerCase() === owner.toLowerCase() && f.repo.toLowerCase() === repo.toLowerCase());
+      if (existing) return { ok: true, follow: { ...existing } };
+      if (mine.length >= limit) return { ok: false, reason: "limit" };
+      seq += 1;
+      const f: FollowRecord = { id: `follow-${seq.toString(36)}`, userId, owner, repo, createdAt: now().toISOString(), lastScanAt: null, lastReportId: null, lastVerdict: null, lastNewUrgent: 0, failures: 0, pausedReason: null };
+      follows.push(f);
+      return { ok: true, follow: { ...f } };
+    },
+    // eslint-disable-next-line @typescript-eslint/require-await
+    async unfollow(userId, owner, repo) {
+      const i = follows.findIndex((f) => f.userId === userId && f.owner.toLowerCase() === owner.toLowerCase() && f.repo.toLowerCase() === repo.toLowerCase());
+      if (i >= 0) follows.splice(i, 1);
+    },
+    // eslint-disable-next-line @typescript-eslint/require-await
+    async listFollows(userId) {
+      // Copies, like rows from PostgREST: a caller never sees later updates through an old record.
+      return follows.filter((f) => f.userId === userId).map((f) => ({ ...f }));
+    },
+    // eslint-disable-next-line @typescript-eslint/require-await
+    async dueFollows(before, limit) {
+      return follows
+        .filter((f) => f.pausedReason === null && (f.lastScanAt === null || f.lastScanAt < before))
+        .sort((a, b) => (a.lastScanAt ?? "").localeCompare(b.lastScanAt ?? ""))
+        .slice(0, limit)
+        .map((f) => ({ ...f }));
+    },
+    // eslint-disable-next-line @typescript-eslint/require-await
+    async updateFollow(id, patch) {
+      const f = follows.find((x) => x.id === id);
+      if (f) Object.assign(f, patch);
     },
     // eslint-disable-next-line @typescript-eslint/require-await
     async countEvent(kind) {
@@ -299,5 +363,60 @@ export function createSupabaseStore(options: SupabaseStoreOptions): ReportStore 
     async countEvent(kind) {
       await call("/rest/v1/rpc/count_event", { method: "POST", body: JSON.stringify({ p_kind: kind }) });
     },
+    async follow(userId, owner, repo, limit) {
+      // Atomic in the database: the count and the insert happen in one function, so two tabs cannot pass the limit together.
+      const out = await call("/rest/v1/rpc/follow_repo", { method: "POST", body: JSON.stringify({ p_user: userId, p_owner: owner, p_repo: repo, p_limit: limit }) });
+      const parsed = z.looseObject({ ok: z.boolean(), follow: followRowSchema.nullable().optional() }).safeParse(out);
+      if (!parsed.success) throw new StoreError("follow_repo returned an unexpected shape", 200);
+      if (!parsed.data.ok || !parsed.data.follow) return { ok: false, reason: "limit" };
+      return { ok: true, follow: toFollow(parsed.data.follow) };
+    },
+    async unfollow(userId, owner, repo) {
+      // The handler stores owner and repo in lower case (GitHub names are case-insensitive), so an exact match is enough.
+      const q = new URLSearchParams({ user_id: `eq.${userId}`, owner: `eq.${owner}`, repo: `eq.${repo}` });
+      await call(`/rest/v1/follows?${q.toString()}`, { method: "DELETE" });
+    },
+    async listFollows(userId) {
+      const q = new URLSearchParams({ user_id: `eq.${userId}`, order: "created_at.asc" });
+      return parseFollows(await call(`/rest/v1/follows?${q.toString()}`, { method: "GET" }));
+    },
+    async dueFollows(before, limit) {
+      const q = new URLSearchParams({ paused_reason: "is.null", or: `(last_scan_at.is.null,last_scan_at.lt.${before})`, order: "last_scan_at.asc.nullsfirst", limit: String(limit) });
+      return parseFollows(await call(`/rest/v1/follows?${q.toString()}`, { method: "GET" }));
+    },
+    async updateFollow(id, patch) {
+      const row: Record<string, unknown> = {};
+      if (patch.lastScanAt !== undefined) row.last_scan_at = patch.lastScanAt;
+      if (patch.lastReportId !== undefined) row.last_report_id = patch.lastReportId;
+      if (patch.lastVerdict !== undefined) row.last_verdict = patch.lastVerdict;
+      if (patch.lastNewUrgent !== undefined) row.last_new_urgent = patch.lastNewUrgent;
+      if (patch.failures !== undefined) row.failures = patch.failures;
+      if (patch.pausedReason !== undefined) row.paused_reason = patch.pausedReason;
+      await call(`/rest/v1/follows?${new URLSearchParams({ id: `eq.${id}` }).toString()}`, { method: "PATCH", body: JSON.stringify(row) });
+    },
   };
+}
+
+const followRowSchema = z.looseObject({
+  id: z.string(),
+  user_id: z.string(),
+  owner: z.string(),
+  repo: z.string(),
+  created_at: z.string(),
+  last_scan_at: z.string().nullable(),
+  last_report_id: z.string().nullable(),
+  last_verdict: z.enum(["pass", "fail", "incomplete"]).nullable(),
+  last_new_urgent: z.number().int(),
+  failures: z.number().int(),
+  paused_reason: z.string().nullable(),
+});
+
+function toFollow(r: z.infer<typeof followRowSchema>): FollowRecord {
+  return { id: r.id, userId: r.user_id, owner: r.owner, repo: r.repo, createdAt: r.created_at, lastScanAt: r.last_scan_at, lastReportId: r.last_report_id, lastVerdict: r.last_verdict, lastNewUrgent: r.last_new_urgent, failures: r.failures, pausedReason: r.paused_reason };
+}
+
+function parseFollows(out: unknown): FollowRecord[] {
+  const parsed = z.array(followRowSchema).safeParse(out);
+  if (!parsed.success) throw new StoreError("follows query returned an unexpected shape", 200);
+  return parsed.data.map(toFollow);
 }

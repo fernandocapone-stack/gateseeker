@@ -1,9 +1,13 @@
 import { z } from "zod";
 
+import { ADVISORY_SOURCE_NAME, loadAdvisories } from "../intel/advisories.js";
+import { compareReports } from "../report/compare.js";
 import type { Report } from "../types.js";
+import { GATESEEKER_VERSION } from "../version.js";
+import { parseGitHubRepoUrl } from "./github-url.js";
 import { bearerToken, type AuthUser, type AuthVerifier } from "./auth.js";
 import { resolveGitHubRepository, scanGitHubRepository, type ServiceErrorCode, type ServiceOptions, type ServiceSuccess } from "./service.js";
-import { EVENT_KINDS, StoreError, type QuotaDecision, type ReportStore } from "./store.js";
+import { EVENT_KINDS, StoreError, type FollowRecord, type QuotaDecision, type ReportStore } from "./store.js";
 
 /**
  * Framework-agnostic HTTP handlers for the hosted service, shared by the
@@ -43,7 +47,7 @@ export interface ScanResponseError {
 
 export interface HttpResponse {
   status: number;
-  body: ScanResponseOk | ScanResponseError | ReportResponseOk | CleanupResponse | EventResponse | ScansResponse;
+  body: ScanResponseOk | ScanResponseError | ReportResponseOk | CleanupResponse | EventResponse | ScansResponse | FollowsResponse | MonitorResponse;
 }
 
 /** What is persisted per report: the scan answer minus id, quota and cache flag, which belong to the moment of the request. */
@@ -162,7 +166,7 @@ export async function handleScanRequest(body: unknown, options: HandlerOptions, 
   try {
     const cacheMs = options.cacheMs ?? DEFAULT_CACHE_MS;
     const hit = cacheMs > 0 ? await store.findRecent(repository.owner, repository.repo, repository.sha, cacheMs) : null;
-    if (hit) {
+    if (hit && (await reusable(hit.body as SavedScan, options))) {
       const id = await store.save({ userId: who.id, owner: repository.owner, repo: repository.repo, ref: repository.ref, sha: repository.sha, cachedFrom: hit.id, body: hit.body, expiresAt: expiresAt() });
       const saved = hit.body as SavedScan;
       await recordHistory(store, who.id, saved, id);
@@ -199,6 +203,32 @@ export async function handleScanRequest(body: unknown, options: HandlerOptions, 
  * person is waiting for: a failure here is swallowed (the report was saved and
  * is returned), and the Dashboard falls back to the browser's copy.
  */
+/** The curated feed digest a report was produced with, from its sources line; null when dependencies were not analyzed. */
+function advisoryDigestOf(report: PublicReport): string | null {
+  const source = report.sources.find((x) => x.name === ADVISORY_SOURCE_NAME);
+  return source ? (/digest ([0-9a-f]+)/.exec(source.endpoint)?.[1] ?? null) : null;
+}
+
+let bundledDigest: Promise<string | null> | null = null;
+
+function feedDigest(options: HandlerOptions): Promise<string | null> {
+  if (options.scan?.advisories) return Promise.resolve(options.scan.advisories.digest);
+  bundledDigest ??= loadAdvisories().then((a) => (a.origin === "none" ? null : a.digest)).catch(() => null);
+  return bundledDigest;
+}
+
+/**
+ * A saved report of the same commit is reused only when it was produced by
+ * this version of Gateseeker with the current curated feed (docs/SPRINT_6.md
+ * 3.4): a newly approved advisory must reach the next scan of an unchanged
+ * commit.
+ */
+async function reusable(body: SavedScan, options: HandlerOptions): Promise<boolean> {
+  if (body.report.gateseekerVersion !== GATESEEKER_VERSION) return false;
+  const used = advisoryDigestOf(body.report);
+  return used === null || used === (await feedDigest(options));
+}
+
 async function recordHistory(store: ReportStore, userId: string, saved: SavedScan, reportId: string): Promise<void> {
   try {
     const { repository, report } = saved;
@@ -279,6 +309,172 @@ export async function handleEventRequest(body: unknown, options: HandlerOptions)
   try {
     await options.store.countEvent(parsed.data.kind);
     return { status: 200, body: { ok: true } };
+  } catch (e) {
+    return storeFailure(e);
+  }
+}
+
+// --- following and the daily monitor (docs/SPRINT_6.md 3.3, 3.4) ------------
+
+export const FOLLOW_LIMIT = 10;
+const followSchema = z.object({ owner: z.string().max(100), repo: z.string().max(150) });
+
+export interface FollowView {
+  owner: string;
+  repo: string;
+  since: string;
+  lastScanAt: string | null;
+  lastReportId: string | null;
+  lastVerdict: "pass" | "fail" | "incomplete" | null;
+  lastNewUrgent: number;
+  failures: number;
+  pausedReason: string | null;
+}
+
+export interface FollowsResponse {
+  ok: true;
+  follows: FollowView[];
+}
+
+function followView(f: FollowRecord): FollowView {
+  return { owner: f.owner, repo: f.repo, since: f.createdAt, lastScanAt: f.lastScanAt, lastReportId: f.lastReportId, lastVerdict: f.lastVerdict, lastNewUrgent: f.lastNewUrgent, failures: f.failures, pausedReason: f.pausedReason };
+}
+
+/**
+ * /api/follows: GET lists the account's followed repositories; POST and
+ * DELETE take {owner, repo}, checked with the same strict grammar as a scan
+ * URL and stored in lower case (GitHub names are case-insensitive).
+ */
+export async function handleFollowsRequest(method: string, body: unknown, options: HandlerOptions & { followLimit?: number }, authorization?: string | null): Promise<HttpResponse> {
+  const store = options.store;
+  if (!store) return fail("not-found", "Following repositories is not available on this server.");
+  const who = await authenticate(options, authorization);
+  if (isResponse(who)) return who;
+  try {
+    if (method === "GET") return { status: 200, body: { ok: true, follows: (await store.listFollows(who.id)).map(followView) } };
+    const parsed = followSchema.safeParse(body);
+    if (!parsed.success) return fail("bad-request", "Send a JSON body with owner and repo.");
+    const url = parseGitHubRepoUrl(`https://github.com/${parsed.data.owner}/${parsed.data.repo}`);
+    if (!url.ok) return fail("invalid-url", url.reason);
+    const owner = url.value.owner.toLowerCase();
+    const repo = url.value.repo.toLowerCase();
+    if (method === "DELETE") {
+      await store.unfollow(who.id, owner, repo);
+      return { status: 200, body: { ok: true, follows: (await store.listFollows(who.id)).map(followView) } };
+    }
+    if (method !== "POST") return fail("bad-request", "Use GET, POST or DELETE.");
+    const limit = options.followLimit ?? FOLLOW_LIMIT;
+    const r = await store.follow(who.id, owner, repo, limit);
+    if (!r.ok) return fail("rate-limited", `You can follow up to ${String(limit)} repositories. Unfollow one first.`);
+    return { status: 200, body: { ok: true, follows: (await store.listFollows(who.id)).map(followView) } };
+  } catch (e) {
+    return storeFailure(e);
+  }
+}
+
+export interface MonitorResponse {
+  ok: true;
+  /** Followed repositories rescanned in this call. */
+  checked: number;
+  /** Due repositories left for the next call (time budget). */
+  remaining: number;
+  /** Rescans with new P1/P2 findings compared with the previous one. */
+  withNewUrgent: number;
+  failed: number;
+  paused: number;
+}
+
+export interface MonitorOptions {
+  /** Stop starting new rescans once less than this is left (ms); default 60 s, about one rescan. */
+  reserveMs?: number;
+  /** Total time for one call (ms); default 240 s, under the function limit. */
+  budgetMs?: number;
+  /** A follow is due when its last rescan is older than this (ms); default 20 h, so a daily cron always finds it. */
+  minIntervalMs?: number;
+  clock?: () => number;
+}
+
+/** Codes that mean the repository cannot be monitored any more, as opposed to a passing failure. */
+const PAUSING = new Set(["not-found", "private"]);
+
+async function monitorOne(f: FollowRecord, options: HandlerOptions, store: ReportStore, at: string): Promise<"ok" | "new-urgent" | "failed" | "paused"> {
+  const url = `https://github.com/${f.owner}/${f.repo}`;
+  const resolved = await resolveGitHubRepository({ ...options, url });
+  if (!resolved.ok) {
+    if (PAUSING.has(resolved.error.code)) {
+      await store.updateFollow(f.id, { pausedReason: resolved.error.code === "private" ? "The repository is private now." : "The repository was not found on GitHub.", lastScanAt: at });
+      return "paused";
+    }
+    await store.updateFollow(f.id, { failures: f.failures + 1, lastScanAt: at });
+    return "failed";
+  }
+  const repository = resolved.value;
+  const cacheMs = options.cacheMs ?? DEFAULT_CACHE_MS;
+  const hit = cacheMs > 0 ? await store.findRecent(repository.owner, repository.repo, repository.sha, cacheMs) : null;
+  let saved: SavedScan;
+  let cachedFrom: string | null = null;
+  if (hit && (await reusable(hit.body as SavedScan, options))) {
+    saved = hit.body as SavedScan;
+    cachedFrom = hit.id;
+  } else {
+    const result = await scanGitHubRepository({ ...options, url, resolved: repository });
+    if (!result.ok) {
+      await store.updateFollow(f.id, { failures: f.failures + 1, lastScanAt: at });
+      return "failed";
+    }
+    saved = { ok: true, repository: result.value.repository, archive: result.value.archive, timings: result.value.timings, report: toPublicReport(result.value.report) };
+  }
+  const now = options.now ?? (() => new Date());
+  const id = await store.save({ userId: f.userId, owner: repository.owner, repo: repository.repo, ref: repository.ref, sha: repository.sha, cachedFrom, body: saved, expiresAt: new Date(now().getTime() + (options.retentionDays ?? DEFAULT_RETENTION_DAYS) * 86_400_000).toISOString() });
+  await recordHistory(store, f.userId, saved, id);
+
+  // New P1/P2 findings against the previous rescan; the first rescan of a follow is the baseline and reports none.
+  let newUrgent = 0;
+  if (f.lastReportId) {
+    const previous = await store.get(f.lastReportId, f.userId);
+    if (previous) {
+      const c = compareReports((previous.body as SavedScan).report, saved.report);
+      newUrgent = c.newFindings.filter((x) => x.priority === "P1" || x.priority === "P2").length;
+    }
+  }
+  const incomplete = saved.report.gate.verdict === "incomplete";
+  await store.updateFollow(f.id, { lastScanAt: at, lastReportId: id, lastVerdict: saved.report.gate.verdict, lastNewUrgent: newUrgent, failures: incomplete ? f.failures + 1 : 0 });
+  if (incomplete) return "failed";
+  return newUrgent > 0 ? "new-urgent" : "ok";
+}
+
+/**
+ * GET /api/cron/monitor, called daily by Vercel Cron with the cron secret.
+ * Rescans the followed repositories that are due, oldest first, until the
+ * time budget runs low, and leaves the rest for the next call. Monitoring
+ * does not spend the hourly analysis quota of the account. Alert emails
+ * (step 5) read the follow rows this writes.
+ */
+export async function handleMonitorRequest(options: HandlerOptions & MonitorOptions, authorization: string | null | undefined, cronSecret: string | undefined): Promise<HttpResponse> {
+  if (!cronSecret || bearerToken(authorization) !== cronSecret) return fail("unauthorized", "Cron secret missing or wrong.");
+  const store = options.store;
+  const empty: MonitorResponse = { ok: true, checked: 0, remaining: 0, withNewUrgent: 0, failed: 0, paused: 0 };
+  if (!store) return { status: 200, body: empty };
+  const clock = options.clock ?? (() => Date.now());
+  const now = options.now ?? (() => new Date());
+  const deadline = clock() + (options.budgetMs ?? 240_000);
+  const reserve = options.reserveMs ?? 60_000;
+  const before = new Date(now().getTime() - (options.minIntervalMs ?? 20 * 3_600_000)).toISOString();
+  const out = { ...empty };
+  try {
+    const due = await store.dueFollows(before, 200);
+    for (const f of due) {
+      if (deadline - clock() < reserve) {
+        out.remaining = due.length - out.checked;
+        break;
+      }
+      const result = await monitorOne(f, options, store, now().toISOString());
+      out.checked += 1;
+      if (result === "new-urgent") out.withNewUrgent += 1;
+      if (result === "failed") out.failed += 1;
+      if (result === "paused") out.paused += 1;
+    }
+    return { status: 200, body: out };
   } catch (e) {
     return storeFailure(e);
   }

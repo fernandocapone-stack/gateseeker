@@ -325,6 +325,21 @@ test.describe("public page", () => {
     await expect(page.getByText(/Kept on your account for 180 days/)).toBeVisible();
   });
 
+  test("follows a repository from its report and lists it in Settings until unfollowed", async ({ page }) => {
+    await signIn(page);
+    await analyze(page, "https://github.com/acme/vibe");
+    await expect(page).toHaveURL(/\/r\/mem-/, { timeout: 30_000 });
+    const follow = page.getByRole("button", { name: "Follow" });
+    await follow.click();
+    await expect(page.getByRole("button", { name: "Following" })).toHaveAttribute("aria-pressed", "true");
+    await page.goto("/app/settings");
+    const list = page.getByRole("list", { name: "Followed repositories" });
+    await expect(list).toContainText("acme/vibe");
+    await expect(list).toContainText("Not checked yet");
+    await list.getByRole("button", { name: "Unfollow" }).click();
+    await expect(page.getByText("You are not following any repository.")).toBeVisible();
+  });
+
   test("offers the GitHub Action workflow with the analyzed repository named", async ({ page }) => {
     await signIn(page);
     await analyze(page, "https://github.com/acme/vibe");
