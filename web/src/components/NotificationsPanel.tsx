@@ -18,7 +18,8 @@ const TONE = { pass: "text-success", fail: "text-destructive", incomplete: "text
 function status(n: WorkspaceNotification): keyof typeof ICON {
   if (n.kind === "refused") return "refused";
   if (n.kind === "incomplete" || n.verdict === "incomplete") return "incomplete";
-  return n.verdict === "fail" ? "fail" : "pass";
+  // Urgent findings show as an alert even when the CI gate would pass (code checks in warning mode).
+  return n.verdict === "fail" || n.p1 + n.p2 > 0 ? "fail" : "pass";
 }
 
 function headline(n: WorkspaceNotification): string {
