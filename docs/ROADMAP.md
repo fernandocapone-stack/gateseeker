@@ -66,7 +66,7 @@ Most findings report a configuration, not a vulnerability. The wording says what
 
 ### Sprint 6 — The product watches for you
 This is the direct answer to "threats appear daily".
-Detailed scope in `docs/SPRINT_6.md` (proposal, 2026-10-31). Checked facts that changed the plan: Vercel Hobby runs cron at most once a day, so rescans are daily (better than the weekly first planned); Resend's free plan (3,000 emails a month, 100 a day) fits the 30-repository target, Postmark's (100 a month) does not. On 2026-10-31 the PO chose Brevo (existing account; free plan about 300 emails a day).
+Detailed scope in `docs/SPRINT_6.md` (approved by the PO on 2026-10-31). Checked facts that changed the plan: Vercel Hobby runs cron at most once a day, so rescans are daily (better than the weekly first planned); Resend's free plan (3,000 emails a month, 100 a day) fits the 30-repository target, Postmark's (100 a month) does not. On 2026-10-31 the PO chose Brevo (existing account; free plan about 300 emails a day).
 
 - **U3:** server-side history: "my repositories" and "my reports" in Supabase (RLS, no policies, service_role only, as today). `localStorage` becomes a cache.
 - **U4, compare:** each rescan of a repo shows *new / fixed / still open* against the previous one, reusing the CLI baseline logic.
@@ -100,7 +100,7 @@ Everything above keeps the non-negotiables: deterministic priority, `incomplete`
 
 ## 5. Decisions needed from the PO
 
-Approved by the PO on 2026-10-28: **1** (keep login and measure), **2** (Sprint 5 before Sprint 6), **7** (Track A1 now; A2 waits). On 2026-10-29: **5** (pnpm and Yarn are not a new ecosystem; Sprint 5 reads them) and the Sprint 5 scope. Open: 3, 4, 6, and the A2 source.
+Approved by the PO on 2026-10-28: **1** (keep login and measure), **2** (Sprint 5 before Sprint 6), **7** (Track A1 now; A2 waits). On 2026-10-29: **5** (pnpm and Yarn are not a new ecosystem; Sprint 5 reads them) and the Sprint 5 scope. On 2026-10-31: **3** (email provider: Brevo) and the Sprint 6 scope. Open: 4, 6, and the A2 source.
 
 1. **Anonymous scans on the page (U1):** reopen, with a stricter limit, or keep login? Recommendation (revised 2026-10-28): **launch with login and measure.** Our audience already has a GitHub account, so sign-in is one click; Home shows a real example report so the value is visible before login; and two aggregate counters (visits to `/login`, completed sign-ins) tell us the abandonment rate. If more than 40% of visitors abandon at login over the first 2 weeks or 100 visits, open anonymous scans: 3 per IP per day, a global daily cap, report shown but not saved, "sign in to save and follow this repo" as the next step.
 2. **Order:** Sprint 5 (fix) before Sprint 6 (monitoring)? Recommendation: yes. Monitoring sends people to reports, so the reports must first tell them how to fix.

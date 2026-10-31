@@ -1,6 +1,6 @@
 # Gateseeker — Sprint 6: o produto vigia por você
 
-> Status: **proposta para aprovação do PO**, escrita em 2026-10-31. Continua `docs/ROADMAP.md` (Sprint 6, itens U3, U4 e U6, decisão 3). Nenhum código começa antes da aprovação deste documento e das decisões do §8, que incluem o primeiro serviço de e-mail do projeto.
+> Status: **aprovada pelo PO em 2026-10-31** com as recomendações do §8: Brevo no plano gratuito, registrar o domínio, token de leitura do GitHub, Vercel gratuito nesta sprint e os limites iniciais propostos. Continua `docs/ROADMAP.md` (Sprint 6, itens U3, U4 e U6, decisão 3).
 > Última atualização: 2026-10-31
 
 Você é o Software Engineer responsável pelo Gateseeker. O stakeholder, Product Owner, Product Designer e auditor é o usuário humano, que não é desenvolvedor: apresente decisões em linguagem simples. As regras de trabalho, a stack e os controles de segurança das sprints anteriores continuam valendo. Esta sprint propõe um serviço hospedado novo (e-mail) e uma credencial nova (token de leitura do GitHub), ambos sujeitos à aprovação do §8.
