@@ -6,7 +6,7 @@ import { AuthProvider, useAuth } from "./auth-context";
 import { PageSkeleton, ReportSkeleton } from "./components/Skeletons";
 
 import { About } from "./pages/About";
-import { AppDemo } from "./pages/AppDemo";
+import { AnalyzePage } from "./pages/Analyze";
 import { Dashboard } from "./pages/Dashboard";
 import { DesignSystem } from "./pages/DesignSystem";
 import { GetStarted } from "./pages/GetStarted";
@@ -98,7 +98,7 @@ function Shell() {
   else if (path === "/resources") page = <Resources />;
   else if (path === "/get-started") page = <GetStarted />;
   else if (path === "/login") page = <Login />;
-  else if (path === "/app") page = <AppDemo />;
+  else if (path === "/app") page = <AnalyzePage />;
   else if (path === "/app/design-system") page = <DesignSystem />;
   else if (path === "/app/settings") page = <SettingsPage />;
   else if (path === "/app/dashboard") page = <Dashboard />;
@@ -108,7 +108,9 @@ function Shell() {
 
   const signedIn = auth.status === "signed-in" && auth.session !== null;
   // Signed in, the workspace pages get the application frame instead of the site header and footer.
-  const workspacePage: WorkspacePage | null = path === "/app" ? "analyze" : path === "/app/design-system" ? "design-system" : path === "/app/settings" ? "settings" : path === "/app/dashboard" ? "dashboard" : path === "/app/scans" ? "scans" : path === "/app/resources" ? "resources" : reportId ? "scan" : null;
+  // The analyze view is full screen: its own frame, no sidebar and no site header.
+  if (path === "/app") return page;
+  const workspacePage: WorkspacePage | null = path === "/app/design-system" ? "design-system" : path === "/app/settings" ? "settings" : path === "/app/dashboard" ? "dashboard" : path === "/app/scans" ? "scans" : path === "/app/resources" ? "resources" : reportId ? "scan" : null;
   if (signedIn && workspacePage) return <Workspace page={workspacePage}>{page}</Workspace>;
   // A public page must not flash for a signed-in visitor: render nothing until the session is known, then redirect (effect above).
   if ((PUBLIC_ROUTES.has(path) || path in WORKSPACE_COUNTERPART) && (auth.status === "loading" || signedIn)) return <div className="min-h-dvh bg-background" />;

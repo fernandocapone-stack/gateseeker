@@ -1,6 +1,8 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@gateseeker/ui-kit";
 import { useEffect, useState } from "react";
 
+import { clearScanNote, readScanNote } from "../scan-note";
+
 import { fetchReport, type ReportOutcome } from "../api";
 import { useAuth } from "../auth-context";
 import { CiSnippet } from "../components/CiSnippet";
@@ -18,6 +20,9 @@ import { useWorkspaceTitle } from "../Workspace";
 export function SavedReport({ id }: { id: string }) {
   const auth = useAuth();
   const [outcome, setOutcome] = useState<ReportOutcome | null>(null);
+  // Left by the analyze view when it opened this report right after an analysis.
+  const [note] = useState(() => readScanNote(id));
+  useEffect(() => { clearScanNote(id); }, [id]);
 
   useEffect(() => {
     if (auth.status !== "signed-in" || !auth.session) return;
@@ -71,8 +76,13 @@ export function SavedReport({ id }: { id: string }) {
       <div className="mb-4 print:hidden">
         <h1 className="sr-only">{name}</h1>
         <p className="text-label text-muted-foreground">
-          Commit <span className="font-mono">{outcome.saved.repository.sha.slice(0, 7)}</span> · Saved report <code>{outcome.id}</code>, kept until {new Date(outcome.expiresAt).toLocaleDateString()}. <Link href="/app" className="text-primary hover:underline">Analyze another repository</Link>.
+          Commit <span className="font-mono">{outcome.saved.repository.sha.slice(0, 7)}</span> · in your Scans until {new Date(outcome.expiresAt).toLocaleDateString()}.
         </p>
+        {note && (
+          <p className="mt-1 text-label text-muted-foreground" data-testid="saved-note">
+            {note.cached ? "Reused a report of this commit from the last 24 hours, so it did not count toward your limit." : note.used !== null && note.limit !== null ? `${String(note.used)} of ${String(note.limit)} analyses used this hour.` : ""}
+          </p>
+        )}
       </div>
       <ReportView response={response} elapsedMs={outcome.saved.timings.totalMs} />
       <div className="mt-6 print:hidden">

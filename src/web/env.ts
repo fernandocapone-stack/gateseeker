@@ -1,5 +1,6 @@
 import { createStaticAuth, createSupabaseAuth } from "./auth.js";
 import { DEFAULT_QUOTA, type HandlerOptions } from "./handler.js";
+import { parseGitHubRepoUrl } from "./github-url.js";
 import { createMemoryStore, createSupabaseStore } from "./store.js";
 
 /**
@@ -11,6 +12,7 @@ import { createMemoryStore, createSupabaseStore } from "./store.js";
  *                              production: Supabase Auth + Postgres store
  *   GATESEEKER_AUTH_STUB=1     local/e2e: fixed token "e2e-token", memory store (ignored when SUPABASE_URL is set)
  *   GATESEEKER_SCAN_LIMIT      analyses per user per hour (default 10)
+ *   GATESEEKER_EXAMPLE_REPO    public GitHub URL behind "Try an example" (default: this project)
  *   GITHUB_TOKEN               optional read-only token for the GitHub API limit
  *   GATESEEKER_GITHUB_API, GATESEEKER_GITHUB_ARCHIVE, GATESEEKER_OSV_ENDPOINT, GATESEEKER_PACKAGIST_BASE
  *                              upstream overrides (tests point them at stubs)
@@ -28,6 +30,14 @@ export function authConfigFromEnv(env: Env): AuthConfig {
   if (env.SUPABASE_URL && env.SUPABASE_ANON_KEY) return { mode: "supabase", url: env.SUPABASE_URL, anonKey: env.SUPABASE_ANON_KEY };
   if (env.GATESEEKER_AUTH_STUB === "1") return { mode: "stub", token: STUB_TOKEN };
   return { mode: "none" };
+}
+
+/** The repository behind the analyze view's "Try an example"; GATESEEKER_EXAMPLE_REPO when it is a valid public GitHub URL. */
+export const DEFAULT_EXAMPLE_REPO = "https://github.com/gateseeker-dev/gateseeker";
+
+export function exampleRepoFromEnv(env: Env): string {
+  const raw = env.GATESEEKER_EXAMPLE_REPO;
+  return raw !== undefined && parseGitHubRepoUrl(raw).ok ? raw.trim() : DEFAULT_EXAMPLE_REPO;
 }
 
 export interface EnvHandlerOptions {

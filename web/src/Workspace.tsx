@@ -6,12 +6,14 @@ import { useAuth } from "./auth-context";
 import { NotificationsPanel } from "./components/NotificationsPanel";
 import { useNotifications } from "./notifications";
 import { Link, navigate } from "./router";
+import { rememberWorkspacePath } from "./scan-note";
 
 /**
  * The signed-in workspace frame (Figma "Analyze Repository" and "Issues"):
  * header with the logo, the page title and the notifications bell, sidebar
  * with the workspace sections and the account menu (Settings, Sign out) at
- * the bottom. "Scans" lists every analysis; an opened scan (/r/<id>) keeps
+ * the bottom. The header carries the Analyze button (also "/" from anywhere),
+ * which opens the full-screen analyze view at /app. "Scans" lists every analysis; an opened scan (/r/<id>) keeps
  * that item active and puts a back button to the list before its title,
  * which the page sets with useWorkspaceTitle once the report has loaded. The design-system catalogue is product documentation: it uses the
  * frame but has no entry in the sidebar (open /app/design-system directly).
@@ -19,9 +21,9 @@ import { Link, navigate } from "./router";
  * skeletons so the page does not jump when it arrives.
  */
 
-export type WorkspacePage = "analyze" | "scans" | "scan" | "dashboard" | "resources" | "settings" | "design-system";
+export type WorkspacePage = "scans" | "scan" | "dashboard" | "resources" | "settings" | "design-system";
 
-const TITLE: Record<WorkspacePage, string> = { analyze: "Analyze repository", scans: "Scans", scan: "Scan", dashboard: "Dashboard", resources: "Resources", settings: "Settings", "design-system": "Design system" };
+const TITLE: Record<WorkspacePage, string> = { scans: "Scans", scan: "Scan", dashboard: "Dashboard", resources: "Resources", settings: "Settings", "design-system": "Design system" };
 
 const TitleContext = createContext<(title: string | null) => void>(() => undefined);
 
@@ -45,6 +47,24 @@ export function Workspace({ page, loading = false, children }: { page: Workspace
   const notifications = useNotifications(auth.session?.user.id ?? null);
   const [panel, setPanel] = useState(false);
   const closePanel = useCallback(() => { setPanel(false); }, []);
+
+  // The analyze view's back button returns here.
+  useEffect(() => {
+    rememberWorkspacePath(window.location.pathname);
+  });
+
+  // "/" opens the analyze view from anywhere in the workspace, unless the person is typing.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "/" || e.metaKey || e.ctrlKey || e.altKey) return;
+      const t = e.target as HTMLElement | null;
+      if (t && (t.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(t.tagName))) return;
+      e.preventDefault();
+      navigate("/app");
+    };
+    document.addEventListener("keydown", onKey);
+    return () => { document.removeEventListener("keydown", onKey); };
+  }, []);
 
   const account = loading ? (
     <div className="flex items-center gap-2.5 px-4 py-2" aria-hidden="true">
@@ -76,9 +96,6 @@ export function Workspace({ page, loading = false, children }: { page: Workspace
       <Link href="/app/dashboard" aria-current={page === "dashboard" ? "page" : undefined} className={navItemClass(page === "dashboard")}>
         <LayoutDashboard aria-hidden="true" /> Dashboard
       </Link>
-      <Link href="/app" aria-current={page === "analyze" ? "page" : undefined} className={navItemClass(page === "analyze")}>
-        <ScanSearch aria-hidden="true" /> Analyze repository
-      </Link>
       <Link href="/app/scans" aria-current={page === "scans" ? "page" : undefined} className={navItemClass(page === "scans" || page === "scan")}>
         <History aria-hidden="true" /> Scans
       </Link>
@@ -92,10 +109,15 @@ export function Workspace({ page, loading = false, children }: { page: Workspace
   const actions = loading ? (
     <Skeleton className="size-8" />
   ) : (
-    <Button variant="outline" size="icon" className="relative" aria-label={unread > 0 ? `Notifications, ${String(unread)} unread` : "Notifications"} aria-haspopup="dialog" onClick={() => { setPanel(true); }}>
+    <>
+      <Link href="/app" aria-label="Analyze a repository" title="Analyze a repository (/)" className={buttonVariants({ size: "sm" })}>
+        <ScanSearch aria-hidden="true" /> <span className="hidden sm:inline">Analyze</span>
+      </Link>
+      <Button variant="outline" size="icon" className="relative" aria-label={unread > 0 ? `Notifications, ${String(unread)} unread` : "Notifications"} aria-haspopup="dialog" onClick={() => { setPanel(true); }}>
       <Bell className="text-primary" aria-hidden="true" />
       {unread > 0 && <span className="absolute -top-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full border border-button-stroke bg-destructive px-1 text-micro font-medium text-destructive-foreground not-italic" aria-hidden="true">{unread > 9 ? "9+" : unread}</span>}
-    </Button>
+      </Button>
+    </>
   );
 
   const title =

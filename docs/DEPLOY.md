@@ -51,6 +51,7 @@ Projeto `gateseeker` → Settings → Environment Variables → Add. Para cada l
 | `SUPABASE_ANON_KEY` | anon key | |
 | `SUPABASE_SERVICE_ROLE_KEY` | service_role key | marque "Sensitive" |
 | `CRON_SECRET` | 32+ caracteres aleatórios (o botão "Generate" do próprio Vercel serve) | marque "Sensitive"; o cron diário de limpeza se autentica com ele |
+| `GATESEEKER_EXAMPLE_REPO` | opcional: URL de um repositório público do GitHub | o botão "Try an example" da tela de análise usa este repositório; sem a variável, usa `https://github.com/gateseeker-dev/gateseeker`. Um repositório de demonstração com achados reais mostra melhor o produto |
 | `GATESEEKER_SCAN_LIMIT` | `10` | análises por usuário por hora; opcional |
 | `GITHUB_TOKEN` | vazio por enquanto | decisão à parte: um token de leitura mínimo sobe o limite da API do GitHub de 60 para 5000 chamadas por hora |
 

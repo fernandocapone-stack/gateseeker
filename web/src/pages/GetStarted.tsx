@@ -14,7 +14,7 @@ export function GetStarted() {
       <div className="grid gap-6">
         <Step n={1} icon={<Globe aria-hidden="true" />} title="In the browser, no install">
           <CardDescription>
-            Paste the URL of a public GitHub repository in the <Link href="/login" className="text-primary hover:underline">demo workspace</Link> (free, rate limited). You get the full report in under a minute for most projects. Public repositories only, up to 50 MB compressed.
+            Sign in with GitHub, paste the URL of a public GitHub repository and get the full report in under a minute for most projects. Free and rate limited; public repositories only, up to 50 MB compressed. <Link href="/login?next=/app" className="text-primary hover:underline">Open the workspace</Link>.
           </CardDescription>
         </Step>
 
@@ -32,7 +32,7 @@ npx gateseeker@beta scan . --baseline base.lock   # compare with a previous lock
         <Card>
           <CardHeader>
             <CardTitle>What is next</CardTitle>
-            <CardDescription>Accounts, history across runs, private repositories and team gate policies are on the roadmap. The engine, the rules and the Action stay open source. If you want one of those, tell us which on GitHub; the waitlist opens with the next release.</CardDescription>
+            <CardDescription>Following a repository with an email when something new appears, private repositories and team gate policies are on the roadmap. The engine, the rules and the Action stay open source. Tell us what you need on GitHub.</CardDescription>
           </CardHeader>
         </Card>
       </div>
