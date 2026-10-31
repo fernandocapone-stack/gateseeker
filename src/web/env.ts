@@ -1,3 +1,4 @@
+import { MIN_FEED_KEY_LENGTH } from "../intel/feed-signature.js";
 import { createStaticAuth, createSupabaseAuth } from "./auth.js";
 import { DEFAULT_QUOTA, type HandlerOptions } from "./handler.js";
 import { parseGitHubRepoUrl } from "./github-url.js";
@@ -14,6 +15,7 @@ import { createMemoryStore, createSupabaseStore } from "./store.js";
  *   GATESEEKER_SCAN_LIMIT      analyses per user per hour (default 10)
  *   GATESEEKER_EXAMPLE_REPO    public GitHub URL behind "Try an example" (default: this project)
  *   GITHUB_TOKEN               optional read-only token for the GitHub API limit
+ *   GATESEEKER_FEED_KEY        HMAC key shared with the feed workflow (32+ characters); without it only the bundled advisory set is used
  *   GATESEEKER_GITHUB_API, GATESEEKER_GITHUB_ARCHIVE, GATESEEKER_OSV_ENDPOINT, GATESEEKER_PACKAGIST_BASE
  *                              upstream overrides (tests point them at stubs)
  */
@@ -67,6 +69,8 @@ export function handlerOptionsFromEnv({ env, workDir, fetch: fetchFn, requireAut
     ...(env.GATESEEKER_GITHUB_API ? { apiBase: env.GATESEEKER_GITHUB_API } : {}),
     ...(env.GATESEEKER_GITHUB_ARCHIVE ? { archiveBase: env.GATESEEKER_GITHUB_ARCHIVE } : {}),
     ...(env.GITHUB_TOKEN ? { githubToken: env.GITHUB_TOKEN } : {}),
+    // A short key is ignored rather than trusted: published sets are then not used and the reports say "bundled".
+    ...(env.GATESEEKER_FEED_KEY && env.GATESEEKER_FEED_KEY.length >= MIN_FEED_KEY_LENGTH ? { feedKey: env.GATESEEKER_FEED_KEY } : {}),
   };
   const auth = authConfigFromEnv(env);
   if (auth.mode === "supabase") {

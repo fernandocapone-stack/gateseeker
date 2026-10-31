@@ -17,6 +17,7 @@ Estado: projeto Vercel `gateseeker` criado em 2026-10-28 (conta pessoal, plano H
 4. Repita os passos 1 e 2 com `supabase/migrations/20261029000000_events.sql` (contadores do funil de login, 2026-10-29). Conferência: a tabela `events` aparece com o cadeado de RLS. **Até esta migração ser aplicada, a página continua funcionando, mas os contadores não são gravados** (o envio falha em silêncio).
 5. Repita os passos 1 e 2 com `supabase/migrations/20261031000000_scans.sql` (histórico de análises no servidor, Sprint 6). Conferência: a tabela `scans` aparece com o cadeado de RLS. **Até esta migração ser aplicada, as análises continuam funcionando e o Dashboard mostra a cópia do navegador**, com um aviso de que o histórico da conta não pôde ser carregado.
 6. Repita os passos 1 e 2 com `supabase/migrations/20261101000000_follows.sql` (repositórios seguidos e reanálise diária, Sprint 6). Conferência: a tabela `follows` aparece com o cadeado de RLS e a função `follow_repo` existe em Database → Functions. **Até esta migração ser aplicada, o botão Follow mostra um erro e o cron diário de monitoramento não faz nada**; o resto do serviço continua funcionando.
+7. Repita os passos 1 e 2 com `supabase/migrations/20261102000000_feed.sql` (feed publicado sem redeploy, Sprint 6). Conferência: a tabela `feed_sets` aparece com o cadeado de RLS e `follows` ganha as colunas `ecosystems` e `queued_at`. **Aplique antes de configurar a chave do feed (§5 e §5.1)**; sem ela, o serviço continua usando o conjunto embutido no build.
 
 Como ler o funil: Table Editor → `events`. Cada linha é um dia (UTC) e um tipo: `login_view` (página de login aberta por quem não está logado), `login_start` (clique em "Continue with GitHub") e `signin_complete` (voltou do GitHub logado). Abandono no login = 1 − `signin_complete` ÷ `login_view`, somando os dias. A regra da decisão 1 do `docs/ROADMAP.md`: acima de 40% em 2 semanas ou 100 visitas, reabrir análises anônimas com limite.
 
@@ -55,9 +56,20 @@ Projeto `gateseeker` → Settings → Environment Variables → Add. Para cada l
 | `CRON_SECRET` | 32+ caracteres aleatórios (o botão "Generate" do próprio Vercel serve) | marque "Sensitive"; os crons diários de limpeza e de monitoramento se autenticam com ele |
 | `GATESEEKER_EXAMPLE_REPO` | opcional: URL de um repositório público do GitHub | o botão "Try an example" da tela de análise usa este repositório; sem a variável, usa `https://github.com/gateseeker-dev/gateseeker`. Um repositório de demonstração com achados reais mostra melhor o produto |
 | `GATESEEKER_SCAN_LIMIT` | `10` | análises por usuário por hora; opcional |
+| `GATESEEKER_FEED_KEY` | 32+ caracteres aleatórios, **o mesmo valor** do segredo do GitHub em §5.1 | marque "Sensitive"; confere a assinatura dos conjuntos de advisories publicados pelo workflow. Sem ela (ou com menos de 32 caracteres), o serviço usa só o conjunto embutido no build |
 | `GITHUB_TOKEN` | vazio por enquanto | decisão à parte: um token de leitura mínimo sobe o limite da API do GitHub de 60 para 5000 chamadas por hora |
 
 Depois de salvar, Deployments → o deploy mais recente → menu ⋯ → Redeploy, para a função ler as variáveis novas.
+
+### 5.1. GitHub: publicação do feed
+
+O workflow `Feed publish` envia o conjunto aprovado ao serviço sempre que um registro aprovado entra na `main`. Ele não guarda nenhuma chave do banco: só assina o conjunto.
+
+1. Repositório `gateseeker-dev/gateseeker` → Settings → Secrets and variables → Actions → aba Secrets → New repository secret: nome `GATESEEKER_FEED_KEY`, valor igual ao da variável do Vercel.
+2. Mesma tela, aba Variables → New repository variable: nome `GATESEEKER_SERVICE_URL`, valor `https://gateseeker.vercel.app` (sem barra no fim).
+3. Actions → Feed publish → Run workflow, para publicar o conjunto atual uma vez.
+
+Sem o segredo ou a variável, o workflow termina com um aviso e não publica nada; o site continua com o conjunto do último deploy.
 
 ## 6. Vercel: proteção
 
@@ -69,6 +81,7 @@ Enquanto a área autenticada não existir, Settings → Deployment Protection �
 - Entrar com GitHub em `/login`, analisar um repositório público em `/app`, abrir o relatório salvo pelo link `/r/<id>`.
 - No relatório, a linha de fontes mostra `gateseeker-advisories: bundled (N approved, digest …)`. Se aparecer `none` ou a limitação "No curated advisory set was available", o `dist/advisories.json` não entrou no pacote da função: a página está consultando só o OSV.
 - Supabase → Table Editor → `reports` mostra a linha; `scan_quota` mostra o contador.
+- Depois de rodar o workflow `Feed publish`: o log mostra `Published N approved record(s), digest …`; Supabase → `feed_sets` tem a linha; uma análise nova mostra `gateseeker-advisories: published <data> (N approved, digest …)` na linha de fontes. Se a assinatura de um conjunto guardado não conferir, o relatório volta a dizer `bundled` e lista o motivo entre os erros.
 - Vercel → Settings → Cron Jobs lista `/api/cron/cleanup` às 03:00 UTC e `/api/cron/monitor` às 06:00 UTC (no plano gratuito o horário é aproximado).
 
 ## Custos e limites que importam

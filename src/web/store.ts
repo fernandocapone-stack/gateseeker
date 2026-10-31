@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import type { SignedFeed } from "../intel/feed-signature.js";
+
 /**
  * Persistence for the hosted service: saved reports (30-day retention), the
  * per-user scan quota and the per-commit cache. Two implementations: in
@@ -65,9 +67,13 @@ export interface FollowRecord {
   failures: number;
   /** Set when monitoring stopped (the repository became private or was deleted). */
   pausedReason: string | null;
+  /** Ecosystems of the repository at its last rescan ("npm", "Packagist"); null before the first. */
+  ecosystems: string[] | null;
+  /** Set when a newly published advisory for one of its ecosystems put it in front of the daily order (docs/SPRINT_6.md 3.4). */
+  queuedAt: string | null;
 }
 
-export type FollowPatch = Partial<Pick<FollowRecord, "lastScanAt" | "lastReportId" | "lastVerdict" | "lastNewUrgent" | "failures" | "pausedReason">>;
+export type FollowPatch = Partial<Pick<FollowRecord, "lastScanAt" | "lastReportId" | "lastVerdict" | "lastNewUrgent" | "failures" | "pausedReason" | "ecosystems" | "queuedAt">>;
 
 export type FollowResult = { ok: true; follow: FollowRecord } | { ok: false; reason: "limit" };
 
@@ -92,11 +98,25 @@ export interface ReportStore {
   follow(userId: string, owner: string, repo: string, limit: number): Promise<FollowResult>;
   unfollow(userId: string, owner: string, repo: string): Promise<void>;
   listFollows(userId: string): Promise<FollowRecord[]>;
-  /** Follows not paused and not rescanned since `before`, never-scanned first, then oldest. */
+  /** Follows not paused that are queued or not rescanned since `before`: queued first, then never-scanned, then oldest. */
   dueFollows(before: string, limit: number): Promise<FollowRecord[]>;
   updateFollow(id: string, patch: FollowPatch): Promise<void>;
+  /** Queues the follows (not paused) whose last rescan saw one of these ecosystems; returns how many. */
+  queueFollows(ecosystems: string[], at: string): Promise<number>;
+  /** Stores a published advisory set as received (already verified by the handler). */
+  saveFeed(feed: SignedFeed): Promise<void>;
+  /** The most recently published advisory set, unverified: the caller checks the signature. */
+  latestFeed(): Promise<SignedFeed | null>;
   /** Adds one to today's counter for this kind. */
   countEvent(kind: EventKind): Promise<void>;
+}
+
+/** Queued follows first, earliest queued first; unqueued ones after (the "nulls last" of the Supabase query). */
+function byQueue(a: string | null, b: string | null): number {
+  if (a === b) return 0;
+  if (a === null) return 1;
+  if (b === null) return -1;
+  return a < b ? -1 : 1;
 }
 
 export interface StoreClock {
@@ -108,6 +128,7 @@ export function createMemoryStore(clock: StoreClock = {}): ReportStore & { event
   const reports = new Map<string, StoredReport>();
   const scans: ScanSummary[] = [];
   const follows: FollowRecord[] = [];
+  const feeds: SignedFeed[] = [];
   const quota = new Map<string, { windowStart: number; used: number }>();
   const events = new Map<string, number>();
   let seq = 0;
@@ -183,7 +204,7 @@ export function createMemoryStore(clock: StoreClock = {}): ReportStore & { event
       if (existing) return { ok: true, follow: { ...existing } };
       if (mine.length >= limit) return { ok: false, reason: "limit" };
       seq += 1;
-      const f: FollowRecord = { id: `follow-${seq.toString(36)}`, userId, owner, repo, createdAt: now().toISOString(), lastScanAt: null, lastReportId: null, lastVerdict: null, lastNewUrgent: 0, failures: 0, pausedReason: null };
+      const f: FollowRecord = { id: `follow-${seq.toString(36)}`, userId, owner, repo, createdAt: now().toISOString(), lastScanAt: null, lastReportId: null, lastVerdict: null, lastNewUrgent: 0, failures: 0, pausedReason: null, ecosystems: null, queuedAt: null };
       follows.push(f);
       return { ok: true, follow: { ...f } };
     },
@@ -200,8 +221,8 @@ export function createMemoryStore(clock: StoreClock = {}): ReportStore & { event
     // eslint-disable-next-line @typescript-eslint/require-await
     async dueFollows(before, limit) {
       return follows
-        .filter((f) => f.pausedReason === null && (f.lastScanAt === null || f.lastScanAt < before))
-        .sort((a, b) => (a.lastScanAt ?? "").localeCompare(b.lastScanAt ?? ""))
+        .filter((f) => f.pausedReason === null && (f.queuedAt !== null || f.lastScanAt === null || f.lastScanAt < before))
+        .sort((a, b) => byQueue(a.queuedAt, b.queuedAt) || (a.lastScanAt ?? "").localeCompare(b.lastScanAt ?? ""))
         .slice(0, limit)
         .map((f) => ({ ...f }));
     },
@@ -209,6 +230,25 @@ export function createMemoryStore(clock: StoreClock = {}): ReportStore & { event
     async updateFollow(id, patch) {
       const f = follows.find((x) => x.id === id);
       if (f) Object.assign(f, patch);
+    },
+    // eslint-disable-next-line @typescript-eslint/require-await
+    async queueFollows(ecosystems, at) {
+      let n = 0;
+      for (const f of follows) {
+        if (f.pausedReason !== null || !f.ecosystems?.some((e) => ecosystems.includes(e))) continue;
+        f.queuedAt = at;
+        n += 1;
+      }
+      return n;
+    },
+    // eslint-disable-next-line @typescript-eslint/require-await
+    async saveFeed(feed) {
+      feeds.push({ ...feed });
+    },
+    // eslint-disable-next-line @typescript-eslint/require-await
+    async latestFeed() {
+      const latest = [...feeds].sort((a, b) => b.publishedAt.localeCompare(a.publishedAt))[0];
+      return latest ? { ...latest } : null;
     },
     // eslint-disable-next-line @typescript-eslint/require-await
     async countEvent(kind) {
@@ -381,7 +421,7 @@ export function createSupabaseStore(options: SupabaseStoreOptions): ReportStore 
       return parseFollows(await call(`/rest/v1/follows?${q.toString()}`, { method: "GET" }));
     },
     async dueFollows(before, limit) {
-      const q = new URLSearchParams({ paused_reason: "is.null", or: `(last_scan_at.is.null,last_scan_at.lt.${before})`, order: "last_scan_at.asc.nullsfirst", limit: String(limit) });
+      const q = new URLSearchParams({ paused_reason: "is.null", or: `(queued_at.not.is.null,last_scan_at.is.null,last_scan_at.lt.${before})`, order: "queued_at.asc.nullslast,last_scan_at.asc.nullsfirst", limit: String(limit) });
       return parseFollows(await call(`/rest/v1/follows?${q.toString()}`, { method: "GET" }));
     },
     async updateFollow(id, patch) {
@@ -392,7 +432,27 @@ export function createSupabaseStore(options: SupabaseStoreOptions): ReportStore 
       if (patch.lastNewUrgent !== undefined) row.last_new_urgent = patch.lastNewUrgent;
       if (patch.failures !== undefined) row.failures = patch.failures;
       if (patch.pausedReason !== undefined) row.paused_reason = patch.pausedReason;
+      if (patch.ecosystems !== undefined) row.ecosystems = patch.ecosystems;
+      if (patch.queuedAt !== undefined) row.queued_at = patch.queuedAt;
       await call(`/rest/v1/follows?${new URLSearchParams({ id: `eq.${id}` }).toString()}`, { method: "PATCH", body: JSON.stringify(row) });
+    },
+    async queueFollows(ecosystems, at) {
+      // Ecosystem names come from the advisory schema's closed list; anything else would break the array literal and is dropped.
+      const names = ecosystems.filter((e) => /^[A-Za-z.]+$/.test(e));
+      if (names.length === 0) return 0;
+      const q = new URLSearchParams({ paused_reason: "is.null", ecosystems: `ov.{${names.join(",")}}`, select: "id" });
+      const out = await call(`/rest/v1/follows?${q.toString()}`, { method: "PATCH", body: JSON.stringify({ queued_at: at }), prefer: "return=representation" });
+      return Array.isArray(out) ? out.length : 0;
+    },
+    async saveFeed(feed) {
+      await call("/rest/v1/feed_sets", { method: "POST", body: JSON.stringify({ published_at: feed.publishedAt, digest: feed.digest, payload: feed.payload, signature: feed.signature }) });
+    },
+    async latestFeed() {
+      const q = new URLSearchParams({ select: "published_at,digest,payload,signature", order: "published_at.desc", limit: "1" });
+      const parsed = z.array(feedRowSchema).safeParse(await call(`/rest/v1/feed_sets?${q.toString()}`, { method: "GET" }));
+      if (!parsed.success) throw new StoreError("feed_sets query returned an unexpected shape", 200);
+      const row = parsed.data[0];
+      return row ? { publishedAt: row.published_at, digest: row.digest, payload: row.payload, signature: row.signature } : null;
     },
   };
 }
@@ -409,10 +469,15 @@ const followRowSchema = z.looseObject({
   last_new_urgent: z.number().int(),
   failures: z.number().int(),
   paused_reason: z.string().nullable(),
+  // Added by 20261102000000_feed.sql; optional so the follow list keeps working before that migration.
+  ecosystems: z.array(z.string()).nullable().optional(),
+  queued_at: z.string().nullable().optional(),
 });
 
+const feedRowSchema = z.looseObject({ published_at: z.string(), digest: z.string(), payload: z.string(), signature: z.string() });
+
 function toFollow(r: z.infer<typeof followRowSchema>): FollowRecord {
-  return { id: r.id, userId: r.user_id, owner: r.owner, repo: r.repo, createdAt: r.created_at, lastScanAt: r.last_scan_at, lastReportId: r.last_report_id, lastVerdict: r.last_verdict, lastNewUrgent: r.last_new_urgent, failures: r.failures, pausedReason: r.paused_reason };
+  return { id: r.id, userId: r.user_id, owner: r.owner, repo: r.repo, createdAt: r.created_at, lastScanAt: r.last_scan_at, lastReportId: r.last_report_id, lastVerdict: r.last_verdict, lastNewUrgent: r.last_new_urgent, failures: r.failures, pausedReason: r.paused_reason, ecosystems: r.ecosystems ?? null, queuedAt: r.queued_at ?? null };
 }
 
 function parseFollows(out: unknown): FollowRecord[] {

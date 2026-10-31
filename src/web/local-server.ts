@@ -4,7 +4,7 @@ import { dirname, extname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { authConfigFromEnv, exampleRepoFromEnv, handlerOptionsFromEnv } from "./env.js";
-import { handleCleanupRequest, handleEventRequest, handleFollowsRequest, handleMonitorRequest, handleReportRequest, handleScanRequest, handleScansRequest } from "./handler.js";
+import { handleCleanupRequest, handleEventRequest, handleFeedPublishedRequest, handleFollowsRequest, handleMonitorRequest, handleReportRequest, handleScanRequest, handleScansRequest } from "./handler.js";
 
 /**
  * Development and end-to-end server for the public page: serves web/dist and
@@ -16,6 +16,7 @@ import { handleCleanupRequest, handleEventRequest, handleFollowsRequest, handleM
  *   GET  /api/reports/<id>    a saved report of the signed-in user
  *   GET/POST/DELETE /api/follows  followed repositories of the signed-in user
  *   GET  /api/cron/monitor    rescan due followed repositories (bearer CRON_SECRET)
+ *   POST /api/feed/published  store a signed advisory set, queue and rescan (GATESEEKER_FEED_KEY)
  *   GET  /api/scans           the signed-in user's analysis history
  *   GET  /api/cron/cleanup    purge expired reports (bearer CRON_SECRET)
  *   POST /api/event           count a login-funnel event (anonymous, aggregate)
@@ -51,13 +52,13 @@ function json(res: ServerResponse, status: number, body: unknown): void {
   res.end(JSON.stringify(body));
 }
 
-function readBody(req: IncomingMessage): Promise<string | null> {
+function readBody(req: IncomingMessage, max = MAX_BODY): Promise<string | null> {
   return new Promise((resolveBody) => {
     let size = 0;
     const chunks: Buffer[] = [];
     req.on("data", (c: Buffer) => {
       size += c.length;
-      if (size > MAX_BODY) {
+      if (size > max) {
         resolveBody(null);
         req.destroy();
         return;
@@ -129,6 +130,24 @@ const server = createServer((req, res) => {
         body = null;
       }
       const out = await handleFollowsRequest(req.method ?? "GET", body, options, authorization);
+      json(res, out.status, out.body);
+    })();
+    return;
+  }
+  if (url.pathname === "/api/feed/published") {
+    if (req.method !== "POST") {
+      json(res, 405, { ok: false, error: { code: "bad-request", message: "POST only." } });
+      return;
+    }
+    void (async () => {
+      const raw = await readBody(req, 4_500_000);
+      let body: unknown;
+      try {
+        body = raw === null ? null : (JSON.parse(raw) as unknown);
+      } catch {
+        body = null;
+      }
+      const out = await handleFeedPublishedRequest(body, options);
       json(res, out.status, out.body);
     })();
     return;

@@ -1,0 +1,53 @@
+name: Feed publish
+
+# Sends the approved advisory set to the hosted service when approved records
+# reach main, so the site uses it without waiting for a redeploy and rescans
+# the followed repositories it affects (docs/SPRINT_6.md 3.5). The set is
+# signed with GATESEEKER_FEED_KEY, a repository secret shared only with the
+# service; this workflow holds no database key and has read-only permissions.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "advisories/approved/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: feed-publish
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+
+      - name: Validate records
+        run: node dist/intel-cli.js validate
+
+      - name: Sign and publish the approved set
+        env:
+          GATESEEKER_FEED_KEY: ${{ secrets.GATESEEKER_FEED_KEY }}
+          GATESEEKER_SERVICE_URL: ${{ vars.GATESEEKER_SERVICE_URL }}
+        run: |
+          set -euo pipefail
+          if [ -z "${GATESEEKER_FEED_KEY}" ] || [ -z "${GATESEEKER_SERVICE_URL}" ]; then
+            echo "::warning::GATESEEKER_FEED_KEY (secret) or GATESEEKER_SERVICE_URL (variable) is not set; the set was not published. The site keeps the set bundled at its last deploy."
+            exit 0
+          fi
+          node dist/intel-cli.js publish-feed --url "${GATESEEKER_SERVICE_URL}"

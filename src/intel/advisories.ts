@@ -64,6 +64,12 @@ export function parseAdvisoryJson(text: string, label: string): { advisories: Ad
   return { advisories, problems };
 }
 
+/** An advisory set from JSON text, as the bundled file or a published set (docs/SPRINT_6.md 3.5). */
+export function advisorySetFromText(text: string, origin: string, label = origin): AdvisorySet {
+  const r = parseAdvisoryJson(text, label);
+  return finish(r.advisories, origin, r.problems);
+}
+
 export async function loadAdvisoryDirectory(dir: string): Promise<{ advisories: Advisory[]; problems: string[] }> {
   const advisories: Advisory[] = [];
   const problems: string[] = [];

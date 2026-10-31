@@ -1,6 +1,8 @@
 import { z } from "zod";
 
-import { ADVISORY_SOURCE_NAME, loadAdvisories } from "../intel/advisories.js";
+import { ADVISORY_SOURCE_NAME, advisorySetFromText, loadAdvisories, type AdvisorySet } from "../intel/advisories.js";
+import type { Advisory } from "../intel/advisory-schema.js";
+import { verifyFeed } from "../intel/feed-signature.js";
 import { compareReports } from "../report/compare.js";
 import type { Report } from "../types.js";
 import { GATESEEKER_VERSION } from "../version.js";
@@ -47,7 +49,7 @@ export interface ScanResponseError {
 
 export interface HttpResponse {
   status: number;
-  body: ScanResponseOk | ScanResponseError | ReportResponseOk | CleanupResponse | EventResponse | ScansResponse | FollowsResponse | MonitorResponse;
+  body: ScanResponseOk | ScanResponseError | ReportResponseOk | CleanupResponse | EventResponse | ScansResponse | FollowsResponse | MonitorResponse | FeedPublishedResponse;
 }
 
 /** What is persisted per report: the scan answer minus id, quota and cache flag, which belong to the moment of the request. */
@@ -88,6 +90,8 @@ export interface HandlerOptions extends Omit<ServiceOptions, "url"> {
   now?: () => Date;
   /** Set when the deployment demands auth but none is configured: every request answers 503 until the environment is fixed. */
   closed?: boolean;
+  /** HMAC key of published advisory sets (GATESEEKER_FEED_KEY); without it only the bundled set is used. */
+  feedKey?: string;
 }
 
 const bodySchema = z.object({ url: z.string().max(400) });
@@ -146,6 +150,7 @@ export async function handleScanRequest(body: unknown, options: HandlerOptions, 
 
   const who = await authenticate(options, authorization);
   if (isResponse(who)) return who;
+  options = await withFeed(options);
 
   const store = options.store;
   const now = options.now ?? (() => new Date());
@@ -209,12 +214,73 @@ function advisoryDigestOf(report: PublicReport): string | null {
   return source ? (/digest ([0-9a-f]+)/.exec(source.endpoint)?.[1] ?? null) : null;
 }
 
-let bundledDigest: Promise<string | null> | null = null;
+async function feedDigest(options: HandlerOptions): Promise<string | null> {
+  const set = await currentAdvisories(options);
+  return set.origin === "none" ? null : set.digest;
+}
 
-function feedDigest(options: HandlerOptions): Promise<string | null> {
-  if (options.scan?.advisories) return Promise.resolve(options.scan.advisories.digest);
-  bundledDigest ??= loadAdvisories().then((a) => (a.origin === "none" ? null : a.digest)).catch(() => null);
-  return bundledDigest;
+// --- curated feed without a redeploy (docs/SPRINT_6.md 3.5) ------------------
+
+/** How long one function instance keeps the published set before reading the database again. */
+const FEED_TTL_MS = 5 * 60_000;
+/** A signed set older (or newer) than this when it arrives is refused, so an old set cannot be sent again to roll the feed back. */
+const FEED_MAX_SKEW_MS = 10 * 60_000;
+
+let bundled: Promise<AdvisorySet> | null = null;
+const liveFeed = new WeakMap<ReportStore, { at: number; set: Promise<AdvisorySet> }>();
+
+function bundledAdvisories(): Promise<AdvisorySet> {
+  bundled ??= loadAdvisories();
+  return bundled;
+}
+
+async function loadPublished(store: ReportStore, key: string): Promise<AdvisorySet> {
+  const fallback = async (problem: string | null): Promise<AdvisorySet> => {
+    const b = await bundledAdvisories();
+    return problem ? { ...b, problems: [...b.problems, problem] } : b;
+  };
+  let feed;
+  try {
+    feed = await store.latestFeed();
+  } catch {
+    return fallback("the published set could not be read from the database; the bundled set was used.");
+  }
+  if (!feed) return fallback(null);
+  if (!verifyFeed(key, feed)) return fallback("the latest published set failed signature verification and was ignored; the bundled set was used.");
+  const set = advisorySetFromText(feed.payload, `published ${feed.publishedAt}`, "published set");
+  if (set.digest !== feed.digest) return fallback("the latest published set does not match its digest and was ignored; the bundled set was used.");
+  return set;
+}
+
+/**
+ * The curated set a scan uses: the latest published set when its signature
+ * and digest check out, otherwise the set bundled in the build. The report's
+ * sources line names which one ("published <time>" or "bundled"), and a
+ * rejected published set is listed among the report's errors.
+ */
+export function currentAdvisories(options: HandlerOptions): Promise<AdvisorySet> {
+  if (options.scan?.advisories) return Promise.resolve(options.scan.advisories);
+  const { store, feedKey } = options;
+  if (!store || !feedKey) return bundledAdvisories();
+  const t = (options.now ?? (() => new Date()))().getTime();
+  const cached = liveFeed.get(store);
+  if (cached && t - cached.at < FEED_TTL_MS) return cached.set;
+  const set = loadPublished(store, feedKey);
+  liveFeed.set(store, { at: t, set });
+  return set;
+}
+
+async function withFeed<T extends HandlerOptions>(options: T): Promise<T> {
+  if (options.scan?.advisories) return options;
+  return { ...options, scan: { ...options.scan, advisories: await currentAdvisories(options) } };
+}
+
+/** Ecosystems with an advisory that is new or changed since the previous set; removed advisories cannot create findings. */
+function changedEcosystems(previous: readonly Advisory[] | null, next: readonly Advisory[]): string[] {
+  const before = new Map((previous ?? []).map((a) => [a.id, JSON.stringify(a)]));
+  const out = new Set<string>();
+  for (const a of next) if (previous === null || before.get(a.id) !== JSON.stringify(a)) out.add(a.ecosystem);
+  return [...out].sort();
 }
 
 /**
@@ -402,10 +468,10 @@ async function monitorOne(f: FollowRecord, options: HandlerOptions, store: Repor
   const resolved = await resolveGitHubRepository({ ...options, url });
   if (!resolved.ok) {
     if (PAUSING.has(resolved.error.code)) {
-      await store.updateFollow(f.id, { pausedReason: resolved.error.code === "private" ? "The repository is private now." : "The repository was not found on GitHub.", lastScanAt: at });
+      await store.updateFollow(f.id, { pausedReason: resolved.error.code === "private" ? "The repository is private now." : "The repository was not found on GitHub.", lastScanAt: at, queuedAt: null });
       return "paused";
     }
-    await store.updateFollow(f.id, { failures: f.failures + 1, lastScanAt: at });
+    await store.updateFollow(f.id, { failures: f.failures + 1, lastScanAt: at, queuedAt: null });
     return "failed";
   }
   const repository = resolved.value;
@@ -419,7 +485,7 @@ async function monitorOne(f: FollowRecord, options: HandlerOptions, store: Repor
   } else {
     const result = await scanGitHubRepository({ ...options, url, resolved: repository });
     if (!result.ok) {
-      await store.updateFollow(f.id, { failures: f.failures + 1, lastScanAt: at });
+      await store.updateFollow(f.id, { failures: f.failures + 1, lastScanAt: at, queuedAt: null });
       return "failed";
     }
     saved = { ok: true, repository: result.value.repository, archive: result.value.archive, timings: result.value.timings, report: toPublicReport(result.value.report) };
@@ -438,7 +504,8 @@ async function monitorOne(f: FollowRecord, options: HandlerOptions, store: Repor
     }
   }
   const incomplete = saved.report.gate.verdict === "incomplete";
-  await store.updateFollow(f.id, { lastScanAt: at, lastReportId: id, lastVerdict: saved.report.gate.verdict, lastNewUrgent: newUrgent, failures: incomplete ? f.failures + 1 : 0 });
+  const ecosystems = [...new Set(saved.report.project.lockfiles.map((l) => (l.kind === "composer.lock" ? "Packagist" : "npm")))].sort();
+  await store.updateFollow(f.id, { lastScanAt: at, lastReportId: id, lastVerdict: saved.report.gate.verdict, lastNewUrgent: newUrgent, failures: incomplete ? f.failures + 1 : 0, ecosystems, queuedAt: null });
   if (incomplete) return "failed";
   return newUrgent > 0 ? "new-urgent" : "ok";
 }
@@ -453,28 +520,96 @@ async function monitorOne(f: FollowRecord, options: HandlerOptions, store: Repor
 export async function handleMonitorRequest(options: HandlerOptions & MonitorOptions, authorization: string | null | undefined, cronSecret: string | undefined): Promise<HttpResponse> {
   if (!cronSecret || bearerToken(authorization) !== cronSecret) return fail("unauthorized", "Cron secret missing or wrong.");
   const store = options.store;
-  const empty: MonitorResponse = { ok: true, checked: 0, remaining: 0, withNewUrgent: 0, failed: 0, paused: 0 };
-  if (!store) return { status: 200, body: empty };
+  if (!store) return { status: 200, body: { ...EMPTY_MONITOR } };
+  try {
+    return { status: 200, body: await runMonitor(await withFeed(options), store) };
+  } catch (e) {
+    return storeFailure(e);
+  }
+}
+
+const EMPTY_MONITOR: MonitorResponse = { ok: true, checked: 0, remaining: 0, withNewUrgent: 0, failed: 0, paused: 0 };
+
+/** Rescans the due follows (queued first) until the time budget runs low. */
+async function runMonitor(options: HandlerOptions & MonitorOptions, store: ReportStore): Promise<MonitorResponse> {
   const clock = options.clock ?? (() => Date.now());
   const now = options.now ?? (() => new Date());
   const deadline = clock() + (options.budgetMs ?? 240_000);
   const reserve = options.reserveMs ?? 60_000;
   const before = new Date(now().getTime() - (options.minIntervalMs ?? 20 * 3_600_000)).toISOString();
-  const out = { ...empty };
-  try {
-    const due = await store.dueFollows(before, 200);
-    for (const f of due) {
-      if (deadline - clock() < reserve) {
-        out.remaining = due.length - out.checked;
-        break;
-      }
-      const result = await monitorOne(f, options, store, now().toISOString());
-      out.checked += 1;
-      if (result === "new-urgent") out.withNewUrgent += 1;
-      if (result === "failed") out.failed += 1;
-      if (result === "paused") out.paused += 1;
+  const out = { ...EMPTY_MONITOR };
+  const due = await store.dueFollows(before, 200);
+  for (const f of due) {
+    if (deadline - clock() < reserve) {
+      out.remaining = due.length - out.checked;
+      break;
     }
-    return { status: 200, body: out };
+    const result = await monitorOne(f, options, store, now().toISOString());
+    out.checked += 1;
+    if (result === "new-urgent") out.withNewUrgent += 1;
+    if (result === "failed") out.failed += 1;
+    if (result === "paused") out.paused += 1;
+  }
+  return out;
+}
+
+const feedSchema = z.object({
+  publishedAt: z.iso.datetime(),
+  digest: z.string().regex(/^[0-9a-f]{16}$/),
+  // Under the 4.5 MB request limit of Vercel functions; today's set is a few KB.
+  payload: z.string().max(4_000_000),
+  signature: z.string().max(128),
+});
+
+export interface FeedPublishedResponse {
+  ok: true;
+  digest: string;
+  /** False when the set equals the latest published one (a re-run of the workflow): nothing was stored or queued. */
+  changed: boolean;
+  /** Ecosystems with new or changed advisories, and how many followed repositories they put in front of the queue. */
+  ecosystems: string[];
+  queued: number;
+  /** The rescans this call ran right away, queued repositories first, within the same time budget as the cron. */
+  monitor: MonitorResponse;
+}
+
+/**
+ * POST /api/feed/published, called by the feed workflow after approved
+ * records reach main (docs/SPRINT_6.md 3.5). The signature is the
+ * authentication: only the workflow and the service know the key. The set
+ * must be freshly signed and newer than the latest one, its records must all
+ * validate and its digest must match. The service stores it (the database
+ * key never leaves the service), queues the followed repositories of the
+ * ecosystems that changed, and rescans them right away within the time budget;
+ * the daily cron picks up whatever is left.
+ */
+export async function handleFeedPublishedRequest(body: unknown, options: HandlerOptions & MonitorOptions): Promise<HttpResponse> {
+  const key = options.feedKey;
+  if (!key) return fail("unauthorized", "Publishing the feed is not configured on this server.");
+  const parsed = feedSchema.safeParse(body);
+  if (!parsed.success) return fail("bad-request", "Send a JSON body with publishedAt, digest, payload and signature.");
+  const feed = parsed.data;
+  if (!verifyFeed(key, feed)) return fail("unauthorized", "Signature missing or wrong.");
+  const now = options.now ?? (() => new Date());
+  const publishedAt = Date.parse(feed.publishedAt);
+  if (Math.abs(now().getTime() - publishedAt) > FEED_MAX_SKEW_MS) return fail("unauthorized", "The signed set is too old or dated in the future; sign it again.");
+  const set = advisorySetFromText(feed.payload, `published ${feed.publishedAt}`, "published set");
+  if (set.problems.length > 0) return fail("bad-request", `The set has invalid records: ${set.problems.slice(0, 3).join("; ")}`);
+  if (set.digest !== feed.digest) return fail("bad-request", "The digest does not match the payload.");
+  const store = options.store;
+  if (!store) return fail("not-found", "Publishing the feed needs the report store.");
+  try {
+    const latest = await store.latestFeed();
+    if (latest && Date.parse(latest.publishedAt) >= publishedAt) return fail("bad-request", "A set published at the same time or later is already stored.");
+    const previous = latest && verifyFeed(key, latest) ? advisorySetFromText(latest.payload, "previous") : null;
+    if (previous?.digest === set.digest) return { status: 200, body: { ok: true, digest: set.digest, changed: false, ecosystems: [], queued: 0, monitor: { ...EMPTY_MONITOR } } };
+    await store.saveFeed(feed);
+    liveFeed.delete(store);
+    // The first published set has nothing to compare with: every ecosystem in it counts as changed.
+    const ecosystems = changedEcosystems(previous?.advisories ?? null, set.advisories);
+    const queued = ecosystems.length > 0 ? await store.queueFollows(ecosystems, now().toISOString()) : 0;
+    const monitor = await runMonitor({ ...options, scan: { ...options.scan, advisories: set } }, store);
+    return { status: 200, body: { ok: true, digest: set.digest, changed: true, ecosystems, queued, monitor } };
   } catch (e) {
     return storeFailure(e);
   }
