@@ -3,7 +3,7 @@ import { createServer, type IncomingMessage, type ServerResponse } from "node:ht
 import { dirname, extname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { authConfigFromEnv, handlerOptionsFromEnv } from "./env.js";
+import { authConfigFromEnv, exampleRepoFromEnv, handlerOptionsFromEnv } from "./env.js";
 import { handleCleanupRequest, handleEventRequest, handleReportRequest, handleScanRequest } from "./handler.js";
 
 /**
@@ -30,6 +30,7 @@ const MAX_BODY = 4096;
 
 const options = handlerOptionsFromEnv({ env: process.env });
 const authConfig = authConfigFromEnv(process.env);
+const exampleRepo = exampleRepoFromEnv(process.env);
 
 const TYPES: Record<string, string> = {
   ".html": "text/html; charset=utf-8",
@@ -94,7 +95,7 @@ const server = createServer((req, res) => {
   const authorization = req.headers.authorization ?? null;
 
   if (url.pathname === "/api/config") {
-    json(res, 200, { ok: true, auth: authConfig });
+    json(res, 200, { ok: true, auth: authConfig, exampleRepo });
     return;
   }
   if (url.pathname === "/api/scan") {

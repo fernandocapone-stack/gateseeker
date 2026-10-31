@@ -4,8 +4,9 @@ import { expect, test, type Page } from "@playwright/test";
 /**
  * Browser tests for the public page, against the stub GitHub/OSV started by
  * e2e/start-web.mjs with the stub sign-in (GATESEEKER_AUTH_STUB=1) and a
- * quota of 3 analyses per hour. The Home is marketing only; the live scanner
- * lives in the demo workspace (/app) behind sign-in. Covers: the sign-in
+ * quota of 3 analyses per hour. The Home is marketing only; the analyze view
+ * (/app, full screen) lives behind sign-in and opens the saved report at
+ * /r/<id> when an analysis finishes. Covers: the sign-in
  * round trip, a valid URL producing a report with the fixture's findings and
  * a saved /r/<id> link, the per-commit reuse, an invalid URL, a
  * missing/private repository, a repository over the size limit, the "use in
@@ -33,7 +34,6 @@ test.describe("public page", () => {
     await expect(page.getByLabel("Repository URL")).toHaveCount(0);
     await signIn(page);
     // Signed in, the public site is gone: its pages forward to the Dashboard.
-    await page.getByRole("link", { name: "GateSeeker workspace" }).waitFor();
     for (const path of ["/", "/about", "/get-started"]) {
       await page.goto(path);
       await expect(page).toHaveURL(/\/app\/dashboard$/);
@@ -57,26 +57,29 @@ test.describe("public page", () => {
     await signIn(page);
     await analyze(page, "https://github.com/acme/vibe");
     await expect(page.getByRole("status")).toContainText("Analyzing");
+    // A finished analysis opens its saved report.
+    await expect(page).toHaveURL(/\/r\/mem-/, { timeout: 30_000 });
     const report = page.getByRole("region", { name: "Report" });
     await expect(report).toBeVisible({ timeout: 30_000 });
     await expect(report).toContainText("acme/vibe@0123456");
-    // The fixture carries hardcoded credentials and a committed .env: pattern findings in warn mode, so the verdict is PASS.
+    // Hardcoded credentials in the fixture: the headline says what to fix; the gate line explains why CI would still pass.
+    await expect(page.getByTestId("headline")).toContainText("to fix now");
+    await expect(page.getByTestId("headline")).not.toContainText("PASS");
+    await expect(page.getByTestId("gate-line")).toContainText("warning mode");
     await expect(report).toContainText("GSK-SECRET-001");
     await expect(report).toContainText("code pattern");
     // Snippets are redacted before they reach the page.
     await expect(report).not.toContainText("sk_live_HoHDwEcLksdRWvioeGponKHY");
     await expect(report.getByText("Limitations")).toBeVisible();
 
-    const note = page.getByTestId("saved-note");
-    await expect(note).toContainText("1 of 3 analyses used this hour");
-    const href = await note.getByRole("link").getAttribute("href");
-    expect(href).toMatch(/^\/r\/mem-/);
-
-    // The saved report opens by its id, for this account.
-    await page.goto(href ?? "/r/none");
-    await expect(page.getByRole("region", { name: "Report" })).toBeVisible();
-    await expect(page.getByText("Saved report")).toBeVisible();
+    await expect(page.getByTestId("saved-note")).toContainText("1 of 3 analyses used this hour");
+    await expect(page.getByText(/in your Scans until/)).toBeVisible();
     await expect(page.locator("#ci")).toContainText("Add this workflow to acme/vibe");
+
+    // The saved report opens again by its id; the note was for the first visit only.
+    await page.reload();
+    await expect(page.getByRole("region", { name: "Report" })).toBeVisible();
+    await expect(page.getByTestId("saved-note")).toHaveCount(0);
 
     // Same commit again: served from the cache, quota untouched.
     await page.goto("/app");
@@ -108,7 +111,7 @@ test.describe("public page", () => {
     const report = page.getByRole("region", { name: "Report" });
     await expect(report).toBeVisible({ timeout: 30_000 });
     await expect(page.getByRole("button", { name: "Print" })).toBeVisible();
-    const details = page.locator("tr[id^=finding-]");
+    const details = page.locator("[id^=finding-]");
     const total = await details.count();
     expect(total).toBeGreaterThan(0);
     // Collapsed on screen, and a filter with no match must not shorten the export.
@@ -125,14 +128,23 @@ test.describe("public page", () => {
 
   test("records analyses as notifications and on the Dashboard, and honours the settings", async ({ page }) => {
     await signIn(page);
+    // The analyze view is full screen; the bell lives in the workspace header.
+    await page.goto("/app/dashboard");
     const bell = page.getByRole("button", { name: /^Notifications/ });
     await expect(bell).toHaveAccessibleName("Notifications");
+    await page.getByRole("banner").getByRole("link", { name: "Analyze a repository" }).click();
     await analyze(page, "https://github.com/acme/vibe");
     await expect(page.getByRole("region", { name: "Report" })).toBeVisible({ timeout: 30_000 });
+    // The header's Analyze button opens the analyze view again.
+    await page.getByRole("banner").getByRole("link", { name: "Analyze a repository" }).click();
     await analyze(page, "https://github.com/acme/private");
     await expect(page.getByRole("alert")).toBeVisible();
     // Typing errors are not worth a notification.
     await analyze(page, "https://gitlab.com/acme/vibe");
+    await expect(page.getByRole("alert")).toContainText("invalid-url");
+    // Esc leaves the analyze view for the page it was opened from.
+    await page.keyboard.press("Escape");
+    await expect(page).toHaveURL(/\/r\/mem-/);
     await expect(bell).toHaveAccessibleName("Notifications, 2 unread");
 
     await bell.click();
@@ -169,9 +181,10 @@ test.describe("public page", () => {
     await page.getByRole("menuitem", { name: "Settings" }).click();
     await expect(page.getByRole("heading", { level: 1 })).toHaveText("Account and preferences");
     await page.getByRole("switch", { name: /Notify me when an analysis ends/ }).uncheck({ force: true });
-    await page.getByRole("navigation", { name: "Workspace", exact: true }).getByRole("link", { name: "Analyze repository" }).click();
+    await page.getByRole("banner").getByRole("link", { name: "Analyze a repository" }).click();
     await analyze(page, "https://github.com/acme/private");
     await expect(page.getByRole("alert")).toBeVisible();
+    await page.keyboard.press("Escape");
     await expect(bell).toHaveAccessibleName("Notifications");
     await bell.click();
     await expect(panel.getByRole("listitem")).toHaveCount(2);
@@ -239,9 +252,9 @@ test.describe("public page", () => {
     await signIn(page);
     await analyze(page, "https://github.com/acme/vibe");
     await expect(page.getByRole("region", { name: "Report" })).toBeVisible({ timeout: 30_000 });
-    const row = page.getByRole("row").filter({ hasText: "GSK-CORS-001" }).first();
-    await row.getByRole("button", { name: "View issue" }).click();
-    const detail = page.locator("tr[id^=finding-]").filter({ visible: true }).first();
+    const row = page.getByRole("list", { name: "Findings" }).getByRole("listitem").filter({ hasText: "GSK-CORS-001" }).first();
+    await row.getByRole("button", { name: "How to fix" }).click();
+    const detail = page.locator("[id^=finding-]").filter({ visible: true }).first();
     await expect(detail.getByText("What could happen")).toBeVisible();
     await expect(detail.getByText("How to fix it")).toBeVisible();
     const prompt = detail.getByTestId("ai-prompt");
@@ -260,6 +273,35 @@ test.describe("public page", () => {
     const comment = detail.getByTestId("suppression-comment");
     await expect(comment).toHaveText(/^(\/\/ |\/\* )gateseeker-ignore GSK-CORS-001 public read-only API, no cookies {2}evil/);
     await expect(detail.getByText(/Paste this on the line above line \d+ of/)).toBeVisible();
+  });
+
+  test("opens the analyze view from the header or with /, offers shortcuts, and groups repeated findings", async ({ page }) => {
+    await signIn(page);
+    const shortcuts = page.getByLabel("Shortcuts");
+    await expect(shortcuts.getByRole("button", { name: "Try an example" })).toBeVisible();
+    await shortcuts.getByRole("button", { name: "Try an example" }).click();
+    await expect(page).toHaveURL(/\/r\/mem-/, { timeout: 30_000 });
+    // Hardcoded credentials in several places: one group, marked as the place to start.
+    const findings = page.getByRole("list", { name: "Findings" });
+    const group = findings.getByRole("listitem").filter({ hasText: /\d+ places/ }).first();
+    await expect(group).toContainText("Start here");
+    await group.getByRole("button", { name: /Show \d+ places/ }).click();
+    await expect(group.getByRole("button", { name: "How to fix" }).first()).toBeVisible();
+    // "/" opens the analyze view; the last repository is a shortcut now; Back returns to the report.
+    await page.keyboard.press("/");
+    await expect(page).toHaveURL(/\/app$/);
+    await expect(page.getByLabel("Shortcuts").getByRole("button", { name: "acme/vibe" })).toBeVisible();
+    await page.getByRole("button", { name: "Back" }).click();
+    await expect(page).toHaveURL(/\/r\/mem-/);
+  });
+
+  test("reads as cards on a phone, without horizontal scrolling", async ({ page }) => {
+    await page.setViewportSize({ width: 375, height: 812 });
+    await signIn(page);
+    await analyze(page, "https://github.com/acme/vibe");
+    await expect(page.getByRole("region", { name: "Report" })).toBeVisible({ timeout: 30_000 });
+    const overflow = await page.evaluate("document.documentElement.scrollWidth - document.documentElement.clientWidth");
+    expect(overflow).toBeLessThanOrEqual(0);
   });
 
   test("offers the GitHub Action workflow with the analyzed repository named", async ({ page }) => {

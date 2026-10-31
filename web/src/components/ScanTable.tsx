@@ -6,7 +6,7 @@ import { Link } from "../router";
 
 /**
  * Table of analyses from the local history: repository with commit and time,
- * verdict, findings per priority and a link to the saved scan. Used by the
+ * status (what to do), findings per priority and a link to the saved scan. Used by the
  * Dashboard (latest per repository) and the Scans list (every analysis).
  */
 
@@ -16,10 +16,12 @@ function reportOpen(r: AnalysisRecord, now: number): boolean {
   return r.reportId !== null && now - Date.parse(r.at) < REPORT_DAYS * 24 * 60 * 60 * 1000;
 }
 
-function VerdictBadge({ verdict }: { verdict: AnalysisRecord["verdict"] }) {
-  if (verdict === "fail") return <Badge variant="critical">fail</Badge>;
-  if (verdict === "incomplete") return <Badge variant="high">incomplete</Badge>;
-  return <Badge variant="kind">pass</Badge>;
+/* What to do, not the CI verdict: a green "pass" next to urgent code findings misleads (UX review, 2026-10-31). */
+function StatusBadge({ r }: { r: AnalysisRecord }) {
+  if (r.byPriority.P1 > 0) return <Badge variant="critical">fix now</Badge>;
+  if (r.byPriority.P2 > 0) return <Badge variant="high">before release</Badge>;
+  if (r.verdict === "incomplete") return <Badge variant="moderate">incomplete</Badge>;
+  return <Badge variant="kind">clear</Badge>;
 }
 
 export function ScanTable({ rows, label }: { rows: AnalysisRecord[]; label: string }) {
@@ -29,7 +31,7 @@ export function ScanTable({ rows, label }: { rows: AnalysisRecord[]; label: stri
       <thead>
         <tr>
           <Th>Repository</Th>
-          <Th className="w-28">Verdict</Th>
+          <Th className="w-32">Status</Th>
           <Th className="w-56">Findings</Th>
           <Th className="w-[130px]">Action</Th>
         </tr>
@@ -45,7 +47,7 @@ export function ScanTable({ rows, label }: { rows: AnalysisRecord[]; label: stri
                 </span>
               </div>
             </Td>
-            <Td><VerdictBadge verdict={r.verdict} /></Td>
+            <Td><StatusBadge r={r} /></Td>
             <Td>
               <span className="flex flex-wrap gap-x-3 text-body tabular-nums">
                 {(["P1", "P2", "P3", "P4"] as const).map((p) => (
