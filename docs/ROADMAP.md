@@ -66,6 +66,8 @@ Most findings report a configuration, not a vulnerability. The wording says what
 
 ### Sprint 6 — The product watches for you
 This is the direct answer to "threats appear daily".
+Detailed scope in `docs/SPRINT_6.md` (proposal, 2026-10-31). Checked facts that changed the plan: Vercel Hobby runs cron at most once a day, so rescans are daily (better than the weekly first planned); Resend's free plan (3,000 emails a month, 100 a day) fits the 30-repository target, Postmark's (100 a month) does not.
+
 - **U3:** server-side history: "my repositories" and "my reports" in Supabase (RLS, no policies, service_role only, as today). `localStorage` becomes a cache.
 - **U4, compare:** each rescan of a repo shows *new / fixed / still open* against the previous one, reusing the CLI baseline logic.
 - **Continuous monitoring:** the user follows a repo. The service rescans it (a) when a new advisory is approved in the feed, and (b) weekly, because OSV changes. When something **new** appears, they get one email: "A new issue affects `owner/repo`: …, fix today." Only new findings trigger an email, never the full list again.
