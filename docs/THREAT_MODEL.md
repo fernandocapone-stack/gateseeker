@@ -51,6 +51,7 @@ Gateseeker processes attacker-controlled input (any project's files and lockfile
 | Multi-gigabyte file exhausts memory | Byte-length check before `JSON.parse`; default 5 MB, configurable. | `parser.test.ts` size tests; `cli.test.ts` oversize → exit 3 |
 | Hundreds of thousands of packages exhaust time or OSV quota | Package-count limit, default 5000. | `parser.test.ts` "rejects lockfiles with more packages than allowed" |
 | Malformed JSON or unexpected structure crashes the process | `JSON.parse` wrapped; Zod `looseObject` schemas; typed rejection, exit 3. | `parser.test.ts` rejection tests |
+| Crafted YAML in pnpm-lock.yaml or a Berry yarn.lock (prototype keys, deep nesting, huge documents, pathological quoting) | Own YAML-subset reader, no dependency: linear line-by-line pass, no anchors/aliases/tags/evaluation, maps created without a prototype, `__proto__`/`constructor`/`prototype` keys refused, duplicate keys refused, depth (32) and entry (500,000) caps, byte limit before parsing; the result is validated with Zod. Yarn 1's own format is read by a separate line reader with the same refusals. | `js-lock.test.ts` "refuses prototype keys, duplicates, tabs and bad indentation", "splits documents and caps depth", "stays fast on adversarial input" |
 | Ambiguous versions used to fake a clean result | Missing/non-semver/non-registry versions are `not-queried`, which forces `incomplete`, never `pass`. | `scan.test.ts` "marks dependencies with unusable versions as not-queried" |
 
 ### 4. OSV communication

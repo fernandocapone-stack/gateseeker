@@ -1,0 +1,95 @@
+---
+lockfileVersion: '9.0'
+
+importers:
+
+  .:
+    configDependencies: {}
+    packageManagerDependencies:
+      pnpm:
+        specifier: 12.15.0
+        version: 12.15.0
+
+packages:
+
+  pnpm@12.15.0:
+    resolution: {integrity: sha512-fixture}
+    engines: {node: '>=18.12'}
+    hasBin: true
+
+snapshots:
+
+  pnpm@12.15.0: {}
+
+---
+lockfileVersion: '9.0'
+
+settings:
+  autoInstallPeers: true
+  excludeLinksFromLockfile: false
+
+importers:
+
+  .:
+    dependencies:
+      debug:
+        specifier: 4.3.4
+        version: 4.3.4
+      lodash:
+        specifier: ^4.17.20
+        version: 4.17.20
+      tiny-git-dep:
+        specifier: github:example/tiny-git-dep#abc1234
+        version: https://codeload.github.com/example/tiny-git-dep/tar.gz/abc1234
+    devDependencies:
+      fake-test-runner:
+        specifier: 1.0.0
+        version: 1.0.0
+      local-tool:
+        specifier: link:./tools/local
+        version: link:tools/local
+
+packages:
+
+  debug@4.3.4:
+    resolution: {integrity: sha512-fixture}
+    engines: {node: '>=6.0'}
+    peerDependencies:
+      supports-color: '*'
+    peerDependenciesMeta:
+      supports-color:
+        optional: true
+
+  fake-test-runner@1.0.0:
+    resolution: {integrity: sha512-fixture}
+
+  lodash@4.17.20:
+    resolution: {integrity: sha512-fixture}
+
+  ms@2.0.0:
+    resolution: {integrity: sha512-fixture}
+
+  ms@2.1.2:
+    resolution: {integrity: sha512-fixture}
+
+  tiny-git-dep@https://codeload.github.com/example/tiny-git-dep/tar.gz/abc1234:
+    resolution: {tarball: https://codeload.github.com/example/tiny-git-dep/tar.gz/abc1234}
+    version: 1.0.0
+
+snapshots:
+
+  debug@4.3.4:
+    dependencies:
+      ms: 2.1.2
+
+  fake-test-runner@1.0.0:
+    dependencies:
+      ms: 2.0.0
+
+  lodash@4.17.20: {}
+
+  ms@2.0.0: {}
+
+  ms@2.1.2: {}
+
+  tiny-git-dep@https://codeload.github.com/example/tiny-git-dep/tar.gz/abc1234: {}

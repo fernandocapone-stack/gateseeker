@@ -28,6 +28,8 @@ export const DEFAULT_PARSER_LIMITS: ParserLimits = {
 export type ParseErrorCode =
   | "too-large"
   | "malformed-json"
+  | "malformed-yaml"
+  | "malformed-lockfile"
   | "invalid-schema"
   | "unsupported-lockfile-version"
   | "too-many-dependencies";
@@ -153,7 +155,7 @@ function isTopLevel(path: string): boolean {
   );
 }
 
-function isNonRegistrySource(resolved: string | undefined): boolean {
+export function isNonRegistrySource(resolved: string | undefined): boolean {
   if (resolved === undefined) return false;
   if (resolved.startsWith("https://registry.")) return false;
   return /^(git\+|git:|github:|file:|link:|http:\/\/|https:\/\/.*\.(tgz|tar\.gz)$)/.test(resolved);

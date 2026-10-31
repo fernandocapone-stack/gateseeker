@@ -23,11 +23,11 @@ export const EXIT = { pass: 0, fail: 1, incomplete: 2, usage: 3 } as const;
 
 const USAGE = `gateseeker ${GATESEEKER_VERSION}
 
-Usage: gateseeker scan <project-dir | package-lock.json | composer.lock> [options]
+Usage: gateseeker scan <project-dir | lockfile> [options]
 
-  A directory runs the code-pattern rules and, for every package-lock.json or
-  composer.lock at its root, the dependency analysis. A lockfile path runs
-  dependencies only.
+  A directory runs the code-pattern rules and the dependency analysis for the
+  lockfiles at its root: one of package-lock.json, pnpm-lock.yaml or yarn.lock
+  (in that order), and composer.lock. A lockfile path runs dependencies only.
 
 Options:
   --format <text|json|sarif|summary>
@@ -125,7 +125,7 @@ export async function main(argv: string[], io: Io): Promise<number> {
 
   const [command, target] = positionals;
   if (command !== "scan" || target === undefined || positionals.length !== 2) {
-    io.stderr(`Expected: gateseeker scan <project-dir | package-lock.json>\n\n${USAGE}`);
+    io.stderr(`Expected: gateseeker scan <project-dir | lockfile>\n\n${USAGE}`);
     return EXIT.usage;
   }
 
@@ -201,9 +201,12 @@ export async function main(argv: string[], io: Io): Promise<number> {
       if (only !== undefined) throw new UsageError("--only applies to directory scans; a lockfile path always runs the dependency analysis only.");
       const content = await readFile(targetPath, "utf8");
       let manifestContent: string | null = null;
-      if (targetPath.toLowerCase().endsWith("composer.lock")) {
+      const lower = targetPath.toLowerCase();
+      // Composer and Yarn need the manifest next to the lockfile (direct and dev dependencies); pnpm only takes the project name from it.
+      const manifestName = lower.endsWith("composer.lock") ? "composer.json" : lower.endsWith("yarn.lock") || lower.endsWith("pnpm-lock.yaml") ? "package.json" : null;
+      if (manifestName !== null) {
         try {
-          manifestContent = await readFile(resolve(targetPath, "..", "composer.json"), "utf8");
+          manifestContent = await readFile(resolve(targetPath, "..", manifestName), "utf8");
         } catch {
           manifestContent = null;
         }

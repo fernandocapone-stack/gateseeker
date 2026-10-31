@@ -90,7 +90,7 @@ export async function runAction(io: ActionIo): Promise<number> {
   let baselineNote = "no baseline (not a pull request, or baseline-ref empty)";
   if (baselineRef) {
     const gitShow = io.gitShow ?? defaultGitShow;
-    for (const kind of ["package-lock.json", "composer.lock"]) {
+    for (const kind of ["package-lock.json", "pnpm-lock.yaml", "yarn.lock", "composer.lock"]) {
       const relPath = join(input(env, "path") ?? ".", kind).split("\\").join("/").replace(/^\.\//, "");
       const content = await gitShow(baselineRef, relPath, workspace);
       if (content !== null && lockfileKind(kind, content) !== null) {

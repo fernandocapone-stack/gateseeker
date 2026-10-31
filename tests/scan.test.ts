@@ -178,7 +178,7 @@ describe("decideVerdict", () => {
 
 describe("unsupported lockfiles (docs/SPRINT_5.md 3.4)", () => {
   const none: Record<QueryState, number> = { vulnerable: 0, "no-known-vulnerabilities": 0, "query-failed": 0, "not-queried": 0 };
-  const ran = { deps: false, patterns: true, patternsMode: "warn" as const, unsupported: ["pnpm-lock.yaml"] };
+  const ran = { deps: false, patterns: true, patternsMode: "warn" as const, unsupported: ["bun.lock"] };
   const dirs: string[] = [];
   function project(files: Record<string, string>): string {
     const d = mkdtempSync(join(tmpdir(), "gsk-unsupported-"));
@@ -192,18 +192,19 @@ describe("unsupported lockfiles (docs/SPRINT_5.md 3.4)", () => {
   const emptyLock = JSON.stringify({ name: "x", lockfileVersion: 3, packages: { "": { name: "x" } } });
 
   it("is incomplete, never pass, when only an unsupported lockfile exists; a gated finding still fails", () => {
-    expect(decideVerdict([], none, "P2", ran)).toMatchObject({ verdict: "incomplete", reason: expect.stringContaining("pnpm-lock.yaml is not supported yet") as string });
+    expect(decideVerdict([], none, "P2", ran)).toMatchObject({ verdict: "incomplete", reason: expect.stringContaining("bun.lock is not supported yet") as string });
     expect(decideVerdict([{ priority: "P1" } as Finding], none, "P2", ran).verdict).toBe("fail");
   });
 
   it("marks the dependencies as not supported in a directory scan", async () => {
-    const r = await scanDirectory({ root: project({ "pnpm-lock.yaml": "lockfileVersion: '9.0'\n", "index.js": "console.log(1);\n" }), now: fixedNow });
+    // pnpm and Yarn are read since Sprint 5 step 5; Bun's lockfile is the one still unsupported.
+    const r = await scanDirectory({ root: project({ "bun.lock": "{}\n", "index.js": "console.log(1);\n" }), now: fixedNow });
     expect(r.ok).toBe(true);
     if (!r.ok) return;
     expect(r.report.analyses.dependencies).toBe("not-supported");
-    expect(r.report.project.unsupportedLockfiles).toEqual(["pnpm-lock.yaml"]);
+    expect(r.report.project.unsupportedLockfiles).toEqual(["bun.lock"]);
     expect(r.report.gate.verdict).toBe("incomplete");
-    expect(r.report.limitations.join(" ")).toContain("npm dependencies were not analyzed: pnpm-lock.yaml is not supported yet");
+    expect(r.report.limitations.join(" ")).toContain("npm dependencies were not analyzed: bun.lock is not supported yet");
   });
 
   it("analyzes package-lock.json when it sits next to yarn.lock, and says the other file was not read", async () => {

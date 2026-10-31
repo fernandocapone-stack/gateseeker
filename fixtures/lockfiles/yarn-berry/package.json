@@ -1,0 +1,14 @@
+{
+  "name": "fixture-yarn-berry",
+  "version": "1.0.0",
+  "packageManager": "yarn@4.5.0",
+  "dependencies": {
+    "debug": "4.3.4",
+    "lodash": "^4.17.20",
+    "tiny-git-dep": "https://github.com/example/tiny-git-dep.git#commit=abc1234"
+  },
+  "devDependencies": {
+    "fake-test-runner": "1.0.0",
+    "typescript": "5.4.5"
+  }
+}

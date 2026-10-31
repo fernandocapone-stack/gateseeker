@@ -115,7 +115,7 @@ export function renderText(report: Report): string {
     );
   } else {
     const unread = report.project.unsupportedLockfiles ?? [];
-    out.push(line("dependencies", report.analyses.dependencies === "not-supported" ? `not analyzed: ${unread.map((n) => sanitize(n, 40)).join(", ")} not supported yet` : "not analyzed (no package-lock.json at root, or --only patterns)"));
+    out.push(line("dependencies", report.analyses.dependencies === "not-supported" ? `not analyzed: ${unread.map((n) => sanitize(n, 40)).join(", ")} not supported yet` : "not analyzed (no supported lockfile at root, or --only patterns)"));
   }
   if (report.patterns) {
     const p = report.patterns;
