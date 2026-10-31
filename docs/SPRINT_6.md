@@ -65,7 +65,7 @@ Entregas:
 
 ### 3.6. E-mail
 
-- Provedor recomendado: **Resend** (plano gratuito: 3.000 e-mails por mês, no máximo 100 por dia, na data desta proposta). O Postmark gratuito fica em 100 por mês, pouco para a meta de 30 repositórios. Decisão no §8.1.
+- Provedor: **Brevo**, onde o PO já tem conta (2026-10-31). O plano gratuito permite 300 e-mails por dia (cerca de 9.000 por mês) com envio transacional por API, mais folga diária que o Resend (100 por dia); em troca, os e-mails do plano gratuito levam a marca do Brevo, e o primeiro plano pago custa cerca de US$ 9 por mês. Valores de sites de comparação, a conferir na conta. O envio fica atrás de uma interface pequena no serviço, para trocar de provedor sem mexer no resto.
 - Remetente num domínio do produto, com SPF, DKIM e DMARC configurados (depende do domínio, §8.2).
 - O endereço vem da conta GitHub da pessoa no Supabase Auth. O Gateseeker não copia o e-mail para tabela própria; busca no momento do envio.
 - Tipos de e-mail: confirmação ao seguir (com descadastro), alerta de achado novo P1/P2, aviso de acompanhamento parado. Texto simples e uma versão HTML mínima, com todo dado do repositório escapado; nenhum link montado a partir de conteúdo do repositório, só links do próprio Gateseeker.
@@ -113,7 +113,7 @@ Repositórios privados e GitHub App (Sprint 7), alertas por Slack ou webhook, fr
 
 ## 8. Decisões que precisam do PO antes de começar
 
-1. **Serviço de e-mail (decisão 3 do roadmap).** Recomendação: **Resend no plano gratuito** até o lançamento (3.000 e-mails por mês, 100 por dia); o plano pago mais barato custa US$ 20 por mês para 50.000 e-mails, sem limite diário. Alternativa: Postmark (gratuito só 100 por mês; o pago começa em US$ 15 por mês para 10.000). Os valores são dos sites dos provedores e de comparadores em 2026-10-31; conferir na contratação.
+1. **Serviço de e-mail (decisão 3 do roadmap): Brevo**, indicado pelo PO em 2026-10-31 (já tem conta). Falta confirmar: manter o plano gratuito até o lançamento, aceitando a marca do Brevo nos e-mails, e criar a chave de API transacional (vai só para as variáveis do Vercel).
 2. **Domínio para o remetente.** E-mail confiável precisa de um domínio próprio com SPF/DKIM/DMARC. Sem domínio, a sprint entrega tudo menos o envio real (os e-mails ficam registrados no painel de teste). Recomendação: registrar `gateseeker.dev` (ou `.io`) agora; custa cerca de US$ 15 a 40 por ano e também serve para o site.
 3. **Token de leitura do GitHub** para as reanálises (variável `GITHUB_TOKEN`, que o serviço já aceita): um token "fine-grained" sem acesso a nenhum repositório, só para subir o limite da API pública. Recomendação: sim, criado na conta do PO ou da organização `gateseeker-dev`.
 4. **Plano do Vercel.** No gratuito, a reanálise é diária e o horário é aproximado. Recomendação: manter o gratuito nesta sprint (diária é suficiente para a hipótese) e reavaliar no lançamento, quando o Pro (US$ 20 por usuário por mês) já é necessário pelos termos de uso comercial.
