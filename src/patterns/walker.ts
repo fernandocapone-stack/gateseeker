@@ -10,7 +10,7 @@ import type { ProjectFile, ProjectSnapshot, WalkStats } from "./types.js";
  * Safety properties:
  *  - symbolic links are never followed;
  *  - every path is checked to stay under the root;
- *  - fixed exclusions plus the root .gitignore are skipped;
+ *  - fixed exclusions, the root .gitignore and .git/info/exclude are skipped;
  *  - binary files are skipped (by extension, then by a NUL probe);
  *  - limits on file count, file size and depth abort the walk with a typed error.
  */
@@ -80,6 +80,18 @@ function looksBinary(buf: Buffer): boolean {
   return probe.includes(0);
 }
 
+/** `.git/info/exclude` of a checkout, when it is a regular file of reasonable size (never through a link). */
+async function readLocalExclude(root: string): Promise<string | null> {
+  const path = join(root, ".git", "info", "exclude");
+  try {
+    const st = await lstat(path);
+    if (!st.isFile() || st.size > 256 * 1024) return null;
+    return await readFile(path, "utf8");
+  } catch {
+    return null;
+  }
+}
+
 export async function walkProject(rootInput: string, limits: WalkLimits = DEFAULT_WALK_LIMITS): Promise<WalkResult> {
   const root = resolve(rootInput);
   let rootStat;
@@ -99,6 +111,10 @@ export async function walkProject(rootInput: string, limits: WalkLimits = DEFAUL
     gitignoreText = null;
   }
   const isGitignored = makeGitignoreMatcher(gitignoreText);
+  // The checkout's own exclusions (.git/info/exclude: local worktrees, editor folders) are skipped too, but only
+  // .gitignore counts for the rules: an exclusion on this machine does not protect anyone else's clone.
+  const isExcluded = makeGitignoreMatcher(await readLocalExclude(root));
+  const isSkipped = (relPath: string): boolean => isGitignored(relPath) || isExcluded(relPath);
 
   const stats: WalkStats = { filesScanned: 0, filesSkippedIgnored: 0, filesSkippedBinary: 0, filesSkippedLarge: 0, largeFiles: [], bytesScanned: 0, directoriesVisited: 0 };
   const rawFiles: { rel: string; abs: string; size: number }[] = [];
@@ -136,7 +152,7 @@ export async function walkProject(rootInput: string, limits: WalkLimits = DEFAUL
       }
 
       if (entry.isDirectory()) {
-        if (ALWAYS_IGNORED_DIRS.has(entry.name) || isGitignored(`${rel}/`) || isGitignored(rel)) {
+        if (ALWAYS_IGNORED_DIRS.has(entry.name) || isSkipped(`${rel}/`) || isSkipped(rel)) {
           stats.filesSkippedIgnored++;
           continue;
         }
@@ -148,7 +164,7 @@ export async function walkProject(rootInput: string, limits: WalkLimits = DEFAUL
       // .gitignore itself and .env files are kept even when gitignored: the
       // ENV rule needs to see them. Everything else gitignored is skipped.
       const keepAnyway = entry.name === ".gitignore" || entry.name === ".env" || entry.name.startsWith(".env.");
-      if (!keepAnyway && isGitignored(rel)) {
+      if (!keepAnyway && isSkipped(rel)) {
         stats.filesSkippedIgnored++;
         continue;
       }

@@ -113,3 +113,9 @@ node dist/cli.js scan /tmp/gs-validation/<repo> --only patterns --format json --
 ```
 
 Commits listed in the sample table pin the exact trees that were analyzed.
+
+## Re-run on 2026-10-31: mentions are not uses
+
+Change under test: `GSK-SECRET-002` and `GSK-SUPABASE-002` no longer count a variable name that only appears inside a sentence in quotes or inside a regular expression, in JavaScript/TypeScript files (`src/patterns/code-text.ts`). The trigger was Gateseeker's own repository: its rule definitions and its Resources page mention these names and were reported as P1.
+
+The five repositories above were cloned again at the same commits and scanned with `--only patterns`, once with the build of `main` and once with the change. The findings are identical in all five (2, 37, 5, 0 and 2), including the three `GSK-SECRET-002` true positives in projectofinalah. The sample has no mention-only case, so the change is covered by the fixture `fixtures/projects/vibe-next-supabase/components/HelpText.tsx` (three mentions not reported, two reads in a template literal and in JSX still reported). The clones and reports were deleted afterwards.
