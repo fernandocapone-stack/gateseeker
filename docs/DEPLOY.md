@@ -15,6 +15,7 @@ Estado: projeto Vercel `gateseeker` criado em 2026-10-28 (conta pessoal, plano H
 2. Cole o conteúdo de `supabase/migrations/20261028000000_init.sql` (abra o arquivo no GitHub e use o botão de copiar) e clique em Run. Deve terminar sem erro ("Success. No rows returned").
 3. Conferência: menu Table Editor deve mostrar `reports`, `scan_quota` e `waitlist`, cada uma com o cadeado de RLS ligado.
 4. Repita os passos 1 e 2 com `supabase/migrations/20261029000000_events.sql` (contadores do funil de login, 2026-10-29). Conferência: a tabela `events` aparece com o cadeado de RLS. **Até esta migração ser aplicada, a página continua funcionando, mas os contadores não são gravados** (o envio falha em silêncio).
+5. Repita os passos 1 e 2 com `supabase/migrations/20261031000000_scans.sql` (histórico de análises no servidor, Sprint 6). Conferência: a tabela `scans` aparece com o cadeado de RLS. **Até esta migração ser aplicada, as análises continuam funcionando e o Dashboard mostra a cópia do navegador**, com um aviso de que o histórico da conta não pôde ser carregado.
 
 Como ler o funil: Table Editor → `events`. Cada linha é um dia (UTC) e um tipo: `login_view` (página de login aberta por quem não está logado), `login_start` (clique em "Continue with GitHub") e `signin_complete` (voltou do GitHub logado). Abandono no login = 1 − `signin_complete` ÷ `login_view`, somando os dias. A regra da decisão 1 do `docs/ROADMAP.md`: acima de 40% em 2 semanas ou 100 visitas, reabrir análises anônimas com limite.
 

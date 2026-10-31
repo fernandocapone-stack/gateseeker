@@ -204,7 +204,7 @@ function Headline({ response, elapsedMs, printing }: { response: ScanResponseOk;
   );
 }
 
-export function ReportView({ response, elapsedMs }: { response: ScanResponseOk; elapsedMs: number }) {
+export function ReportView({ response, elapsedMs, newIds }: { response: ScanResponseOk; elapsedMs: number; newIds?: Set<string> }) {
   const { report } = response;
   const printing = usePrinting();
   const [filter, setFilter] = useState<Filter>("all");
@@ -264,7 +264,7 @@ export function ReportView({ response, elapsedMs }: { response: ScanResponseOk; 
         <h2 className="sr-only">Issues</h2>
         <ul aria-label="Findings" className="overflow-hidden rounded-lg border bg-sidebar">
           {groups.length > 0 ? (
-            groups.map((g) => <IssueGroup key={g.key} group={g} printing={printing} startHere={g.key === startKey} />)
+            groups.map((g) => <IssueGroup key={g.key} group={g} printing={printing} startHere={g.key === startKey} newIds={newIds} />)
           ) : (
             <li className="px-3 py-4 text-body text-muted-foreground">
               {report.findings.length === 0 ? "No known vulnerabilities or insecure patterns were found in the sources consulted." : "No findings with this priority."}
@@ -298,10 +298,11 @@ export function ReportView({ response, elapsedMs }: { response: ScanResponseOk; 
   );
 }
 
-function Labels({ f, startHere }: { f: Finding; startHere: boolean }) {
+function Labels({ f, startHere, isNew }: { f: Finding; startHere: boolean; isNew: boolean }) {
   return (
     <div className="flex flex-wrap items-center gap-2">
       {startHere && <Badge variant="kind" className="border-primary/50 text-primary">Start here</Badge>}
+      {isNew && <Badge variant="critical">New</Badge>}
       <Badge variant={severityVariant(f.severity.tier)}>{f.severity.tier}</Badge>
       <Badge variant="kind">{kindLabel(f)}</Badge>
     </div>
@@ -317,18 +318,18 @@ function PriorityCell({ f }: { f: Finding }) {
   );
 }
 
-function IssueGroup({ group, printing, startHere }: { group: Group; printing: boolean; startHere: boolean }) {
+function IssueGroup({ group, printing, startHere, newIds }: { group: Group; printing: boolean; startHere: boolean; newIds?: Set<string> }) {
   const [open, setOpen] = useState(false);
   const first = group.findings[0];
   if (!first) return null;
-  if (group.findings.length === 1) return <IssueRow finding={first} printing={printing} startHere={startHere} />;
+  if (group.findings.length === 1) return <IssueRow finding={first} printing={printing} startHere={startHere} isNew={newIds?.has(first.id) ?? false} />;
   const id = `group-${first.id}`;
   const expanded = open || printing;
   return (
     <li className="border-b last:border-b-0 print:break-inside-avoid">
       <div className="flex flex-col gap-3 px-3 py-4 sm:flex-row sm:items-start sm:gap-4">
         <div className="grid min-w-0 flex-1 gap-2">
-          <Labels f={first} startHere={startHere} />
+          <Labels f={first} startHere={startHere} isNew={group.findings.some((f) => newIds?.has(f.id))} />
           <div className="grid gap-0.5">
             <p className="text-body font-medium break-words">{findingTitle(first)}</p>
             <p className="text-label font-light text-muted-foreground">{oneLiner(first)}</p>
@@ -342,14 +343,14 @@ function IssueGroup({ group, printing, startHere }: { group: Group; printing: bo
       </div>
       <ul id={id} className={cn("border-t bg-background/40", !expanded && "hidden")}>
         {group.findings.map((f) => (
-          <IssueRow key={f.id} finding={f} printing={printing} startHere={false} compact />
+          <IssueRow key={f.id} finding={f} printing={printing} startHere={false} isNew={newIds?.has(f.id) ?? false} compact />
         ))}
       </ul>
     </li>
   );
 }
 
-function IssueRow({ finding: f, printing, startHere, compact = false }: { finding: Finding; printing: boolean; startHere: boolean; compact?: boolean }) {
+function IssueRow({ finding: f, printing, startHere, isNew, compact = false }: { finding: Finding; printing: boolean; startHere: boolean; isNew: boolean; compact?: boolean }) {
   const [open, setOpen] = useState(false);
   const detailId = `finding-${f.id}`;
   const expanded = open || printing;
@@ -358,13 +359,13 @@ function IssueRow({ finding: f, printing, startHere, compact = false }: { findin
       <div className={cn("flex flex-col gap-3 px-3 sm:flex-row sm:items-start sm:gap-4", compact ? "py-3" : "py-4")}>
         <div className="grid min-w-0 flex-1 gap-2">
           {compact ? (
-            <p className="font-mono text-label break-all text-muted-foreground">{f.subject}</p>
+            <p className="flex flex-wrap items-center gap-2 font-mono text-label break-all text-muted-foreground">{f.subject}{isNew && <Badge variant="critical">New</Badge>}</p>
           ) : (
             <>
               <div className="flex flex-wrap items-center gap-2">
                 <span className="font-mono text-label font-light break-all text-muted-foreground">{f.subject}</span>
               </div>
-              <Labels f={f} startHere={startHere} />
+              <Labels f={f} startHere={startHere} isNew={isNew} />
               <div className="grid gap-0.5">
                 <p className="text-body font-medium break-words">{findingTitle(f)}</p>
                 <p className="text-label font-light text-muted-foreground">{oneLiner(f)}</p>

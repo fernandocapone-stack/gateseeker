@@ -5,7 +5,7 @@ import { useEffect } from "react";
 import { useAuth } from "../auth-context";
 import { ScanTable } from "../components/ScanTable";
 import { PageSkeleton } from "../components/Skeletons";
-import { latestPerRepository, useHistory } from "../history";
+import { latestPerRepository, useScanHistory } from "../history";
 import { Link, navigate } from "../router";
 
 /**
@@ -16,7 +16,7 @@ import { Link, navigate } from "../router";
 
 export function Dashboard() {
   const auth = useAuth();
-  const history = useHistory(auth.session?.user.id ?? null);
+  const { records: history, source } = useScanHistory(auth.session?.user.id ?? null, auth.session?.accessToken ?? null);
 
   useEffect(() => {
     if (auth.status === "signed-out") navigate("/login?next=/app/dashboard");
@@ -66,7 +66,7 @@ export function Dashboard() {
         <>
           <h2 className="sr-only">Repositories</h2>
           <ScanTable rows={latest} label="Repositories" />
-          <p className="text-caption text-muted-foreground">Kept in this browser for this account, last 100 analyses. Saved reports open for 30 days.</p>
+          <p className="text-caption text-muted-foreground">{source === "server" ? "Kept on your account for 180 days, on any device. Saved reports open for 30 days." : "Showing this browser's copy (your account history could not be loaded). Saved reports open for 30 days."}</p>
         </>
       )}
     </div>

@@ -5,7 +5,7 @@ import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { useAuth } from "../auth-context";
 import { Progress, Refusal, ScanIcon, useScan } from "../components/Scanner";
 import { PageSkeleton } from "../components/Skeletons";
-import { latestPerRepository, useHistory } from "../history";
+import { latestPerRepository, useScanHistory } from "../history";
 import { navigate } from "../router";
 import { leaveScanNote, workspaceBackPath } from "../scan-note";
 import { ReportView } from "../views/Report";
@@ -69,7 +69,7 @@ function Analyze({ token, userId }: { token: string; userId: string }) {
   const [url, setUrl] = useState("");
   const { phase, start, cancel } = useScan(token);
   const example = useExampleRepo();
-  const recent = latestPerRepository(useHistory(userId)).slice(0, 3);
+  const recent = latestPerRepository(useScanHistory(userId, token).records).slice(0, 3);
   const running = phase.kind === "running";
 
   const leave = () => {
